@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SKYWATCH Radar</title>
+<!--
+  SKYWATCH as an installable PWA. Serve this folder over HTTPS (GitHub
+  Pages works) and install from the browser: Edge/Chrome show an install
+  icon in the address bar on Windows; on iPhone/iPad use Safari's
+  Share -> Add to Home Screen. Live feeds:
+    - Past radar:  IEM NEXRAD N0Q composite tiles, 5-min steps, last 50 min
+    - Forecast:    IEM HRRR simulated reflectivity (REFD), 15-min steps
+    - Satellite:   GOES-East CONUS GeoColor from NOAA STAR
+    - Conditions:  Open-Meteo with automatic NWS fallback
+-->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0A1018">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SKYWATCH">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #0A1018; color: #DCE3EA;
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  header, .footnote { display: none; }
+
+  /* the "screen" fills the real screen */
+  .device { position: fixed; inset: 0; }
+  .screen {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    overflow: hidden; background: #0A1018;
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #lmap { position: absolute; inset: 0; background: #0A1018; }
+  .leaflet-container { background: #0A1018; font-family: inherit; }
+  .leaflet-control-attribution {
+    background: rgba(8,14,22,0.7) !important; color: #6E8496 !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a { color: #8FA5B7 !important; }
+
+  /* ---- on-screen chrome (over the map) ---- */
+  .bar {
+    position: absolute; left: 0; right: 0;
+    display: flex; align-items: center;
+    color: #D7E2EC; z-index: 700; pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .topbar {
+    top: 0; height: 44px; padding: 0 14px; gap: 12px;
+    background: linear-gradient(rgba(6,10,16,0.88), rgba(6,10,16,0.55) 70%, rgba(6,10,16,0));
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.08em; color: #EAF2F8; }
+  .badge {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    padding: 4px 9px; border-radius: 4px; border: 1px solid; white-space: nowrap;
+  }
+  .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
+  .badge.fcst { color: #F5D06A; border-color: #9E7E24; background: rgba(74,58,12,0.55); }
+  .badge.sat  { color: #8FC7F5; border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
+  .topbar .spacer { flex: 1; }
+  .frametime { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #BFD3E2; }
+  .frametime.fcst { color: #F5D06A; }
+  .clockbox {
+    text-align: right; font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; line-height: 1.5; color: #7E93A5;
+  }
+  .clockbox .clock { font-size: 13px; color: #D7E2EC; }
+
+  .botbar {
+    bottom: 0; height: 58px; padding: 0 14px 8px; gap: 10px;
+    background: linear-gradient(rgba(6,10,16,0), rgba(6,10,16,0.6) 30%, rgba(6,10,16,0.9));
+  }
+  .btn {
+    height: 42px; min-width: 42px; border-radius: 8px;
+    border: 1px solid rgba(140,170,195,0.35);
+    background: rgba(16,26,38,0.82); color: #CFE0EE;
+    font-size: 19px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { background: rgba(30,46,64,0.9); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid #53C7F0; outline-offset: 1px; }
+  .btn.small { font-size: 10px; letter-spacing: 0.08em; font-weight: 700; padding: 0 8px; }
+  .btn.on { border-color: #53C7F0; color: #53C7F0; }
+
+  .zoomstack {
+    position: absolute; right: 12px; top: 58px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 700;
+  }
+
+  .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; }
+  /* time-proportional custom scrubber: -50 min history | +165 min forecast,
+     so NOW sits at 50/215 = 23.3% of the track, not the middle */
+  .trackbox {
+    flex: 1; position: relative; height: 28px;
+    display: flex; align-items: center;
+    cursor: pointer; touch-action: none;
+  }
+  .track {
+    position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px;
+    background: linear-gradient(to right,
+      rgba(120,170,200,0.5) 0 23.3%,
+      rgba(245,197,66,0.45) 23.3% 100%);
+  }
+  .thumb {
+    position: absolute; top: 50%; left: 23.3%;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .trackbox:focus-visible { outline: 2px solid #53C7F0; outline-offset: 2px; border-radius: 4px; }
+  .nowmark {
+    position: absolute; left: 23.3%; top: -7px; transform: translateX(-50%);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8.5px; letter-spacing: 0.1em; color: #9FB4C6;
+    pointer-events: none; text-align: center; line-height: 1.1;
+  }
+  .nowmark::after {
+    content: ""; display: block; width: 1px; height: 8px;
+    background: #9FB4C6; margin: 1px auto 0;
+  }
+  .spanlabel {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; letter-spacing: 0.08em; color: #7E93A5; white-space: nowrap;
+  }
+  .spanlabel.fcst { color: #D8B44A; }
+
+  /* prediction mode: yellow outline around the whole screen, PREDICTION tab top-center */
+  #predFrame {
+    position: absolute; inset: 0; z-index: 800;
+    border: 3px solid #F5C542;
+    pointer-events: none; display: none;
+  }
+  .screen.pred #predFrame { display: block; }
+  #predFrame .tab {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    background: #F5C542; color: #221A04;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+    padding: 4px 16px; border-radius: 0 0 7px 7px;
+    white-space: nowrap;
+  }
+  .screen.pred .frametime { visibility: hidden; }  /* the tab carries the valid time */
+
+  .legend { position: absolute; left: 12px; bottom: 66px; z-index: 700; pointer-events: none; }
+  .legend .swatches { display: flex; height: 8px; border-radius: 2px; overflow: hidden; }
+  .legend .swatches i { width: 13px; }
+  .legend .marks {
+    display: flex; justify-content: space-between;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; color: #8FA5B7; margin-top: 3px;
+  }
+  .legend .cap {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; letter-spacing: 0.1em; color: #6E8496; margin-bottom: 4px;
+  }
+
+  .status {
+    position: absolute; left: 12px; top: 54px; z-index: 700;
+    background: rgba(8,14,22,0.8);
+    border: 1px solid rgba(140,170,195,0.25); border-radius: 6px;
+    padding: 6px 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; line-height: 1.6; color: #8FA5B7;
+    pointer-events: none;
+  }
+  .status .on { color: #6ADBD0; }
+  .status .off { color: #E07A5F; }
+
+  /* ---- satellite view ---- */
+  #satview {
+    position: absolute; inset: 0; z-index: 600;
+    background: #000; overflow: hidden; display: none;
+  }
+  .screen.satmode #satview { display: block; }
+  .screen.satmode .botbar, .screen.satmode .legend,
+  .screen.satmode #zoomIn, .screen.satmode #zoomOut, .screen.satmode #homeBtn,
+  .screen.satmode .status { display: none; }
+  /* GOES CONUS is 5:3, the panel is ~5.1:3 — filling the width crops only a
+     few rows top/bottom, so no crop toggle is needed */
+  #satview img { position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 100%; }
+  .satmsg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    color: #8FA5B7; display: none;
+  }
+  #satview.err .satmsg { display: block; }
+  #satview.err img { display: none; }
+
+  /* ---- current conditions block (bottom right, opposite the legend) ---- */
+  .wx {
+    position: absolute; right: 12px; bottom: 66px; z-index: 700;
+    background: rgba(8,14,22,0.85);
+    border: 1px solid rgba(140,170,195,0.25); border-radius: 8px;
+    padding: 10px 13px; min-width: 196px;
+    font-family: ui-monospace, Consolas, monospace;
+    cursor: pointer;
+  }
+  .screen.satmode .wx { display: none; }
+  .wx .place {
+    font-size: 10px; letter-spacing: 0.1em; color: #6E8496;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .wx .big { display: flex; align-items: baseline; gap: 9px; }
+  .wx .temp { font-size: 26px; font-weight: 700; color: #EAF2F8; }
+  .wx .cond { font-size: 11px; color: #8FC7F5; }
+  .wx .rows {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 14px;
+    margin-top: 7px;
+  }
+  .wx .rows .k { font-size: 10px; color: #7E93A5; letter-spacing: 0.06em; }
+  .wx .rows .v { font-size: 11px; color: #CFE0EE; text-align: right; }
+  .wx .hint { font-size: 11px; color: #F5D06A; letter-spacing: 0.06em; }
+
+  /* ---- settings page ---- */
+  #settings {
+    position: absolute; inset: 0; z-index: 950;
+    background: rgba(6,10,16,0.96);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+  }
+  .screen.settings #settings { display: flex; }
+  #settings .title {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px; letter-spacing: 0.22em; color: #8FA5B7;
+  }
+  #settings label {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.12em; color: #7E93A5;
+  }
+  #settings input {
+    background: rgba(16,26,38,0.9); color: #EAF2F8;
+    border: 1px solid rgba(140,170,195,0.4); border-radius: 8px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 22px; letter-spacing: 0.2em; text-align: center;
+    width: 150px; padding: 10px 6px; outline: none;
+  }
+  #settings input:focus { border-color: #53C7F0; }
+  #settings .msg {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: #8FA5B7; min-height: 16px;
+  }
+  #settings .msg.err { color: #E07A5F; }
+  #settings .btnrow { display: flex; gap: 12px; }
+  #settings .chk {
+    display: flex; align-items: center; gap: 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.08em; color: #AEB9C4;
+    cursor: pointer; max-width: 460px;
+  }
+  #settings .chk input { width: 18px; height: 18px; accent-color: #53C7F0; cursor: pointer; }
+
+  /* ---- fade layer for auto-mode transitions ---- */
+  #fader {
+    position: absolute; inset: 0; z-index: 940;
+    background: #000; opacity: 0; pointer-events: none;
+    transition: opacity 0.45s;
+  }
+  #fader.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #fader { transition: none; } }
+
+  /* ---- full-screen conditions & forecast board (auto-mode phase 3) ---- */
+  #statsview {
+    position: absolute; inset: 0; z-index: 620;
+    background: #0A1018;
+    display: none;
+    padding: 64px 70px 40px;
+    font-family: ui-monospace, Consolas, monospace;
+    gap: 80px; justify-content: center;
+  }
+  .screen.stats #statsview { display: flex; }
+  .screen.stats .botbar, .screen.stats .legend, .screen.stats .wx,
+  .screen.stats .status, .screen.stats #zoomIn, .screen.stats #zoomOut,
+  .screen.stats #homeBtn, .screen.stats #satBtn { display: none; }
+  #statsview .col { display: flex; flex-direction: column; min-width: 330px; }
+  #statsview .place {
+    font-size: 14px; letter-spacing: 0.14em; color: #6E8496;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  #statsview .bigtemp { font-size: 84px; font-weight: 700; color: #EAF2F8; line-height: 1; }
+  #statsview .bigcond { font-size: 17px; color: #8FC7F5; letter-spacing: 0.1em; margin: 10px 0 24px; }
+  #statsview .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; }
+  #statsview .grid .k { font-size: 13px; color: #7E93A5; letter-spacing: 0.08em; }
+  #statsview .grid .v { font-size: 15px; color: #DCE9F4; text-align: right; }
+  #statsview .sect {
+    font-size: 12px; letter-spacing: 0.18em; color: #D8B44A;
+    margin: 0 0 12px; border-bottom: 1px solid rgba(216,180,74,0.35);
+    padding-bottom: 6px;
+  }
+  #statsview .daily { font-size: 15px; color: #DCE9F4; margin-bottom: 18px; }
+  #statsview .hours { display: grid; grid-template-columns: auto auto auto; gap: 8px 26px; }
+  #statsview .hours .h { font-size: 14px; color: #7E93A5; }
+  #statsview .hours .t { font-size: 15px; color: #DCE9F4; text-align: right; }
+  #statsview .hours .p { font-size: 14px; color: #6AA8D8; text-align: right; }
+  #statsview .bigmsg {
+    align-self: center; margin: auto;
+    font-size: 14px; color: #8FA5B7; letter-spacing: 0.1em;
+  }
+
+  .footnote {
+    margin-top: 16px; max-width: 72ch; text-align: center;
+    color: #8B96A1; font-size: 12.5px; line-height: 1.5;
+  }
+  .footnote b { color: #DCE3EA; }
+
+  /* ---- PWA: notch / home-indicator safe areas ---- */
+  .topbar { padding-top: env(safe-area-inset-top); height: calc(44px + env(safe-area-inset-top)); }
+  .botbar { padding-bottom: calc(8px + env(safe-area-inset-bottom)); height: calc(58px + env(safe-area-inset-bottom)); }
+  .zoomstack { right: calc(12px + env(safe-area-inset-right)); top: calc(58px + env(safe-area-inset-top)); }
+  .status { top: calc(54px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); }
+  .legend { left: calc(12px + env(safe-area-inset-left)); bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .wx { right: calc(12px + env(safe-area-inset-right)); bottom: calc(66px + env(safe-area-inset-bottom)); }
+
+  /* ---- small screens (phones) ---- */
+  @media (max-width: 740px), (max-height: 480px) {
+    .brand { display: none; }
+    .clockbox div:last-child { display: none; }
+    .status { display: none; }
+    .legend .swatches i { width: 8px; }
+    .legend .marks, .legend .cap { font-size: 8px; }
+    .wx { min-width: 150px; padding: 7px 9px; }
+    .wx .temp { font-size: 20px; }
+    .wx .rows .k { font-size: 9px; }
+    .wx .rows .v { font-size: 10px; }
+    .btn { height: 36px; min-width: 36px; font-size: 16px; }
+    #statsview { flex-direction: column; gap: 22px; padding: 60px 26px 24px; overflow-y: auto; }
+    #statsview .col { min-width: 0; }
+    #statsview .bigtemp { font-size: 54px; }
+    #statsview .bigcond { font-size: 14px; margin: 6px 0 14px; }
+    #statsview .grid .k { font-size: 11px; }
+    #statsview .grid .v { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 1024 × 600 · Live Data</div>
+  <h1>SKYWATCH — device simulation, real feeds</h1>
+  <p class="sub">Screen rendered 1:1 at panel resolution. Mouse stands in for touch.</p>
+</header>
+
+<div class="device">
+  <div class="screen" id="screen">
+    <div id="lmap"></div>
+
+    <div id="satview">
+      <img id="satimg" alt="GOES-East GeoColor satellite image">
+      <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
+    </div>
+
+    <div id="predFrame"><span class="tab" id="predTab">PREDICTION</span></div>
+
+    <div class="wx" id="wxPanel" title="Tap to change ZIP">
+      <div class="place" id="wxPlace">LOCAL CONDITIONS</div>
+      <div class="hint" id="wxHint">TAP TO SET ZIP CODE</div>
+      <div class="big" style="display:none" id="wxBig">
+        <span class="temp" id="wxTemp">--°</span>
+        <span class="cond" id="wxCond"></span>
+      </div>
+      <div class="rows" style="display:none" id="wxRows"></div>
+    </div>
+
+    <div id="statsview"></div>
+    <div id="fader"></div>
+
+    <div id="settings">
+      <div class="title">SETTINGS</div>
+      <label for="zipInput">ZIP CODE</label>
+      <input id="zipInput" inputmode="numeric" maxlength="5" placeholder="50021" autocomplete="postal-code">
+      <label class="chk">
+        <input type="checkbox" id="autoChk">
+        AUTO MODE — RADAR ×2 → SATELLITE 10s → CONDITIONS 20s, LOOPED
+      </label>
+      <div class="msg" id="setMsg"></div>
+      <div class="btnrow">
+        <button class="btn small" id="saveBtn">SAVE</button>
+        <button class="btn small" id="cancelBtn">CANCEL</button>
+      </div>
+    </div>
+
+    <div class="bar topbar">
+      <span class="brand">SKYWATCH</span>
+      <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
+      <span class="spacer"></span>
+      <span class="frametime" id="frameTime">--:--</span>
+      <span class="spacer"></span>
+      <div class="clockbox">
+        <div class="clock" id="clock">--:--</div>
+        <div>UPD <span id="updCount">-:--</span></div>
+      </div>
+    </div>
+
+    <div class="status" id="status">loading…</div>
+
+    <div class="zoomstack">
+      <button class="btn" id="zoomIn" aria-label="Zoom in">+</button>
+      <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
+      <button class="btn small" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
+      <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
+      <button class="btn" id="settingsBtn" aria-label="Settings" style="font-size:15px">⚙</button>
+    </div>
+
+    <div class="legend">
+      <div class="cap">REFLECTIVITY dBZ</div>
+      <div class="swatches" id="legendSwatches"></div>
+      <div class="marks"><span>10</span><span>25</span><span>40</span><span>55</span><span>70</span></div>
+    </div>
+
+    <div class="bar botbar">
+      <button class="btn" id="playBtn" aria-label="Play or pause">⏸</button>
+      <div class="scrubwrap">
+        <span class="spanlabel">-50 MIN</span>
+        <div class="trackbox" id="trackbox" tabindex="0" role="slider"
+             aria-label="Radar timeline" aria-valuemin="-50" aria-valuemax="165"
+             aria-valuenow="0" aria-valuetext="now">
+          <div class="track"></div>
+          <div class="nowmark">NOW</div>
+          <div class="thumb" id="thumb"></div>
+        </div>
+        <span class="spanlabel fcst">+2:45</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">
+  <b>Live feeds:</b> IEM NEXRAD N0Q composite (past, 5-min steps) and IEM HRRR REFD forecast
+  tiles (15-min steps, auto-falls back to an older run while the newest processes);
+  <b>SAT</b> shows the current GOES-East CONUS GeoColor image from NOAA STAR as-is.
+  No Level 2 close-up in this build — that needs a home server to render the raw volumes.
+</p>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  "use strict";
+  const IEM = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/";
+  const GOES_DIR = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/";
+  const GOES_PRIMARY = GOES_DIR + "GOES19-ABI-CONUS-GEOCOLOR-2500x1500.jpg";
+  const GOES_FALLBACK = GOES_DIR + "latest.jpg";
+  const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  const PAST = 11;   // t = -50 .. 0 min, 5-min steps
+  const FUT = 11;    // t = +15 .. +165 min, 15-min steps
+  const NOW_I = PAST - 1;
+  const NFRAMES = PAST + FUT;
+  function frameT(i) { return i < PAST ? -(PAST - 1 - i) * 5 : (i - PAST + 1) * 15; }
+
+  // dBZ legend swatches (NWS ramp)
+  const PAL = ["#04E9E7","#019FF4","#0300F4","#02FD02","#01C501","#008E00","#FDF802",
+               "#E5BC00","#FD9500","#FD0000","#D40000","#BC0000","#F800FD","#9854C6","#FDFDFD"];
+  (function () {
+    const box = document.getElementById("legendSwatches");
+    PAL.forEach(function (c) {
+      const i = document.createElement("i");
+      i.style.background = c;
+      box.appendChild(i);
+    });
+  })();
+
+  // ---- map (guarded: keep the UI alive if the Leaflet CDN is unreachable) ----
+  let map = null;
+  if (window.L) {
+    map = L.map("lmap", {
+      center: HOME_VIEW.center,
+      zoom: HOME_VIEW.zoom,
+      minZoom: 4,
+      maxZoom: 10,
+      zoomSnap: 0,               // allow fractional zooms (auto mode targets an exact width)
+      zoomControl: false,
+      attributionControl: true
+    });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OSM &copy; CARTO · IEM/NOAA · NOAA STAR",
+      subdomains: "abcd"
+    }).addTo(map);
+  }
+
+  // ---- GOES-East (raw image, refreshed every 5 min) ----
+  const screenEl = document.getElementById("screen");
+  const satview = document.getElementById("satview");
+  const satimg = document.getElementById("satimg");
+  let goesOk = false, goesFetched = null, triedFallback = false;
+  satimg.addEventListener("load", function () {
+    goesOk = true; goesFetched = new Date();
+    satview.classList.remove("err");
+    updateStatus(); if (satMode) updateChrome();
+  });
+  satimg.addEventListener("error", function () {
+    if (!triedFallback) {
+      triedFallback = true;
+      satimg.src = GOES_FALLBACK + "?t=" + Date.now();
+      return;
+    }
+    goesOk = false; satview.classList.add("err"); updateStatus();
+  });
+  function loadGoes() {
+    triedFallback = false;
+    satimg.src = GOES_PRIMARY + "?t=" + Date.now();
+  }
+  loadGoes();
+  setInterval(loadGoes, REFRESH_MS);
+
+  // ---- radar frame layers ----
+  function pad(n, w) { return String(n).padStart(w, "0"); }
+  function utcStamp(d, minStep) {
+    const m = Math.floor(d.getUTCMinutes() / minStep) * minStep;
+    return "" + d.getUTCFullYear() + pad(d.getUTCMonth() + 1, 2) + pad(d.getUTCDate(), 2) +
+           pad(d.getUTCHours(), 2) + pad(m, 2);
+  }
+  let hrrrRunOffsetHrs = 2, hrrrErrors = 0, radarErrors = 0;
+  function hrrrInit() {
+    const d = new Date(Date.now() - hrrrRunOffsetHrs * 3600 * 1000);
+    d.setUTCMinutes(0, 0, 0);
+    return d;
+  }
+  function layerUrl(i) {
+    const t = frameT(i);
+    if (i < PAST) {
+      // explicit timestamps for every frame (~3 min processing lag) — the
+      // "-0" current alias mixes per-tile cache ages and tears at tile seams
+      const d = new Date(Date.now() - 180000 + t * 60000);
+      return IEM + "ridge::USCOMP-N0Q-" + utcStamp(d, 5) + "/{z}/{x}/{y}.png";
+    }
+    const init = hrrrInit();
+    const validMs = Date.now() + t * 60000;
+    let fmin = Math.round((validMs - init.getTime()) / 900000) * 15;
+    fmin = Math.max(0, Math.min(1080, fmin));
+    return IEM + "hrrr::REFD-F" + pad(fmin, 4) + "-" + utcStamp(init, 60) + "/{z}/{x}/{y}.png";
+  }
+
+  const layers = new Array(NFRAMES).fill(null);
+  function buildLayer(i) {
+    if (!map) return null;
+    const lyr = L.tileLayer(layerUrl(i), {
+      opacity: 0, zIndex: 400, maxNativeZoom: 9,
+      updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0
+    });
+    lyr.on("tileerror", function () {
+      if (i < PAST) { radarErrors++; }
+      else {
+        hrrrErrors++;
+        if (hrrrErrors > 12 && hrrrRunOffsetHrs < 6) {
+          hrrrErrors = 0;
+          hrrrRunOffsetHrs++;
+          rebuildFuture();
+        }
+      }
+      updateStatus();
+    });
+    lyr.addTo(map);
+    return lyr;
+  }
+  function rebuildFuture() {
+    for (let i = PAST; i < NFRAMES; i++) {
+      if (layers[i]) {
+        if (map && map.hasLayer(layers[i])) map.removeLayer(layers[i]);
+        layers[i] = null;
+      }
+    }
+    if (frame >= PAST) show(frame);
+  }
+
+  let frame = NOW_I;
+  function show(i) {
+    frame = i;
+    const nx = (i + 1) % NFRAMES;
+    if (!layers[i]) layers[i] = buildLayer(i);
+    if (!layers[nx]) layers[nx] = buildLayer(nx);
+    // only the visible + preloading frame stay attached (request hygiene)
+    for (let j = 0; j < NFRAMES; j++) {
+      const lyr = layers[j];
+      if (!lyr || !map) continue;
+      if (j === i || j === nx) {
+        if (!map.hasLayer(lyr)) lyr.addTo(map);
+        lyr.setOpacity(j === i ? 0.75 : 0);
+      } else if (map.hasLayer(lyr)) {
+        map.removeLayer(lyr);
+      }
+    }
+    updateChrome();
+  }
+
+  // ---- chrome ----
+  const trackbox = document.getElementById("trackbox");
+  const thumb = document.getElementById("thumb");
+  const predTab = document.getElementById("predTab");
+  const playBtn = document.getElementById("playBtn");
+  const srcBadge = document.getElementById("srcBadge");
+  const frameTimeEl = document.getElementById("frameTime");
+  const clockEl = document.getElementById("clock");
+  const updEl = document.getElementById("updCount");
+  const statusEl = document.getElementById("status");
+  const satBtn = document.getElementById("satBtn");
+  let satMode = false;
+  function fmt(d) { return pad(d.getHours(), 2) + ":" + pad(d.getMinutes(), 2); }
+
+  // time-proportional thumb position: -50 .. +165 min over the track width
+  const T_MIN = frameT(0), T_SPAN = frameT(NFRAMES - 1) - T_MIN;
+  function updateChrome() {
+    screenEl.classList.toggle("pred", frame >= PAST && !satMode && !statsMode);
+    if (statsMode) {
+      srcBadge.textContent = "CONDITIONS + FORECAST";
+      srcBadge.className = "badge mrms";
+      frameTimeEl.textContent = loc ? loc.name.toUpperCase() + ", " + loc.state : "";
+      frameTimeEl.className = "frametime";
+      return;
+    }
+    if (satMode) {
+      srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
+      srcBadge.className = "badge sat";
+      frameTimeEl.textContent = goesFetched ? "FETCHED " + fmt(goesFetched) : "--:--";
+      frameTimeEl.className = "frametime";
+      return;
+    }
+    const t = frameT(frame);
+    thumb.style.left = ((t - T_MIN) / T_SPAN * 100) + "%";
+    trackbox.setAttribute("aria-valuenow", String(t));
+    trackbox.setAttribute("aria-valuetext", t === 0 ? "now" : (t < 0 ? t + " minutes" : "+" + t + " minutes forecast"));
+    const d = new Date(Date.now() + t * 60000);
+    if (frame < PAST) {
+      srcBadge.textContent = "NEXRAD N0Q · IEM COMPOSITE";
+      srcBadge.className = "badge mrms";
+      frameTimeEl.textContent = fmt(d) + (frame === NOW_I ? " · LATEST" : "");
+      frameTimeEl.className = "frametime";
+    } else {
+      srcBadge.textContent = "HRRR REFD · +" + Math.floor(t / 60) + ":" + pad(t % 60, 2);
+      srcBadge.className = "badge fcst";
+      frameTimeEl.textContent = "FCST " + fmt(d);
+      frameTimeEl.className = "frametime fcst";
+      predTab.textContent = "PREDICTION · " + fmt(d);
+    }
+  }
+  function updateStatus() {
+    statusEl.innerHTML =
+      "RADAR  <span class='" + (map ? (radarErrors < 20 ? "on'>ok" : "off'>errors") : "off'>map lib unavailable") + "</span><br>" +
+      "HRRR   <span class='on'>run -" + hrrrRunOffsetHrs + "h</span><br>" +
+      "GOES-E <span class='" + (goesOk ? "on'>ok" : "off'>…") + "</span>";
+  }
+  updateStatus();
+
+  // clock + countdown to the next radar rebuild (a real deadline, not cosmetic)
+  let nextRefresh = Date.now() + REFRESH_MS;
+  setInterval(function () {
+    clockEl.textContent = fmt(new Date());
+    const s = Math.max(0, Math.round((nextRefresh - Date.now()) / 1000));
+    updEl.textContent = Math.floor(s / 60) + ":" + pad(s % 60, 2);
+  }, 1000);
+  clockEl.textContent = fmt(new Date());
+
+  setInterval(function () {
+    nextRefresh = Date.now() + REFRESH_MS;
+    for (let i = 0; i < PAST; i++) {
+      if (layers[i]) {
+        if (map && map.hasLayer(layers[i])) map.removeLayer(layers[i]);
+        layers[i] = null;
+      }
+    }
+    show(frame);
+  }, REFRESH_MS);
+
+  // ---- controls ----
+  document.getElementById("zoomIn").addEventListener("click", function () { if (map) map.zoomIn(); });
+  document.getElementById("zoomOut").addEventListener("click", function () { if (map) map.zoomOut(); });
+  document.getElementById("homeBtn").addEventListener("click", function () {
+    if (!map) return;
+    if (loc) map.setView([loc.lat, loc.lon], 6);
+    else map.setView(HOME_VIEW.center, HOME_VIEW.zoom);
+  });
+  function setSatMode(on) {
+    satMode = on;
+    screenEl.classList.toggle("satmode", satMode);
+    satBtn.textContent = satMode ? "RADAR" : "SAT";
+    satBtn.classList.toggle("on", satMode);
+    if (satMode && (!goesFetched || Date.now() - goesFetched.getTime() > REFRESH_MS)) loadGoes();
+    updateChrome();
+  }
+  satBtn.addEventListener("click", function () { setSatMode(!satMode); });
+
+  let statsMode = false;
+  function setStats(on) {
+    statsMode = on;
+    screenEl.classList.toggle("stats", on);
+    if (on) renderStats();
+    updateChrome();
+  }
+
+  let playing = true;
+  playBtn.addEventListener("click", function () {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸" : "▶";
+  });
+  // scrubbing: pick the frame whose time is nearest to the pointer position
+  function frameAtFraction(frac) {
+    const t = T_MIN + Math.max(0, Math.min(1, frac)) * T_SPAN;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < NFRAMES; i++) {
+      const d = Math.abs(frameT(i) - t);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+  function scrubTo(i) {
+    playing = false;
+    playBtn.textContent = "▶";
+    if (i !== frame) show(i); else updateChrome();
+  }
+  let scrubbing = false;
+  trackbox.addEventListener("pointerdown", function (e) {
+    scrubbing = true;
+    trackbox.setPointerCapture(e.pointerId);
+    const r = trackbox.getBoundingClientRect();
+    scrubTo(frameAtFraction((e.clientX - r.left) / r.width));
+  });
+  trackbox.addEventListener("pointermove", function (e) {
+    if (!scrubbing) return;
+    const r = trackbox.getBoundingClientRect();
+    scrubTo(frameAtFraction((e.clientX - r.left) / r.width));
+  });
+  trackbox.addEventListener("pointerup", function () { scrubbing = false; });
+  trackbox.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft" && frame > 0) { e.preventDefault(); scrubTo(frame - 1); }
+    if (e.key === "ArrowRight" && frame < NFRAMES - 1) { e.preventDefault(); scrubTo(frame + 1); }
+    if (e.key === "Home") { e.preventDefault(); scrubTo(NOW_I); }
+  });
+  setInterval(function () {
+    if (screenEl.classList.contains("settings")) return;
+    if (satMode || statsMode) return;
+    if (!(playing || (autoOn && autoPhase === "radar"))) return;
+    const nx = (frame + 1) % NFRAMES;
+    if (autoOn && autoPhase === "radar" && nx === 0) {
+      autoLoops++;
+      if (autoLoops >= 2) { enterSatPhase(); return; }
+      autoRadarView(autoLoops);      // second pass: zoom in on the ZIP
+    }
+    show(nx);
+  }, 700);
+
+  // ---- local conditions (ZIP -> Zippopotam.us geocode -> Open-Meteo current) ----
+  const WX_REFRESH_MS = 10 * 60 * 1000;
+  let loc = null;
+  let lastWx = null;
+  try { loc = JSON.parse(localStorage.getItem("skywatch_loc") || "null"); } catch (e) { loc = null; }
+
+  const wxPanel = document.getElementById("wxPanel");
+  const wxPlace = document.getElementById("wxPlace");
+  const wxHint = document.getElementById("wxHint");
+  const wxBig = document.getElementById("wxBig");
+  const wxTemp = document.getElementById("wxTemp");
+  const wxCond = document.getElementById("wxCond");
+  const wxRows = document.getElementById("wxRows");
+
+  const WMO = {
+    0: "CLEAR", 1: "MOSTLY CLEAR", 2: "PARTLY CLOUDY", 3: "OVERCAST",
+    45: "FOG", 48: "FREEZING FOG",
+    51: "LIGHT DRIZZLE", 53: "DRIZZLE", 55: "HEAVY DRIZZLE",
+    56: "FRZ DRIZZLE", 57: "FRZ DRIZZLE",
+    61: "LIGHT RAIN", 63: "RAIN", 65: "HEAVY RAIN",
+    66: "FREEZING RAIN", 67: "FREEZING RAIN",
+    71: "LIGHT SNOW", 73: "SNOW", 75: "HEAVY SNOW", 77: "SNOW GRAINS",
+    80: "SHOWERS", 81: "SHOWERS", 82: "HEAVY SHOWERS",
+    85: "SNOW SHOWERS", 86: "SNOW SHOWERS",
+    95: "THUNDERSTORM", 96: "T-STORM + HAIL", 99: "T-STORM + HAIL"
+  };
+  const DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+  function wxShowHint(text) {
+    wxHint.textContent = text;
+    wxHint.style.display = "block";
+    wxBig.style.display = "none";
+    wxRows.style.display = "none";
+  }
+  function row(k, v) { return "<span class='k'>" + k + "</span><span class='v'>" + v + "</span>"; }
+
+  // two independent sources, normalized to one shape:
+  //   { src, temp, feels, rh, dew, windTxt, gust, pres, precip, cond,
+  //     hours: [{label, temp, pp}], daily: {hi, lo, pp} }
+  function okJson(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+  // a blocked domain often hangs instead of failing — time out so the fallback engages fast
+  function fetchT(url) {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 8000);
+    return fetch(url, { signal: ctl.signal })
+      .catch(function (e) { throw (e && e.name === "AbortError") ? new Error("TIMEOUT") : e; })
+      .finally(function () { clearTimeout(t); });
+  }
+  function degF(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "°F"; }
+  function pct(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "%"; }
+
+  function omFetch() {
+    const base = "https://api.open-meteo.com/v1/forecast?latitude=" + loc.lat +
+      "&longitude=" + loc.lon +
+      "&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m," +
+      "precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl" +
+      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
+      "&timezone=auto&timeformat=unixtime";
+    const full = base +
+      "&hourly=temperature_2m,precipitation_probability,weather_code" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2";
+    return fetchT(full).then(okJson)
+      .catch(function (e) {
+        // retry without forecast params only if the API rejected them;
+        // an unreachable domain (timeout/network) goes straight to the NWS fallback
+        if (!(e && /^HTTP 4/.test(e.message))) throw e;
+        return fetchT(base).then(okJson);
+      })
+      .then(function (j) {
+        const c = j.current;
+        const hours = [];
+        const hl = j.hourly;
+        if (hl && hl.time) {
+          const off = j.utc_offset_seconds || 0;
+          const nowS = Date.now() / 1000;
+          let s0 = 0;
+          while (s0 < hl.time.length - 1 && hl.time[s0] < nowS - 3600) s0++;
+          for (let i = s0; i < Math.min(s0 + 8, hl.time.length); i++) {
+            hours.push({
+              label: new Date((hl.time[i] + off) * 1000).toISOString().slice(11, 16),
+              temp: hl.temperature_2m[i],
+              pp: hl.precipitation_probability ? hl.precipitation_probability[i] : null
+            });
+          }
+        }
+        const dl = j.daily;
+        return {
+          src: "OPEN-METEO",
+          temp: c.temperature_2m, feels: c.apparent_temperature,
+          rh: c.relative_humidity_2m, dew: c.dew_point_2m,
+          windTxt: DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH",
+          gust: Math.round(c.wind_gusts_10m) + " MPH",
+          pres: (c.pressure_msl * 0.02953).toFixed(2) + " inHg",
+          precip: (c.precipitation || 0).toFixed(2) + " IN/HR",
+          cond: WMO[c.weather_code] || "",
+          hours: hours,
+          daily: dl && dl.time ? { hi: dl.temperature_2m_max[0], lo: dl.temperature_2m_min[0], pp: dl.precipitation_probability_max[0] } : null
+        };
+      });
+  }
+
+  // fallback: National Weather Service (different domain, also CORS-open, US only)
+  function nwsFetch() {
+    return fetchT("https://api.weather.gov/points/" + loc.lat + "," + loc.lon).then(okJson)
+      .then(function (p) {
+        return Promise.all([
+          fetchT(p.properties.forecastHourly).then(okJson),
+          fetchT(p.properties.forecast).then(okJson)
+        ]);
+      })
+      .then(function (res) {
+        const hp = (res[0].properties.periods || []);
+        const now = hp[0] || {};
+        const hours = hp.slice(0, 8).map(function (per) {
+          return {
+            label: per.startTime.slice(11, 16),
+            temp: per.temperature,
+            pp: per.probabilityOfPrecipitation && per.probabilityOfPrecipitation.value != null
+              ? per.probabilityOfPrecipitation.value : null
+          };
+        });
+        let hi = null, lo = null, ppMax = null;
+        (res[1].properties.periods || []).slice(0, 2).forEach(function (per) {
+          if (per.isDaytime) hi = per.temperature; else lo = per.temperature;
+          const v = per.probabilityOfPrecipitation && per.probabilityOfPrecipitation.value;
+          if (v != null) ppMax = Math.max(ppMax == null ? 0 : ppMax, v);
+        });
+        return {
+          src: "NWS",
+          temp: now.temperature, feels: null,
+          rh: now.relativeHumidity ? now.relativeHumidity.value : null,
+          dew: now.dewpoint && now.dewpoint.value != null ? now.dewpoint.value * 9 / 5 + 32 : null,
+          windTxt: (now.windDirection || "--") + " " + (parseInt(now.windSpeed, 10) || "--") + " MPH",
+          gust: null, pres: null, precip: null,
+          cond: (now.shortForecast || "").toUpperCase(),
+          hours: hours,
+          daily: hi != null || lo != null ? { hi: hi, lo: lo, pp: ppMax } : null
+        };
+      });
+  }
+
+  function refreshWx() {
+    if (!loc) { wxPlace.textContent = "LOCAL CONDITIONS"; wxShowHint("TAP TO SET ZIP CODE"); return; }
+    omFetch()
+      .catch(function (omErr) {
+        return nwsFetch().catch(function (nwsErr) {
+          throw new Error("OM: " + omErr.message + " / NWS: " + nwsErr.message);
+        });
+      })
+      .then(function (n) {
+        lastWx = n;
+        wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src;
+        wxTemp.textContent = degF(n.temp);
+        wxCond.textContent = n.cond;
+        wxRows.innerHTML =
+          row("FEELS", degF(n.feels)) +
+          row("HUMIDITY", pct(n.rh)) +
+          row("DEW PT", degF(n.dew)) +
+          row("WIND", n.windTxt) +
+          row("GUSTS", n.gust || "--") +
+          row("PRESSURE", n.pres || "--") +
+          row("PRECIP", n.precip || "--");
+        wxHint.style.display = "none";
+        wxBig.style.display = "flex";
+        wxRows.style.display = "grid";
+        if (statsMode) renderStats();
+      })
+      .catch(function (err) {
+        lastWx = null;
+        wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
+        wxShowHint("WEATHER UNAVAILABLE — " + (err && err.message ? err.message : "NETWORK"));
+        if (statsMode) renderStats();
+      });
+  }
+  refreshWx();
+  setInterval(refreshWx, WX_REFRESH_MS);
+
+  // ---- full-screen conditions & forecast board ----
+  const statsEl = document.getElementById("statsview");
+  function renderStats() {
+    if (!loc) { statsEl.innerHTML = "<div class='bigmsg'>SET A ZIP CODE IN SETTINGS</div>"; return; }
+    if (!lastWx) { statsEl.innerHTML = "<div class='bigmsg'>WEATHER UNAVAILABLE</div>"; return; }
+    const n = lastWx;
+    const left = "<div class='col'>" +
+      "<div class='place'>" + loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src + "</div>" +
+      "<div class='bigtemp'>" + degF(n.temp) + "</div>" +
+      "<div class='bigcond'>" + n.cond + "</div>" +
+      "<div class='grid'>" +
+      row("FEELS LIKE", degF(n.feels)) +
+      row("HUMIDITY", pct(n.rh)) +
+      row("DEW POINT", degF(n.dew)) +
+      row("WIND", n.windTxt) +
+      row("GUSTS", n.gust || "--") +
+      row("PRESSURE", n.pres || "--") +
+      row("PRECIP", n.precip || "--") +
+      "</div></div>";
+    let hours = "";
+    n.hours.forEach(function (h) {
+      hours += "<span class='h'>" + h.label + "</span>" +
+               "<span class='t'>" + (h.temp == null ? "--" : Math.round(h.temp) + "°") + "</span>" +
+               "<span class='p'>" + pct(h.pp) + "</span>";
+    });
+    let daily = "";
+    if (n.daily) {
+      daily = "TODAY — HI " + (n.daily.hi == null ? "--" : Math.round(n.daily.hi) + "°") +
+        " · LO " + (n.daily.lo == null ? "--" : Math.round(n.daily.lo) + "°") +
+        " · PRECIP " + pct(n.daily.pp);
+    }
+    const right = "<div class='col'><div class='sect'>PREDICTIONS</div>" +
+      (daily ? "<div class='daily'>" + daily + "</div>" : "") +
+      "<div class='hours'>" + hours + "</div></div>";
+    statsEl.innerHTML = left + right;
+  }
+
+  // ---- auto mode: radar x2 -> satellite 20s -> conditions 20s, looped ----
+  const fader = document.getElementById("fader");
+  let autoOn = localStorage.getItem("skywatch_auto") === "1";
+  let autoPhase = "radar", autoLoops = 0, autoTimer = null;
+  function fadeSwap(fn) {
+    fader.classList.add("show");
+    setTimeout(function () { fn(); fader.classList.remove("show"); }, 480);
+  }
+  // pass 1: zoomed-out regional view; pass 2: 175 km across — both centered on the ZIP
+  function zoomForWidthKm(km, lat) {
+    // web-mercator meters/pixel at zoom 0 is 156543 * cos(lat)
+    const px = window.innerWidth || 1024;
+    return Math.log2(156543.03392 * Math.cos(lat * Math.PI / 180) * px / (km * 1000));
+  }
+  function autoRadarView(pass) {
+    if (!map) return;
+    const c = loc ? [loc.lat, loc.lon] : HOME_VIEW.center;
+    map.setView(c, pass === 0 ? 5 : zoomForWidthKm(175, c[0]));
+  }
+  function enterRadarPhase() {
+    autoPhase = "radar";
+    clearTimeout(autoTimer);
+    fadeSwap(function () {
+      setStats(false);
+      setSatMode(false);
+      autoLoops = 0;
+      playing = true;
+      playBtn.textContent = "⏸";
+      autoRadarView(0);
+      show(0);
+    });
+  }
+  function enterSatPhase() {
+    autoPhase = "sat";
+    fadeSwap(function () { setSatMode(true); });
+    autoTimer = setTimeout(enterStatsPhase, 10000);
+  }
+  function enterStatsPhase() {
+    autoPhase = "stats";
+    fadeSwap(function () { setSatMode(false); setStats(true); });
+    autoTimer = setTimeout(enterRadarPhase, 20000);
+  }
+
+  // ---- settings page ----
+  const settingsBtn = document.getElementById("settingsBtn");
+  const zipInput = document.getElementById("zipInput");
+  const setMsg = document.getElementById("setMsg");
+  const autoChk = document.getElementById("autoChk");
+  function openSettings() {
+    zipInput.value = loc ? loc.zip : "";
+    autoChk.checked = autoOn;
+    setMsg.textContent = "";
+    setMsg.className = "msg";
+    screenEl.classList.add("settings");
+    zipInput.focus();
+  }
+  function closeSettings() { screenEl.classList.remove("settings"); }
+  settingsBtn.addEventListener("click", openSettings);
+  wxPanel.addEventListener("click", openSettings);
+  document.getElementById("cancelBtn").addEventListener("click", closeSettings);
+  document.getElementById("saveBtn").addEventListener("click", saveZip);
+  zipInput.addEventListener("keydown", function (e) { if (e.key === "Enter") saveZip(); });
+
+  function applyAuto() {
+    const want = autoChk.checked;
+    localStorage.setItem("skywatch_auto", want ? "1" : "0");
+    if (want && !autoOn) {
+      autoOn = true;
+      enterRadarPhase();
+    } else if (!want && autoOn) {
+      autoOn = false;
+      clearTimeout(autoTimer);
+      if (satMode || statsMode) {
+        fadeSwap(function () { setStats(false); setSatMode(false); });
+      }
+    }
+  }
+  function saveZip() {
+    const zip = zipInput.value.trim();
+    if (zip === "") {          // no ZIP change — just apply the auto-mode choice
+      applyAuto();
+      closeSettings();
+      return;
+    }
+    if (!/^\d{5}$/.test(zip)) {
+      setMsg.textContent = "ENTER A 5-DIGIT ZIP";
+      setMsg.className = "msg err";
+      return;
+    }
+    setMsg.textContent = "LOOKING UP " + zip + "…";
+    setMsg.className = "msg";
+    fetch("https://api.zippopotam.us/us/" + zip)
+      .then(function (r) { if (!r.ok) throw new Error("notfound"); return r.json(); })
+      .then(function (j) {
+        const p = j.places[0];
+        loc = {
+          zip: zip,
+          lat: parseFloat(p.latitude),
+          lon: parseFloat(p.longitude),
+          name: p["place name"],
+          state: p["state abbreviation"]
+        };
+        localStorage.setItem("skywatch_loc", JSON.stringify(loc));
+        applyAuto();
+        closeSettings();
+        refreshWx();
+        if (map) map.setView([loc.lat, loc.lon], 6);
+      })
+      .catch(function (e) {
+        setMsg.textContent = e.message === "notfound" ? "ZIP NOT FOUND" : "LOOKUP FAILED — CHECK CONNECTION";
+        setMsg.className = "msg err";
+      });
+  }
+  if (loc && map) map.setView([loc.lat, loc.lon], 6);
+
+  // the map container tracks the window now — keep Leaflet's size in sync
+  window.addEventListener("resize", function () { if (map) map.invalidateSize(); });
+  window.addEventListener("orientationchange", function () {
+    setTimeout(function () { if (map) map.invalidateSize(); }, 300);
+  });
+
+  // PWA: offline app shell
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(function () { /* not fatal */ });
+  }
+
+  show(NOW_I);
+  if (autoOn) enterRadarPhase();
+})();
+</script>
+</body>
+</html>

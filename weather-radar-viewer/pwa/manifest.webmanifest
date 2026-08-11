@@ -1,0 +1,16 @@
+{
+  "name": "SKYWATCH Radar",
+  "short_name": "SKYWATCH",
+  "description": "Live NEXRAD radar, HRRR forecast, GOES-East satellite, and local conditions.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0A1018",
+  "theme_color": "#0A1018",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
