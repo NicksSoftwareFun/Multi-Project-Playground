@@ -8,6 +8,7 @@ alerts API, and Supercell Wx release info.
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -17,7 +18,9 @@ try:  # mcp SDK >= 2.0
 except ImportError:  # mcp SDK 1.x
     from mcp.server.fastmcp import FastMCP
 
-from . import clients
+from mcp.types import ImageContent, TextContent
+
+from . import clients, desktop
 from .util import (
     LEVEL3_PRODUCT_CODES,
     haversine_km,
@@ -327,6 +330,235 @@ async def get_supercell_wx_latest_release() -> dict:
                 "download_url": a.get("browser_download_url"),
             }
             for a in data.get("assets", [])
+        ],
+    }
+
+
+# --- Desktop control of a running Supercell Wx window -----------------------
+#
+# These tools drive the actual desktop app: take screenshots (return them as
+# images for the AI client to analyze), and inject the app's own mouse
+# gestures and default hotkeys to zoom, pan, and change display modes.
+# They require the [desktop] extra and a desktop session on the machine
+# running this server.
+
+
+@mcp.tool()
+def screenshot(target: str = "window", monitor: int = 1, max_width: int = 1536) -> list:
+    """Capture the Supercell Wx window (or full desktop) and return the image for analysis.
+
+    Take a screenshot after each control action to see its effect. The returned
+    text block gives the capture geometry; click_at/drag_at/scroll_at accept
+    coordinates measured directly on this image (space="image").
+
+    Args:
+        target: "window" for the Supercell Wx window (falls back to desktop if
+            not found), or "desktop" for the whole screen.
+        monitor: Monitor number for desktop capture (1 = primary).
+        max_width: Downscale the image to at most this many pixels wide.
+    """
+    png, info = desktop.capture(target=target, monitor=monitor, max_width=max_width)
+    return [
+        TextContent(type="text", text=json.dumps(info)),
+        ImageContent(
+            type="image",
+            data=desktop.png_to_data_url_size(png),
+            mimeType="image/png",
+        ),
+    ]
+
+
+@mcp.tool()
+def get_window_info() -> dict:
+    """Locate the Supercell Wx window and report its screen geometry."""
+    region = desktop.find_window()
+    if region is None:
+        return {
+            "found": False,
+            "note": f"No visible window titled {desktop.WINDOW_TITLE!r}. "
+                    "Is Supercell Wx running? Screenshots will fall back to the desktop.",
+        }
+    return {
+        "found": True,
+        "left": region.left,
+        "top": region.top,
+        "width": region.width,
+        "height": region.height,
+    }
+
+
+@mcp.tool()
+def focus_supercell_window() -> dict:
+    """Bring the Supercell Wx window to the foreground so hotkeys and clicks reach it."""
+    ok = desktop.focus_window()
+    return {"focused": ok}
+
+
+@mcp.tool()
+def map_zoom(steps: int, method: str = "keys") -> dict:
+    """Zoom the Supercell Wx map in (positive steps) or out (negative steps).
+
+    Args:
+        steps: Number of zoom steps; positive zooms in, negative zooms out.
+        method: "keys" presses the app's '='/'-' zoom hotkeys; "wheel" scrolls
+            the mouse wheel at the window center.
+    """
+    if steps == 0:
+        return {"zoomed": 0}
+    desktop.focus_window()
+    count = min(abs(steps), 20)
+    if method == "wheel":
+        cx, cy = desktop.window_center()
+        desktop.scroll(cx, cy, count if steps > 0 else -count)
+    else:
+        key = desktop.ZOOM_IN_KEY if steps > 0 else desktop.ZOOM_OUT_KEY
+        desktop.press_hotkey((key,), presses=count)
+    return {"zoomed": count if steps > 0 else -count, "method": method,
+            "hint": "Take a screenshot to verify the new view."}
+
+
+@mcp.tool()
+def map_pan(direction: str, seconds: float = 0.5) -> dict:
+    """Pan the Supercell Wx map using the app's W/A/S/D pan hotkeys.
+
+    Args:
+        direction: One of "up", "down", "left", "right".
+        seconds: How long to hold the pan key (0.05-5.0; longer = farther).
+    """
+    key = desktop.PAN_KEYS.get(direction.lower())
+    if key is None:
+        raise ValueError(f"direction must be one of {sorted(desktop.PAN_KEYS)}")
+    desktop.focus_window()
+    desktop.hold_key(key, seconds)
+    return {"panned": direction, "seconds": seconds,
+            "hint": "Take a screenshot to verify the new view. For precise pans, "
+                    "use drag_at on the map instead."}
+
+
+@mcp.tool()
+def change_display_mode(action: str, presses: int = 1) -> dict:
+    """Change what the Supercell Wx map displays, via the app's default hotkeys.
+
+    Args:
+        action: One of:
+            - "next_product_category" / "previous_product_category": cycle the
+              radar product category (reflectivity, velocity, etc.)
+            - "increase_tilt" / "decrease_tilt": change the elevation tilt
+            - "cycle_map_style": switch the base map style
+        presses: Repeat the action this many times (1-10).
+    """
+    keys = desktop.DISPLAY_MODE_HOTKEYS.get(action)
+    if keys is None:
+        raise ValueError(f"action must be one of {sorted(desktop.DISPLAY_MODE_HOTKEYS)}")
+    desktop.focus_window()
+    desktop.press_hotkey(keys, presses=max(1, min(presses, 10)))
+    return {"action": action, "presses": presses,
+            "hint": "Take a screenshot to see the new display mode."}
+
+
+@mcp.tool()
+def click_at(x: float, y: float, button: str = "left", double: bool = False,
+             space: str = "image") -> dict:
+    """Click in the Supercell Wx window (or anywhere on screen).
+
+    On the map: middle-click selects and centers the nearest radar site to the
+    clicked point; double left-click zooms in 2x; double right-click zooms out.
+
+    Args:
+        x: X coordinate.
+        y: Y coordinate.
+        button: "left", "right", or "middle".
+        double: Double-click instead of single.
+        space: "image" to use coordinates measured on the last screenshot
+            (recommended), or "screen" for raw screen pixels.
+    """
+    sx, sy = desktop.resolve_point(x, y, space)
+    desktop.click(sx, sy, button=button, double=double)
+    return {"clicked": {"x": sx, "y": sy}, "button": button, "double": double}
+
+
+@mcp.tool()
+def drag_at(from_x: float, from_y: float, to_x: float, to_y: float,
+            duration: float = 0.6, space: str = "image") -> dict:
+    """Left-click drag, e.g. to pan the map by an exact pixel offset.
+
+    Dragging the map moves the ground with the cursor: drag left to look
+    further right. Coordinates default to the last screenshot's image space.
+    """
+    sx1, sy1 = desktop.resolve_point(from_x, from_y, space)
+    sx2, sy2 = desktop.resolve_point(to_x, to_y, space)
+    desktop.drag(sx1, sy1, sx2, sy2, duration=duration)
+    return {"dragged": {"from": [sx1, sy1], "to": [sx2, sy2]}}
+
+
+@mcp.tool()
+def scroll_at(x: float, y: float, clicks: int, space: str = "image") -> dict:
+    """Scroll the mouse wheel at a point (positive = zoom in on the map)."""
+    sx, sy = desktop.resolve_point(x, y, space)
+    desktop.scroll(sx, sy, clicks)
+    return {"scrolled": clicks, "at": {"x": sx, "y": sy}}
+
+
+@mcp.tool()
+def press_keys(keys: str, presses: int = 1) -> dict:
+    """Press a key or hotkey combo in the focused window, e.g. "z", "ctrl+]", "f11".
+
+    Useful Supercell Wx defaults: '='/'-' zoom, 'z' map style, 'ctrl+]' next
+    product category, ']' tilt up, space timeline play, 'f11' full screen.
+    """
+    combo = tuple(k.strip().lower() for k in keys.split("+") if k.strip())
+    if not combo:
+        raise ValueError("keys must be a non-empty key or 'mod+key' combo")
+    desktop.focus_window()
+    desktop.press_hotkey(combo, presses=max(1, min(presses, 20)))
+    return {"pressed": list(combo), "presses": presses}
+
+
+@mcp.tool()
+def type_text(text: str) -> dict:
+    """Type text into the focused control (e.g. a radar site search box)."""
+    desktop.type_text(text)
+    return {"typed_chars": len(text)}
+
+
+@mcp.tool()
+async def center_on_location(latitude: float, longitude: float) -> dict:
+    """Prepare to center the Supercell Wx map on a location, and return the plan.
+
+    Focuses the window and looks up the nearest radar site. Centering is then a
+    short visual loop for you to drive: Supercell Wx centers on a radar site
+    when one is selected, and middle-clicking the map selects the site nearest
+    the click. Follow the returned steps, taking a screenshot between actions.
+    """
+    focused = desktop.focus_window()
+    nearest: list[dict] = []
+    lookup_error = None
+    try:
+        stations = [s for s in await _get_stations() if s["latitude"] is not None]
+        nearest = sorted(
+            (
+                {**s, "distance_km": round(
+                    haversine_km(latitude, longitude, s["latitude"], s["longitude"]), 1)}
+                for s in stations
+            ),
+            key=lambda s: s["distance_km"],
+        )[:3]
+    except Exception as exc:
+        lookup_error = str(exc)
+    return {
+        "target": {"latitude": latitude, "longitude": longitude},
+        "window_focused": focused,
+        "nearest_radar_sites": nearest,
+        "nearest_site_lookup_error": lookup_error,
+        "steps": [
+            "1. screenshot() to see the current view.",
+            "2. If the target region is not visible, map_zoom(-5) to zoom out "
+            "until it is, taking screenshots to check.",
+            "3. click_at(x, y, button='middle') on the target location in the "
+            "image: Supercell Wx selects and centers the nearest radar site "
+            f"(expected: {nearest[0]['id'] if nearest else 'see nearest_radar_sites'}).",
+            "4. screenshot() to confirm, then map_zoom(+N) to zoom in, and "
+            "drag_at(...) for fine centering on the exact location.",
         ],
     }
 
