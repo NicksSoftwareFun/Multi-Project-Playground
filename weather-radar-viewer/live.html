@@ -240,8 +240,10 @@
   function layerUrl(i) {
     const t = frameT(i);
     if (i < PAST) {
-      if (i === NOW_I) return IEM + "ridge::USCOMP-N0Q-0/{z}/{x}/{y}.png";
-      const d = new Date(Date.now() + t * 60000);
+      // Explicit timestamps for every frame, including "now" (with a ~3 min
+      // processing lag). The "-0" current alias is cached per tile on IEM's
+      // side, which can mix scan times and cut storms off at tile seams.
+      const d = new Date(Date.now() - 180000 + t * 60000);
       return IEM + "ridge::USCOMP-N0Q-" + utcStamp(d, 5) + "/{z}/{x}/{y}.png";
     }
     const init = hrrrInit();
@@ -254,7 +256,12 @@
   const layers = new Array(NFRAMES).fill(null);
   function buildLayer(i) {
     if (!map) return null;
-    const lyr = L.tileLayer(layerUrl(i), { opacity: 0, zIndex: 400, maxNativeZoom: 9 });
+    // updateWhenIdle/keepBuffer keep the request count down — IEM renders
+    // tiles on demand, and hammering it during pans is what loses tiles.
+    const lyr = L.tileLayer(layerUrl(i), {
+      opacity: 0, zIndex: 400, maxNativeZoom: 9,
+      updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0
+    });
     lyr.on("tileerror", function () {
       if (i < PAST) { radarErrors++; }
       else {
@@ -280,16 +287,22 @@
   let frame = NOW_I;
   function show(i) {
     frame = i;
-    for (let j = 0; j < NFRAMES; j++) {
-      if (layers[j]) layers[j].setOpacity(j === i ? 0.75 : 0);
-    }
-    if (!layers[i]) {
-      layers[i] = buildLayer(i);
-      if (layers[i]) layers[i].setOpacity(0.75);
-    }
-    // preload the next frame in the loop
-    const nx = (i + 1) % NFRAMES;
+    const nx = (i + 1) % NFRAMES;         // preload the next frame in the loop
+    if (!layers[i]) layers[i] = buildLayer(i);
     if (!layers[nx]) layers[nx] = buildLayer(nx);
+    // Only the visible frame and the preloading one stay on the map; keeping
+    // all frames attached multiplies tile requests on every pan/zoom, and
+    // failed requests show up as blank rectangles cut along tile edges.
+    for (let j = 0; j < NFRAMES; j++) {
+      const lyr = layers[j];
+      if (!lyr || !map) continue;
+      if (j === i || j === nx) {
+        if (!map.hasLayer(lyr)) lyr.addTo(map);
+        lyr.setOpacity(j === i ? 0.75 : 0);
+      } else if (map.hasLayer(lyr)) {
+        map.removeLayer(lyr);
+      }
+    }
     updateChrome();
   }
 
@@ -361,6 +374,18 @@
   setInterval(function () {
     if (playing && !satMode) show((frame + 1) % NFRAMES);
   }, 700);
+
+  // Radar timestamps are computed when a layer is built; rebuild the past
+  // frames every 5 minutes so a long-running display keeps up with new scans.
+  setInterval(function () {
+    for (let i = 0; i < PAST; i++) {
+      if (layers[i]) {
+        if (map && map.hasLayer(layers[i])) map.removeLayer(layers[i]);
+        layers[i] = null;
+      }
+    }
+    show(frame);
+  }, 5 * 60 * 1000);
 
   show(NOW_I);
 })();
