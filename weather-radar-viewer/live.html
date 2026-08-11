@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKYWATCH Live — Real Radar + GOES-East</title>
+<!--
+  Live companion to mockup.html. Open this file directly in a browser
+  (double-click, or serve locally) — it pulls REAL data:
+    - Past radar:   IEM NEXRAD N0Q composite tiles (5-min steps, last 50 min)
+    - Forecast:     IEM HRRR simulated reflectivity (REFD) tiles, 15-min steps
+    - Backdrop:     GOES-East (GOES-19) CONUS GeoColor from NOAA STAR
+  Notes:
+    - The GOES image is in geostationary projection; it is overlaid here with
+      approximate bounds, so alignment drifts toward the edges. Good enough
+      for a backdrop; not for navigation.
+    - HRRR runs hourly and takes ~1-2 h to appear on IEM; if forecast tiles
+      404, the app automatically falls back to an older run.
+    - Free-tier friendly: personal use, modest request rates.
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0A1018; color: #D7E2EC;
+               font-family: system-ui, "Segoe UI", Roboto, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel {
+    position: absolute; z-index: 1000;
+    background: rgba(8,14,22,0.88);
+    border: 1px solid rgba(140,170,195,0.3);
+    border-radius: 8px;
+  }
+  .topbar {
+    top: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  .brand { font-weight: 700; letter-spacing: 0.08em; font-size: 14px; }
+  .badge {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.05em;
+    padding: 3px 8px; border-radius: 4px; border: 1px solid;
+  }
+  .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
+  .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
+  .badge.warn { color: #F5B85C; border-color: #8A6224; background: rgba(74,52,15,0.55); }
+  .vtime { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #BFD3E2; }
+  .botbar {
+    bottom: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    width: min(640px, calc(100vw - 40px));
+  }
+  button {
+    width: 38px; height: 38px; border-radius: 8px;
+    border: 1px solid rgba(140,170,195,0.35);
+    background: rgba(16,26,38,0.9); color: #CFE0EE;
+    font-size: 16px; cursor: pointer;
+  }
+  button:hover { background: rgba(30,46,64,0.9); }
+  .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
+  input[type=range] {
+    width: 100%; -webkit-appearance: none; appearance: none; margin: 0;
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right,
+      rgba(120,170,200,0.5) 0 47.6%, rgba(160,120,220,0.45) 47.6% 100%);
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  .nowmark {
+    position: absolute; left: 47.6%; top: -14px; transform: translateX(-50%);
+    font-family: ui-monospace, Consolas, monospace; font-size: 9px;
+    letter-spacing: 0.1em; color: #9FB4C6; pointer-events: none;
+  }
+  .lbl { font-family: ui-monospace, Consolas, monospace; font-size: 10px; color: #7E93A5; }
+  .lbl.f { color: #A88BD8; }
+  .status {
+    top: 10px; left: 10px;
+    padding: 8px 12px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10.5px; line-height: 1.6; color: #8FA5B7;
+  }
+  .status .on { color: #6ADBD0; }
+  .status .off { color: #E07A5F; }
+  .leaflet-container { background: #0A1018; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel topbar">
+  <span class="brand">SKYWATCH LIVE</span>
+  <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
+  <span class="vtime" id="vtime">--:--</span>
+</div>
+<div class="panel status" id="status">loading…</div>
+<div class="panel botbar">
+  <button id="playBtn" aria-label="Play or pause">⏸</button>
+  <span class="lbl">-50m</span>
+  <div class="trackbox">
+    <div class="nowmark">NOW</div>
+    <input type="range" id="scrub" min="0" max="21" value="10" step="1" aria-label="Radar timeline">
+  </div>
+  <span class="lbl f">+2:45</span>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  "use strict";
+  const IEM = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/";
+  const GOES_URL = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/latest.jpg";
+  // GOES-East CONUS sector, approximate lat/lon bounds (geostationary projection,
+  // so this overlay is a visual backdrop, not a precise georeference).
+  const GOES_BOUNDS = [[14.6, -152.1], [56.8, -52.9]];
+
+  const PAST = 11;   // t = -50 .. 0 min, 5-min steps
+  const FUT = 11;    // t = +15 .. +165 min, 15-min steps
+  const NOW_I = PAST - 1;
+  const NFRAMES = PAST + FUT;
+  function frameT(i) { return i < PAST ? -(PAST - 1 - i) * 5 : (i - PAST + 1) * 15; }
+
+  const map = L.map("map", {
+    center: [38.5, -86],
+    zoom: 5,
+    minZoom: 4,
+    maxZoom: 10,
+    maxBounds: [[22, -108], [52, -58]],
+    zoomControl: true,
+    attributionControl: true
+  });
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap &copy; CARTO · Radar: IEM/NOAA · Sat: NOAA STAR",
+    subdomains: "abcd"
+  }).addTo(map);
+
+  // ---- GOES-East backdrop, refreshed every 5 minutes ----
+  let goesLayer = null;
+  let goesOk = false;
+  function loadGoes() {
+    const url = GOES_URL + "?t=" + Date.now();
+    const probe = new Image();
+    probe.onload = function () {
+      goesOk = true;
+      if (goesLayer) map.removeLayer(goesLayer);
+      goesLayer = L.imageOverlay(url, GOES_BOUNDS, { opacity: 0.8, zIndex: 200 }).addTo(map);
+      updateStatus();
+    };
+    probe.onerror = function () { goesOk = false; updateStatus(); };
+    probe.src = url;
+  }
+  loadGoes();
+  setInterval(loadGoes, 5 * 60 * 1000);
+
+  // ---- radar frame layers ----
+  function pad(n, w) { return String(n).padStart(w, "0"); }
+  function utcStamp(d, minStep) {
+    const m = Math.floor(d.getUTCMinutes() / minStep) * minStep;
+    return "" + d.getUTCFullYear() + pad(d.getUTCMonth() + 1, 2) + pad(d.getUTCDate(), 2) +
+           pad(d.getUTCHours(), 2) + pad(m, 2);
+  }
+
+  let hrrrRunOffsetHrs = 2;     // try the run from ~2 h ago first; fall back older on 404s
+  let hrrrErrors = 0;
+  let radarErrors = 0;
+
+  function hrrrInit() {
+    const d = new Date(Date.now() - hrrrRunOffsetHrs * 3600 * 1000);
+    d.setUTCMinutes(0, 0, 0);
+    return d;
+  }
+  function layerUrl(i) {
+    const t = frameT(i);
+    if (i < PAST) {
+      if (i === NOW_I) return IEM + "ridge::USCOMP-N0Q-0/{z}/{x}/{y}.png";
+      const d = new Date(Date.now() + t * 60000);
+      return IEM + "ridge::USCOMP-N0Q-" + utcStamp(d, 5) + "/{z}/{x}/{y}.png";
+    }
+    const init = hrrrInit();
+    const validMs = Date.now() + t * 60000;
+    let fmin = Math.round((validMs - init.getTime()) / 900000) * 15;
+    fmin = Math.max(0, Math.min(1080, fmin));
+    return IEM + "hrrr::REFD-F" + pad(fmin, 4) + "-" + utcStamp(init, 60) + "/{z}/{x}/{y}.png";
+  }
+
+  const layers = new Array(NFRAMES).fill(null);
+  function buildLayer(i) {
+    const lyr = L.tileLayer(layerUrl(i), { opacity: 0, zIndex: 400, maxNativeZoom: 9 });
+    lyr.on("tileerror", function () {
+      if (i < PAST) { radarErrors++; }
+      else {
+        hrrrErrors++;
+        if (hrrrErrors > 12 && hrrrRunOffsetHrs < 6) {
+          hrrrErrors = 0;
+          hrrrRunOffsetHrs++;      // this HRRR run isn't on IEM yet — use an older one
+          rebuildFuture();
+        }
+      }
+      updateStatus();
+    });
+    lyr.addTo(map);
+    return lyr;
+  }
+  function rebuildFuture() {
+    for (let i = PAST; i < NFRAMES; i++) {
+      if (layers[i]) { map.removeLayer(layers[i]); layers[i] = null; }
+    }
+    if (frame >= PAST) show(frame);
+  }
+
+  let frame = NOW_I;
+  function show(i) {
+    frame = i;
+    for (let j = 0; j < NFRAMES; j++) {
+      if (layers[j]) layers[j].setOpacity(j === i ? 0.75 : 0);
+    }
+    if (!layers[i]) {
+      layers[i] = buildLayer(i);
+      layers[i].setOpacity(0.75);
+    }
+    // preload the next frame in the loop
+    const nx = (i + 1) % NFRAMES;
+    if (!layers[nx]) layers[nx] = buildLayer(nx);
+    updateChrome();
+  }
+
+  // ---- chrome ----
+  const scrub = document.getElementById("scrub");
+  const playBtn = document.getElementById("playBtn");
+  const srcBadge = document.getElementById("srcBadge");
+  const vtime = document.getElementById("vtime");
+  const statusEl = document.getElementById("status");
+  function fmt(d) { return pad(d.getHours(), 2) + ":" + pad(d.getMinutes(), 2); }
+  function updateChrome() {
+    scrub.value = String(frame);
+    const t = frameT(frame);
+    const d = new Date(Date.now() + t * 60000);
+    if (frame < PAST) {
+      srcBadge.textContent = "NEXRAD N0Q · IEM COMPOSITE";
+      srcBadge.className = "badge mrms";
+      vtime.textContent = fmt(d) + (frame === NOW_I ? " · LATEST" : "");
+    } else {
+      srcBadge.textContent = "HRRR REFD FCST · +" + Math.floor(t / 60) + ":" + pad(t % 60, 2);
+      srcBadge.className = "badge fcst";
+      vtime.textContent = "FCST " + fmt(d);
+    }
+  }
+  function updateStatus() {
+    statusEl.innerHTML =
+      "RADAR  <span class='" + (radarErrors < 20 ? "on'>ok" : "off'>errors") + "</span><br>" +
+      "HRRR   <span class='on'>run -" + hrrrRunOffsetHrs + "h</span><br>" +
+      "GOES-E <span class='" + (goesOk ? "on'>ok" : "off'>unavailable") + "</span>";
+  }
+  updateStatus();
+
+  let playing = true;
+  playBtn.addEventListener("click", function () {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸" : "▶";
+  });
+  scrub.addEventListener("input", function () {
+    playing = false;
+    playBtn.textContent = "▶";
+    show(parseInt(scrub.value, 10));
+  });
+  setInterval(function () {
+    if (playing) show((frame + 1) % NFRAMES);
+  }, 700);
+
+  show(NOW_I);
+})();
+</script>
+</body>
+</html>

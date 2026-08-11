@@ -9,7 +9,6 @@
     --chip-ink: #3B4650;
     --rule: #C9D0D6;
   }
-  :root:not([data-theme="light"]) { }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #14181D;
@@ -122,11 +121,13 @@
   }
   .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
   .badge.l2   { color: #F5B85C; border-color: #8A6224; background: rgba(74,52,15,0.55); }
+  .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
   .topbar .spacer { flex: 1; }
   .frametime {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 13px; color: #BFD3E2;
   }
+  .frametime.fcst { color: #C9A6F5; }
   .clockbox {
     text-align: right;
     font-family: ui-monospace, Consolas, monospace;
@@ -149,10 +150,13 @@
     font-size: 19px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
+    font-family: inherit;
   }
   .btn:hover { background: rgba(30,46,64,0.9); }
   .btn:active { transform: translateY(1px); }
   .btn:focus-visible { outline: 2px solid #53C7F0; outline-offset: 1px; }
+  .btn.small { font-size: 10px; letter-spacing: 0.08em; font-weight: 700; }
+  .btn.on { border-color: #53C7F0; color: #53C7F0; }
 
   .zoomstack {
     position: absolute; right: 12px; top: 58px;
@@ -160,12 +164,16 @@
     z-index: 5;
   }
 
-  .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; position: relative; }
+  .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
   input.scrub {
-    flex: 1; -webkit-appearance: none; appearance: none;
+    width: 100%; -webkit-appearance: none; appearance: none;
     height: 4px; border-radius: 2px;
-    background: rgba(140,170,195,0.35);
+    background: linear-gradient(to right,
+      rgba(120,170,200,0.45) 0%, rgba(120,170,200,0.45) 47.8%,
+      rgba(160,120,220,0.4) 47.8%, rgba(160,120,220,0.4) 100%);
     cursor: pointer;
+    margin: 0;
   }
   input.scrub::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -176,11 +184,29 @@
     width: 14px; height: 14px; border-radius: 50%;
     background: #53C7F0; border: 2px solid #0A1018;
   }
+  .nowmark {
+    position: absolute; left: 47.8%; top: -13px;
+    transform: translateX(-50%);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8.5px; letter-spacing: 0.1em;
+    color: #9FB4C6;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.1;
+  }
+  .nowmark::after {
+    content: "";
+    display: block;
+    width: 1px; height: 8px;
+    background: #9FB4C6;
+    margin: 1px auto 0;
+  }
   .spanlabel {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 10px; letter-spacing: 0.08em; color: #7E93A5;
     white-space: nowrap;
   }
+  .spanlabel.fcst { color: #A88BD8; }
 
   .legend {
     position: absolute; left: 12px; bottom: 66px;
@@ -233,7 +259,7 @@
   /* ---- notes below device ---- */
   .notes {
     margin-top: 22px;
-    max-width: 820px;
+    max-width: 860px;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -254,7 +280,7 @@
     color: var(--sub);
     font-size: 13.5px;
     line-height: 1.55;
-    max-width: 68ch;
+    max-width: 70ch;
     margin: 0 auto;
   }
   .datanote b { color: var(--ink); font-weight: 600; }
@@ -263,7 +289,7 @@
 <header>
   <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 800 × 480</div>
   <h1>Home radar console — interactive mockup</h1>
-  <p class="sub">MRMS mosaic wide, KDMX Level&nbsp;2 super-res close. Mouse stands in for touch.</p>
+  <p class="sub">Eastern US · GOES-East backdrop · MRMS past → HRRR forecast · KDMX Level&nbsp;2 close-up</p>
 </header>
 
 <div class="device">
@@ -284,6 +310,7 @@
       <div class="zoomstack">
         <button class="btn" id="zoomIn" aria-label="Zoom in">+</button>
         <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
+        <button class="btn small on" id="satBtn" aria-label="Toggle satellite layer">SAT</button>
         <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
       </div>
       <div class="scalebar" id="scalebar">
@@ -299,8 +326,11 @@
         <button class="btn" id="playBtn" aria-label="Play or pause">⏸</button>
         <div class="scrubwrap">
           <span class="spanlabel" id="spanStart">-44 MIN</span>
-          <input class="scrub" id="scrub" type="range" min="0" max="11" value="11" step="1" aria-label="Radar history">
-          <span class="spanlabel">NOW</span>
+          <div class="trackbox">
+            <div class="nowmark">NOW</div>
+            <input class="scrub" id="scrub" type="range" min="0" max="23" value="11" step="1" aria-label="Radar history and forecast">
+          </div>
+          <span class="spanlabel fcst">+3 HR</span>
         </div>
       </div>
       <div class="toast" id="toast"></div>
@@ -312,19 +342,21 @@
   <div class="chips">
     <div class="chip"><b>Drag</b> pan</div>
     <div class="chip"><b>Scroll</b> pinch-zoom</div>
-    <div class="chip"><b>Double-click</b> zoom in</div>
-    <div class="chip"><b>Zoom in past ~200 km view</b> switches to KDMX Level 2</div>
-    <div class="chip"><b>⌂</b> reset to regional view</div>
+    <div class="chip"><b>Zoom in</b> switches to KDMX Level 2</div>
+    <div class="chip"><b>Scrub right of NOW</b> = HRRR forecast</div>
+    <div class="chip"><b>SAT</b> toggles satellite</div>
+    <div class="chip"><b>⌂</b> reset view</div>
   </div>
   <p class="datanote">
-    <b>About the data:</b> the storm on screen is a procedural simulation (this page can't
-    reach NOAA's servers), but the two rendering modes model the real sources faithfully.
-    Wide views sample a <b>1&nbsp;km Cartesian grid at a 2-minute cadence — MRMS composite
-    reflectivity</b>, pulled as tiles from NOAA's map services. Past the zoom threshold the
-    panel switches to <b>NEXRAD Level&nbsp;2 super-resolution</b> from the KDMX (Des&nbsp;Moines)
-    radar: polar gates 0.5° × 250&nbsp;m fetched from the open AWS <i>noaa-nexrad-level2</i>
-    bucket — note the radial beam texture and the 230&nbsp;km range ring. On the real device
-    the ESP32-S3 would fetch pre-rendered tiles over Wi-Fi and blit them to the 800×480 panel.
+    <b>About the data:</b> this hosted page can't reach NOAA (the artifact sandbox blocks all
+    external requests), so everything on screen is a faithful simulation of the real feeds.
+    Left of NOW: <b>MRMS composite reflectivity</b> sampled on a true 1&nbsp;km grid, switching
+    to <b>KDMX NEXRAD Level&nbsp;2</b> polar gates (0.5° × 250&nbsp;m) when zoomed in. Right of
+    NOW: <b>HRRR simulated reflectivity (REFD)</b> on the model's 3&nbsp;km grid at 15-minute
+    steps — on hardware these come as ready-made XYZ tiles from the Iowa Environmental Mesonet.
+    The cloud backdrop emulates <b>GOES-East GeoColor</b> over the eastern US; the real device
+    would pull the live image from NOAA STAR (<i>cdn.star.nesdis.noaa.gov</i>). For actual live
+    data in a browser, open <b>live.html</b> from this repo locally — no sandbox, real tiles.
   </p>
 </section>
 
@@ -353,24 +385,92 @@
     return s;
   }
 
-  // ---------- storm model (world coords in km, KDMX radar at origin, +x east, +y north) ----------
-  const VX = 0.75, VY = 0.15;                 // squall line motion, km per minute (~46 km/h ENE)
-  const U = { x: 0.38, y: 0.925 };            // unit vector along the line (SSW→NNE)
-  const N = { x: 0.925, y: -0.38 };           // line normal, pointing east (ahead of line)
+  // ---------- geography: km coords centered on KDMX (41.73 N, 93.72 W) ----------
+  const LAT0 = 41.73, LON0 = -93.72, KX = 83.1, KY = 110.9;
+  function ll(lat, lon) { return { x: (lon - LON0) * KX, y: (lat - LAT0) * KY }; }
+
+  // Gulf + Atlantic coastline, SW Texas to Maine (approximate)
+  const COAST = [
+    [25.9,-97.2],[27.8,-97.4],[28.6,-96.0],[29.3,-94.8],[29.6,-92.2],[29.2,-89.2],
+    [30.2,-88.9],[30.4,-88.0],[30.4,-86.6],[29.9,-85.4],[29.7,-84.9],[29.1,-83.1],
+    [28.2,-82.8],[27.9,-82.6],[26.5,-82.1],[26.1,-81.8],[25.2,-81.1],[24.9,-80.7],
+    [25.8,-80.2],[27.0,-80.1],[28.5,-80.5],[29.7,-81.2],[30.4,-81.4],[31.2,-81.2],
+    [32.0,-80.9],[32.8,-79.9],[33.7,-78.8],[33.9,-77.9],[34.6,-76.5],[35.2,-75.5],
+    [36.0,-75.7],[36.9,-76.0],[37.6,-75.8],[38.3,-75.1],[38.9,-74.9],[39.4,-74.3],
+    [40.5,-74.0],[40.6,-73.8],[40.8,-72.7],[41.0,-71.9],[41.3,-71.9],[41.5,-71.0],
+    [41.7,-70.0],[42.0,-70.2],[42.3,-70.9],[42.8,-70.7],[43.6,-70.2],[44.3,-68.9],
+    [44.8,-66.9]
+  ];
+  // Great Lakes (approximate filled shapes)
+  const LAKES = [
+    [[46.8,-92.1],[47.3,-90.8],[47.7,-89.5],[47.9,-88.2],[47.4,-86.7],[46.6,-84.8],[46.4,-85.9],[46.5,-88.0],[46.6,-90.2]],
+    [[45.9,-85.0],[45.0,-85.6],[43.8,-86.5],[42.6,-86.5],[41.7,-86.9],[41.7,-87.5],[42.6,-87.8],[44.0,-87.5],[45.2,-86.4],[45.8,-85.6]],
+    [[46.1,-84.1],[45.3,-83.3],[44.4,-82.7],[43.6,-82.4],[43.0,-82.4],[43.9,-81.7],[44.6,-80.4],[45.3,-80.8],[45.9,-81.8],[46.2,-83.0]],
+    [[42.9,-78.9],[42.4,-79.8],[41.9,-80.8],[41.5,-82.0],[41.4,-82.9],[41.7,-83.4],[42.1,-83.1],[42.4,-81.8],[42.7,-80.3]],
+    [[43.3,-79.7],[43.2,-78.5],[43.3,-77.0],[43.5,-76.2],[44.1,-76.4],[43.9,-77.8],[43.6,-79.2]]
+  ];
+  const CITIES = [
+    // tier 0: eastern-US wide view
+    { n: "Chicago",      lat: 41.88, lon: -87.63, t: 0 },
+    { n: "Minneapolis",  lat: 44.98, lon: -93.27, t: 0 },
+    { n: "St Louis",     lat: 38.63, lon: -90.20, t: 0 },
+    { n: "Dallas",       lat: 32.78, lon: -96.80, t: 0 },
+    { n: "Houston",      lat: 29.76, lon: -95.37, t: 0 },
+    { n: "New Orleans",  lat: 29.95, lon: -90.07, t: 0 },
+    { n: "Atlanta",      lat: 33.75, lon: -84.39, t: 0 },
+    { n: "Miami",        lat: 25.76, lon: -80.19, t: 0 },
+    { n: "Washington",   lat: 38.90, lon: -77.04, t: 0 },
+    { n: "New York",     lat: 40.71, lon: -74.01, t: 0 },
+    { n: "Detroit",      lat: 42.33, lon: -83.05, t: 0 },
+    { n: "Memphis",      lat: 35.15, lon: -90.05, t: 0 },
+    { n: "Nashville",    lat: 36.16, lon: -86.78, t: 0 },
+    { n: "Charlotte",    lat: 35.23, lon: -80.84, t: 0 },
+    { n: "Boston",       lat: 42.36, lon: -71.06, t: 0 },
+    // tier 1: regional
+    { n: "Kansas City",  lat: 39.10, lon: -94.58, t: 1 },
+    { n: "Omaha",        lat: 41.26, lon: -95.94, t: 1 },
+    { n: "Des Moines",   lat: 41.59, lon: -93.62, t: 1 },
+    { n: "Cedar Rapids", lat: 41.98, lon: -91.67, t: 1 },
+    { n: "Indianapolis", lat: 39.77, lon: -86.16, t: 1 },
+    { n: "Cincinnati",   lat: 39.10, lon: -84.51, t: 1 },
+    { n: "Pittsburgh",   lat: 40.44, lon: -79.99, t: 1 },
+    { n: "Cleveland",    lat: 41.50, lon: -81.69, t: 1 },
+    { n: "Milwaukee",    lat: 43.04, lon: -87.91, t: 1 },
+    // tier 2/3: central Iowa (KDMX close-up)
+    { n: "Ames",         lat: 42.03, lon: -93.62, t: 2 },
+    { n: "Marshalltown", lat: 42.05, lon: -92.91, t: 2 },
+    { n: "Fort Dodge",   lat: 42.50, lon: -94.17, t: 2 },
+    { n: "Ottumwa",      lat: 41.02, lon: -92.41, t: 2 },
+    { n: "Ankeny",       lat: 41.73, lon: -93.61, t: 3 },
+    { n: "Boone",        lat: 42.06, lon: -93.88, t: 3 },
+    { n: "Perry",        lat: 41.84, lon: -94.10, t: 3 },
+    { n: "Newton",       lat: 41.70, lon: -93.05, t: 3 },
+    { n: "Grinnell",     lat: 41.74, lon: -92.72, t: 3 },
+    { n: "Winterset",    lat: 41.33, lon: -94.01, t: 3 },
+    { n: "Indianola",    lat: 41.36, lon: -93.56, t: 3 },
+    { n: "Pella",        lat: 41.41, lon: -92.92, t: 3 }
+  ];
+  const RIVER = [
+    [-42, 95], [-30, 70], [-24, 52], [-14, 38], [-8, 22], [-2, 8],
+    [2, -6], [6, -14], [14, -26], [22, -42], [30, -58], [38, -72]
+  ];
+
+  // ---------- storm model (km, KDMX at origin, +x east, +y north) ----------
+  const VX = 0.75, VY = 0.15;                 // squall line motion, km/min (~46 km/h ENE)
+  const U = { x: 0.38, y: 0.925 };            // along-line unit vector (SSW-NNE)
+  const N = { x: 0.925, y: -0.38 };           // line normal, pointing east
   const P0 = { x: 22, y: -8 };                // line anchor at t = 0
 
   const CELLS = [];
   for (let i = 0; i < 9; i++) {
-    const s = -115 + i * 28 + (hash2(i, 7) - 0.5) * 14;
     CELLS.push({
-      s: s,
+      s: -115 + i * 28 + (hash2(i, 7) - 0.5) * 14,
       offn: (hash2(i, 19) - 0.5) * 8,
-      peak: 47 + hash2(i, 11) * 16,           // 47–63 dBZ cores
-      rl: 9 + hash2(i, 13) * 8,               // radius along line
-      rw: 4.5 + hash2(i, 17) * 3.5            // radius across line
+      peak: 47 + hash2(i, 11) * 16,
+      rl: 9 + hash2(i, 13) * 8,
+      rw: 4.5 + hash2(i, 17) * 3.5
     });
   }
-  // scattered small cells ahead of the line
   const POPS = [];
   for (let i = 0; i < 5; i++) {
     POPS.push({
@@ -381,14 +481,13 @@
     });
   }
 
-  function stormField(ax, ay, t) {
-    // ax, ay are storm-frame coords; t in minutes (0 = now, negative = past)
+  function stormField(ax, ay, t, spread) {
+    const sp = spread || 1;
     const rx = ax - P0.x, ry = ay - P0.y;
-    const dl = rx * U.x + ry * U.y;
-    const dn = rx * N.x + ry * N.y;
+    const dl = (rx * U.x + ry * U.y) / sp;
+    const dn = (rx * N.x + ry * N.y) / sp;
     let dbz = -25;
 
-    // trailing stratiform shield
     if (dn < 10 && dn > -150 && Math.abs(dl) < 170) {
       const f1 = Math.min(1, (10 - dn) / 20);
       const f2 = Math.min(1, (dn + 150) / 55);
@@ -397,13 +496,12 @@
       if (strat > dbz) dbz = strat;
     }
 
-    // convective line cells (with slow pulsing)
     for (let i = 0; i < CELLS.length; i++) {
       const c = CELLS[i];
       const cx = P0.x + U.x * c.s + N.x * c.offn;
       const cy = P0.y + U.y * c.s + N.y * c.offn;
-      const ddl = (ax - cx) * U.x + (ay - cy) * U.y;
-      const ddn = (ax - cx) * N.x + (ay - cy) * N.y;
+      const ddl = ((ax - cx) * U.x + (ay - cy) * U.y) / sp;
+      const ddn = ((ax - cx) * N.x + (ay - cy) * N.y) / sp;
       const q = (ddl * ddl) / (c.rl * c.rl) + (ddn * ddn) / (c.rw * c.rw);
       if (q < 9) {
         const pulse = 0.84 + 0.32 * vnoise(i * 13.7 + 3.1, t * 0.09);
@@ -412,10 +510,9 @@
       }
     }
 
-    // pop-up cells ahead
     for (let i = 0; i < POPS.length; i++) {
       const p = POPS[i];
-      const dx = ax - p.x, dy = ay - p.y;
+      const dx = (ax - p.x) / sp, dy = (ay - p.y) / sp;
       const q = (dx * dx + dy * dy) / (p.r * p.r);
       if (q < 9) {
         const v = p.peak * Math.exp(-q);
@@ -426,8 +523,7 @@
   }
 
   function fieldMRMS(x, y, t) {
-    // 1 km Cartesian grid sample (quantize), km-scale texture
-    const qx = Math.floor(x) + 0.5, qy = Math.floor(y) + 0.5;
+    const qx = Math.floor(x) + 0.5, qy = Math.floor(y) + 0.5;   // 1 km grid
     const ax = qx - VX * t, ay = qy - VY * t;
     let v = stormField(ax, ay, t);
     v += (fbm(ax * 0.16, ay * 0.16, 3) - 0.5) * 9;
@@ -440,7 +536,7 @@
 
   function fieldL2(x, y, t) {
     const r = Math.hypot(x, y);
-    if (r > L2_MAX_R || r < 0.8) return -999;   // beyond range / cone of silence
+    if (r > L2_MAX_R || r < 0.8) return -999;
     const azBin = Math.round(Math.atan2(y, x) / AZ_STEP);
     const az = azBin * AZ_STEP;
     const rq = (Math.floor(r / GATE) + 0.5) * GATE;
@@ -448,8 +544,18 @@
     const ax = gx - VX * t, ay = gy - VY * t;
     let v = stormField(ax, ay, t);
     v += (fbm(ax * 0.16, ay * 0.16, 3) - 0.5) * 9;
-    v += (fbm(ax * 0.85 + 40, ay * 0.85 - 40, 3) - 0.5) * 8;      // fine-scale structure
-    v += (hash2(azBin & 2047, Math.floor(r * 4) + ((t * 7) | 0)) - 0.5) * 4;  // gate speckle
+    v += (fbm(ax * 0.85 + 40, ay * 0.85 - 40, 3) - 0.5) * 8;
+    v += (hash2(azBin & 2047, Math.floor(r * 4) + ((t * 7) | 0)) - 0.5) * 4;
+    return v;
+  }
+
+  // HRRR REFD forecast: 3 km model grid, smoother texture, drift error grows with lead
+  function fieldHRRR(x, y, t) {
+    const g = 3;
+    const qx = Math.floor(x / g) * g + g / 2, qy = Math.floor(y / g) * g + g / 2;
+    const ax = qx - VX * t - t * 0.02, ay = qy - VY * t + t * 0.012;
+    let v = stormField(ax, ay, t, 1.3) * 0.96;
+    v += (fbm(ax * 0.07, ay * 0.07, 3) - 0.5) * 10;
     return v;
   }
 
@@ -468,72 +574,97 @@
     return idx;
   }
 
-  // ---------- geography ----------
-  const CITIES = [
-    { n: "Des Moines",  x: 3,    y: -13,  t: 1 },
-    { n: "Omaha",       x: -180, y: -25,  t: 1 },
-    { n: "Cedar Rapids",x: 185,  y: 40,   t: 1 },
-    { n: "Mason City",  x: 25,   y: 155,  t: 1 },
-    { n: "Ottumwa",     x: 85,   y: -75,  t: 2 },
-    { n: "Fort Dodge",  x: -45,  y: 95,   t: 2 },
-    { n: "Ames",        x: 6,    y: 37,   t: 2 },
-    { n: "Marshalltown",x: 58,   y: 32,   t: 2 },
-    { n: "Creston",     x: -60,  y: -70,  t: 2 },
-    { n: "Ankeny",      x: 7,    y: -2,   t: 3 },
-    { n: "Boone",       x: -18,  y: 40,   t: 3 },
-    { n: "Perry",       x: -28,  y: 18,   t: 3 },
-    { n: "Newton",      x: 48,   y: -8,   t: 3 },
-    { n: "Grinnell",    x: 75,   y: -5,   t: 3 },
-    { n: "Winterset",   x: -28,  y: -45,  t: 3 },
-    { n: "Indianola",   x: 12,   y: -40,  t: 3 },
-    { n: "Pella",       x: 58,   y: -35,  t: 3 }
-  ];
-  const RIVER = [
-    [-42, 95], [-30, 70], [-24, 52], [-14, 38], [-8, 22], [-2, 8],
-    [2, -6], [6, -14], [14, -26], [22, -42], [30, -58], [38, -72]
-  ];
-
-  // ---------- view / state ----------
+  // ---------- view / timeline state ----------
   const W = 800, H = 480;
-  const HOME = { cx: 12, cy: -4, s: 1.5 };
+  const HOME = { cx: 766, cy: -525, s: 0.28 };   // eastern half of the US
   const view = { cx: HOME.cx, cy: HOME.cy, s: HOME.s };
-  const L2_THRESHOLD = 3.5;       // px per km
-  const NFRAMES = 12, FRAME_MIN = 4;   // 12 frames, 4-minute spacing
+  const L2_THRESHOLD = 3.5;
+  const PAST = 12, FUT = 12;                     // 12 x 4 min past, 12 x 15 min future
+  const NFRAMES = PAST + FUT;
+  const NOW_I = PAST - 1;
 
-  let frame = NFRAMES - 1;        // current frame index (11 = now)
+  let frame = NOW_I;
   let playing = true;
   let interacting = false;
+  let satOn = true;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduceMotion) playing = false;
+
+  function frameT(i) { return i < PAST ? -(PAST - 1 - i) * 4 : (i - PAST + 1) * 15; }
+  function frameKind(i) {
+    if (i >= PAST) return "hrrr";
+    return view.s >= L2_THRESHOLD ? "l2" : "mrms";
+  }
 
   const canvas = document.getElementById("map");
   const ctx = canvas.getContext("2d");
   const off = document.createElement("canvas");
   off.width = W; off.height = H;
   const offCtx = off.getContext("2d");
+  const SW = 200, SH = 120;                      // satellite cloud raster (coarse, upscaled)
+  const satOff = document.createElement("canvas");
+  satOff.width = SW; satOff.height = SH;
+  const satCtx = satOff.getContext("2d");
 
-  const frameCache = new Map();   // key -> ImageData
+  const cache = new Map();
   function viewKey() {
     return view.cx.toFixed(2) + "," + view.cy.toFixed(2) + "," + view.s.toFixed(3);
   }
-  function mode() { return view.s >= L2_THRESHOLD ? "l2" : "mrms"; }
-  function frameT(i) { return -(NFRAMES - 1 - i) * FRAME_MIN; }
+
+  // ---------- satellite clouds (GOES-East GeoColor emulation) ----------
+  function cloudAt(wx, wy, t) {
+    const tt = Math.min(t, 0);                   // no future satellite: freeze at latest
+    const ax = wx - VX * tt, ay = wy - VY * tt;
+    let c = fbm(ax * 0.004 + 2.7, ay * 0.004 - 1.3, 4);
+    c = Math.max(0, (c - 0.52) * 2.6);
+    const s = stormField(ax - 6, ay, tt, 2.4);   // anvil shield, nudged downshear
+    const a = Math.max(0, Math.min(1, (s - 8) / 30));
+    let cl = Math.max(c * 0.55, a);
+    cl *= 0.75 + 0.5 * fbm(ax * 0.03, ay * 0.03, 3);
+    return Math.min(1, cl);
+  }
+
+  function renderSat(fi) {
+    const key = "sat|" + Math.min(fi, NOW_I) + "|" + viewKey();
+    let img = cache.get(key);
+    if (!img) {
+      img = satCtx.createImageData(SW, SH);
+      const d = img.data;
+      const t = frameT(Math.min(fi, NOW_I));
+      const kmPerCellX = W / SW / view.s, kmPerCellY = H / SH / view.s;
+      for (let py = 0; py < SH; py++) {
+        const wy = view.cy - (py + 0.5 - SH / 2) * kmPerCellY;
+        for (let px = 0; px < SW; px++) {
+          const wx = view.cx + (px + 0.5 - SW / 2) * kmPerCellX;
+          const cl = cloudAt(wx, wy, t);
+          if (cl < 0.04) continue;
+          const o = (py * SW + px) * 4;
+          d[o] = 216; d[o + 1] = 221; d[o + 2] = 228;
+          d[o + 3] = Math.min(255, cl * 215) | 0;
+        }
+      }
+      if (cache.size > 80) cache.clear();
+      cache.set(key, img);
+    }
+    satCtx.putImageData(img, 0, 0);
+  }
 
   // ---------- radar raster ----------
   function renderRadar(fi, step) {
-    const key = mode() + "|" + fi + "|" + step + "|" + viewKey();
-    let img = frameCache.get(key);
+    const kind = frameKind(fi);
+    const key = kind + "|" + fi + "|" + step + "|" + viewKey();
+    let img = cache.get(key);
     if (!img) {
       img = offCtx.createImageData(W, H);
       const d = img.data;
       const t = frameT(fi);
-      const isL2 = mode() === "l2";
+      const fld = kind === "l2" ? fieldL2 : (kind === "hrrr" ? fieldHRRR : fieldMRMS);
       const invS = 1 / view.s;
       for (let py = 0; py < H; py += step) {
         const wy = view.cy - (py + step * 0.5 - H / 2) * invS;
         for (let px = 0; px < W; px += step) {
           const wx = view.cx + (px + step * 0.5 - W / 2) * invS;
-          const v = isL2 ? fieldL2(wx, wy, t) : fieldMRMS(wx, wy, t);
+          const v = fld(wx, wy, t);
           const pi = palIndex(v);
           if (pi < 0) continue;
           const c = PAL[pi];
@@ -547,8 +678,8 @@
           }
         }
       }
-      if (frameCache.size > 40) frameCache.clear();
-      frameCache.set(key, img);
+      if (cache.size > 80) cache.clear();
+      cache.set(key, img);
     }
     offCtx.putImageData(img, 0, 0);
   }
@@ -556,54 +687,86 @@
   // ---------- basemap ----------
   function w2sx(x) { return W / 2 + (x - view.cx) * view.s; }
   function w2sy(y) { return H / 2 - (y - view.cy) * view.s; }
+  function path(pts) {
+    ctx.beginPath();
+    pts.forEach(function (p, i) {
+      const w = ll(p[0], p[1]);
+      if (i === 0) ctx.moveTo(w2sx(w.x), w2sy(w.y));
+      else ctx.lineTo(w2sx(w.x), w2sy(w.y));
+    });
+  }
 
   function drawBase() {
-    ctx.fillStyle = "#0A1018";
+    // ocean
+    ctx.fillStyle = "#0A1322";
     ctx.fillRect(0, 0, W, H);
 
-    // county-ish grid every 40 km
-    ctx.strokeStyle = "rgba(70,90,110,0.22)";
+    // land: coastline closed far inland (W and N edges of the domain)
+    path(COAST.concat([[47.5, -67.0], [50.5, -76.0], [51.5, -105.0], [23.5, -105.0], [25.9, -97.2]]));
+    ctx.closePath();
+    ctx.fillStyle = "#111713";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(110,140,160,0.5)";
     ctx.lineWidth = 1;
-    const g = 40;
-    const x0 = Math.floor((view.cx - W / 2 / view.s) / g) * g;
-    const x1 = view.cx + W / 2 / view.s;
-    const y0 = Math.floor((view.cy - H / 2 / view.s) / g) * g;
-    const y1 = view.cy + H / 2 / view.s;
-    ctx.beginPath();
-    for (let x = x0; x <= x1; x += g) { ctx.moveTo(w2sx(x), 0); ctx.lineTo(w2sx(x), H); }
-    for (let y = y0; y <= y1; y += g) { ctx.moveTo(0, w2sy(y)); ctx.lineTo(W, w2sy(y)); }
+    path(COAST);
     ctx.stroke();
 
-    // river
-    ctx.strokeStyle = "rgba(60,110,150,0.5)";
-    ctx.lineWidth = Math.max(1, view.s * 0.35);
-    ctx.beginPath();
-    RIVER.forEach(function (p, i) {
-      if (i === 0) ctx.moveTo(w2sx(p[0]), w2sy(p[1]));
-      else ctx.lineTo(w2sx(p[0]), w2sy(p[1]));
+    // Great Lakes
+    ctx.fillStyle = "#0A1322";
+    ctx.strokeStyle = "rgba(110,140,160,0.4)";
+    LAKES.forEach(function (lk) {
+      path(lk);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
     });
-    ctx.stroke();
 
-    // interstates
-    ctx.strokeStyle = "rgba(150,160,150,0.4)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, w2sy(-16)); ctx.lineTo(W, w2sy(-16));   // I-80
-    ctx.moveTo(w2sx(5), 0); ctx.lineTo(w2sx(5), H);       // I-35
-    ctx.stroke();
-    if (view.s > 2.2) {
-      ctx.fillStyle = "rgba(170,180,170,0.75)";
-      ctx.font = "10px ui-monospace, Consolas, monospace";
-      ctx.fillText("I-80", 8, w2sy(-16) - 5);
-      ctx.fillText("I-35", w2sx(5) + 5, 14);
+    if (view.s > 1.2) {
+      // county-ish grid every 40 km
+      ctx.strokeStyle = "rgba(70,90,110,0.22)";
+      ctx.lineWidth = 1;
+      const g = 40;
+      const x0 = Math.floor((view.cx - W / 2 / view.s) / g) * g;
+      const x1 = view.cx + W / 2 / view.s;
+      const y0 = Math.floor((view.cy - H / 2 / view.s) / g) * g;
+      const y1 = view.cy + H / 2 / view.s;
+      ctx.beginPath();
+      for (let x = x0; x <= x1; x += g) { ctx.moveTo(w2sx(x), 0); ctx.lineTo(w2sx(x), H); }
+      for (let y = y0; y <= y1; y += g) { ctx.moveTo(0, w2sy(y)); ctx.lineTo(W, w2sy(y)); }
+      ctx.stroke();
+
+      // Des Moines River
+      ctx.strokeStyle = "rgba(60,110,150,0.5)";
+      ctx.lineWidth = Math.max(1, view.s * 0.35);
+      ctx.beginPath();
+      RIVER.forEach(function (p, i) {
+        if (i === 0) ctx.moveTo(w2sx(p[0]), w2sy(p[1]));
+        else ctx.lineTo(w2sx(p[0]), w2sy(p[1]));
+      });
+      ctx.stroke();
+    }
+
+    if (view.s > 0.9) {
+      // interstates
+      ctx.strokeStyle = "rgba(150,160,150,0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, w2sy(-16)); ctx.lineTo(W, w2sy(-16));   // I-80
+      ctx.moveTo(w2sx(5), 0); ctx.lineTo(w2sx(5), H);       // I-35
+      ctx.stroke();
+      if (view.s > 2.2) {
+        ctx.fillStyle = "rgba(170,180,170,0.75)";
+        ctx.font = "10px ui-monospace, Consolas, monospace";
+        ctx.fillText("I-80", 8, w2sy(-16) - 5);
+        ctx.fillText("I-35", w2sx(5) + 5, 14);
+      }
     }
   }
 
   function drawOverlays() {
-    const isL2 = mode() === "l2";
+    const isL2 = frameKind(frame) === "l2";
 
-    // range rings (always faint, brighter in L2)
-    const ringAlpha = isL2 ? 0.4 : 0.15;
+    const ringAlpha = isL2 ? 0.4 : (view.s > 1 ? 0.15 : 0.07);
     ctx.strokeStyle = "rgba(120,160,190," + ringAlpha + ")";
     ctx.lineWidth = 1;
     [50, 100, 150, 200].forEach(function (r) {
@@ -624,19 +787,26 @@
     const rx = w2sx(0), ry = w2sy(0);
     ctx.fillStyle = "#F5B85C";
     ctx.beginPath();
-    ctx.arc(rx, ry, 4, 0, Math.PI * 2);
+    ctx.arc(rx, ry, view.s > 1 ? 4 : 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#0A1018"; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = "rgba(245,200,130,0.95)";
-    ctx.font = "bold 11px ui-monospace, Consolas, monospace";
-    ctx.fillText("KDMX", rx + 8, ry - 6);
+    if (view.s > 0.55) {
+      ctx.fillStyle = "rgba(245,200,130,0.95)";
+      ctx.font = "bold 11px ui-monospace, Consolas, monospace";
+      ctx.fillText("KDMX", rx + 8, ry - 6);
+    }
 
     // cities
     ctx.font = "11px system-ui, sans-serif";
     CITIES.forEach(function (c) {
-      const show = c.t === 1 || (c.t === 2 && view.s > 1.1) || (c.t === 3 && view.s > 3);
+      const show =
+        (c.t === 0) ||
+        (c.t === 1 && view.s > 0.6) ||
+        (c.t === 2 && view.s > 1.6) ||
+        (c.t === 3 && view.s > 3);
       if (!show) return;
-      const sx = w2sx(c.x), sy = w2sy(c.y);
+      const w = ll(c.lat, c.lon);
+      const sx = w2sx(w.x), sy = w2sy(w.y);
       if (sx < -30 || sx > W + 30 || sy < -20 || sy > H + 20) return;
       ctx.fillStyle = "rgba(215,230,240,0.9)";
       ctx.beginPath();
@@ -650,8 +820,14 @@
   }
 
   function draw() {
-    const step = interacting ? 3 : (mode() === "l2" ? 1 : 2);
+    const kind = frameKind(frame);
+    const step = interacting ? 3 : (kind === "l2" ? 1 : 2);
     drawBase();
+    if (satOn) {
+      renderSat(frame);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(satOff, 0, 0, W, H);
+    }
     renderRadar(frame, step);
     ctx.globalAlpha = 0.78;
     ctx.drawImage(off, 0, 0);
@@ -667,10 +843,8 @@
   const toastEl = document.getElementById("toast");
   const scrub = document.getElementById("scrub");
   const playBtn = document.getElementById("playBtn");
-  const spanStart = document.getElementById("spanStart");
-  spanStart.textContent = "-" + ((NFRAMES - 1) * FRAME_MIN) + " MIN";
+  document.getElementById("spanStart").textContent = "-" + ((PAST - 1) * 4) + " MIN";
 
-  // legend swatches
   (function () {
     const box = document.getElementById("legendSwatches");
     PAL.forEach(function (c) {
@@ -684,38 +858,51 @@
   function fmt(d) {
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
+  function fmtLead(min) {
+    return "+" + Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0");
+  }
   function updateChrome() {
-    const ft = new Date(t0.getTime() + frameT(frame) * 60000);
-    frameTimeEl.textContent = fmt(ft) + (frame === NFRAMES - 1 ? " · LATEST" : "");
+    const t = frameT(frame);
+    const kind = frameKind(frame);
+    const ft = new Date(t0.getTime() + t * 60000);
     scrub.value = String(frame);
-    const isL2 = mode() === "l2";
-    srcBadge.textContent = isL2 ? "KDMX LEVEL II · 250 M" : "MRMS MOSAIC · 1 KM";
-    srcBadge.className = "badge " + (isL2 ? "l2" : "mrms");
-    // scale bar: nice round distance close to 100 screen px
+    if (kind === "hrrr") {
+      frameTimeEl.textContent = "FCST " + fmt(ft);
+      frameTimeEl.className = "frametime fcst";
+      srcBadge.textContent = "HRRR REFD · 3 KM · " + fmtLead(t);
+      srcBadge.className = "badge fcst";
+    } else {
+      frameTimeEl.textContent = fmt(ft) + (frame === NOW_I ? " · LATEST" : "");
+      frameTimeEl.className = "frametime";
+      const isL2 = kind === "l2";
+      srcBadge.textContent = isL2 ? "KDMX LEVEL II · 250 M" : "MRMS MOSAIC · 1 KM";
+      srcBadge.className = "badge " + (isL2 ? "l2" : "mrms");
+    }
     const kmTarget = 100 / view.s;
-    const nice = [5, 10, 20, 25, 50, 100, 200].reduce(function (a, b) {
+    const nice = [5, 10, 20, 25, 50, 100, 200, 500].reduce(function (a, b) {
       return Math.abs(b - kmTarget) < Math.abs(a - kmTarget) ? b : a;
     });
     document.getElementById("scaleRule").style.width = (nice * view.s) + "px";
     document.getElementById("scaleText").textContent = nice + " km";
   }
 
-  let lastMode = mode();
+  let lastZoomMode = view.s >= L2_THRESHOLD ? "l2" : "mrms";
   let toastTimer = null;
   function checkModeSwitch() {
-    const m = mode();
-    if (m !== lastMode) {
-      lastMode = m;
-      toastEl.textContent = m === "l2"
-        ? "▲ KDMX LEVEL II — SUPER-RES 0.5° × 250 M"
-        : "▼ MRMS COMPOSITE — 1 KM NATIONAL MOSAIC";
-      toastEl.classList.add("show");
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+    const m = view.s >= L2_THRESHOLD ? "l2" : "mrms";
+    if (m !== lastZoomMode) {
+      lastZoomMode = m;
+      if (frame < PAST) {
+        toastEl.textContent = m === "l2"
+          ? "▲ KDMX LEVEL II — SUPER-RES 0.5° × 250 M"
+          : "▼ MRMS COMPOSITE — 1 KM NATIONAL MOSAIC";
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+      }
     }
   }
 
-  // wall clock + fake update countdown
   let updSecs = 120;
   setInterval(function () {
     clockEl.textContent = fmt(new Date());
@@ -729,7 +916,7 @@
   let lastAdvance = 0;
   function tick(ts) {
     if (playing && !interacting) {
-      const dwell = frame === NFRAMES - 1 ? 1400 : 380;
+      const dwell = frame === NOW_I ? 1300 : (frame === NFRAMES - 1 ? 1300 : 380);
       if (ts - lastAdvance > dwell) {
         frame = (frame + 1) % NFRAMES;
         lastAdvance = ts;
@@ -751,7 +938,7 @@
     }, 160);
   }
   function refresh() {
-    frameCache.clear();
+    cache.clear();
     checkModeSwitch();
     updateChrome();
     draw();
@@ -781,7 +968,7 @@
   });
 
   function zoomAt(px, py, factor) {
-    const ns = Math.min(40, Math.max(0.7, view.s * factor));
+    const ns = Math.min(40, Math.max(0.22, view.s * factor));
     if (ns === view.s) return;
     const wx = view.cx + (px - W / 2) / view.s;
     const wy = view.cy - (py - H / 2) / view.s;
@@ -808,6 +995,12 @@
   document.getElementById("homeBtn").addEventListener("click", function () {
     view.cx = HOME.cx; view.cy = HOME.cy; view.s = HOME.s;
     refresh();
+  });
+  const satBtn = document.getElementById("satBtn");
+  satBtn.addEventListener("click", function () {
+    satOn = !satOn;
+    satBtn.classList.toggle("on", satOn);
+    draw();
   });
 
   scrub.addEventListener("input", function () {
