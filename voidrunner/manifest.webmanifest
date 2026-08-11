@@ -2,7 +2,7 @@
   "name": "VOIDRUNNER",
   "short_name": "VOIDRUNNER",
   "description": "A 3D sci-fi corridor runner. Thread the gaps, graze for the multiplier, burn overdrive. No ads, no tracking, plays offline.",
-  "id": "/voidrunner/",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

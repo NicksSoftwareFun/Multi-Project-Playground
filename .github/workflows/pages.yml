@@ -1,8 +1,22 @@
-name: Deploy PWA to GitHub Pages
+name: Deploy to GitHub Pages
+
+# A repository gets one Pages site, but this repo holds several projects, so
+# the site is assembled from more than one source:
+#
+#   /             SKYWATCH radar PWA   (weather-radar-viewer/pwa)
+#   /voidrunner/  VOIDRUNNER           (voidrunner)
+#
+# Each project lives on its own branch, so rather than publishing whichever
+# branch happened to trigger the run, we check out the current tip of each
+# project branch explicitly. Deploying one project then never deletes another.
+# When these branches are merged together, drop the extra checkouts and point
+# them all at the merged branch.
 
 on:
   push:
-    branches: [claude/weather-radar-sources-l13g18]
+    branches:
+      - claude/weather-radar-sources-l13g18
+      - claude/scifi-3d-mobile-game-cdw95j
   workflow_dispatch:
 
 permissions:
@@ -21,13 +35,58 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      # continue-on-error so a branch that has been merged away or renamed
+      # degrades to "that project is missing" instead of failing the deploy.
+      - name: Check out SKYWATCH
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: claude/weather-radar-sources-l13g18
+          path: sources/skywatch
+
+      - name: Check out VOIDRUNNER
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: claude/scifi-3d-mobile-game-cdw95j
+          path: sources/voidrunner
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+
+          if [ -d sources/skywatch/weather-radar-viewer/pwa ]; then
+            cp -R sources/skywatch/weather-radar-viewer/pwa/. _site/
+            echo "SKYWATCH    -> /"
+          else
+            echo "::warning::SKYWATCH source missing, site root will be empty"
+          fi
+
+          if [ -d sources/voidrunner/voidrunner ]; then
+            mkdir -p _site/voidrunner
+            cp -R sources/voidrunner/voidrunner/. _site/voidrunner/
+            rm -rf _site/voidrunner/tools
+            echo "VOIDRUNNER  -> /voidrunner/"
+          else
+            echo "::warning::VOIDRUNNER source missing"
+          fi
+
+          if [ -z "$(ls -A _site)" ]; then
+            echo "::error::nothing to publish - every source checkout failed"
+            exit 1
+          fi
+
+          echo "--- published tree ---"
+          find _site -maxdepth 2 | sort
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          # the PWA folder becomes the site root
-          path: weather-radar-viewer/pwa
+          path: _site
+
       - id: deployment
         uses: actions/deploy-pages@v4

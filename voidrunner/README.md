@@ -1,5 +1,7 @@
 # VOIDRUNNER
 
+**Play it: https://nickssoftwarefun.github.io/Multi-Project-Playground/voidrunner/**
+
 A 3D sci-fi corridor runner for phones, built with three.js. One folder, no
 build step, no dependencies to install, no server to run. Open `index.html`
 over HTTP and play.
@@ -24,6 +26,13 @@ game is made of ES modules.
 
 On a phone, use **Add to Home Screen** — it is a PWA, so it installs, launches
 fullscreen and works with the radio off.
+
+### Deployment
+
+`.github/workflows/pages.yml` publishes the repository's Pages site. Because a
+repo only gets one site and this one holds several projects, the workflow checks
+out each project branch and assembles them side by side — the radar PWA at `/`
+and this game at `/voidrunner/` — so deploying one never removes the other.
 
 ### Controls
 
