@@ -79,7 +79,7 @@
   }
   .screen-box { overflow: hidden; border-radius: 6px; background: #000; }
   .screen {
-    width: 800px; height: 480px;
+    width: 1024px; height: 600px;
     transform-origin: top left;
     position: relative;
     background: #0A1018;
@@ -122,6 +122,7 @@
   .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
   .badge.l2   { color: #F5B85C; border-color: #8A6224; background: rgba(74,52,15,0.55); }
   .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
+  .badge.sat  { color: #8FC7F5; border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
   .topbar .spacer { flex: 1; }
   .frametime {
     font-family: ui-monospace, Consolas, monospace;
@@ -155,7 +156,7 @@
   .btn:hover { background: rgba(30,46,64,0.9); }
   .btn:active { transform: translateY(1px); }
   .btn:focus-visible { outline: 2px solid #53C7F0; outline-offset: 1px; }
-  .btn.small { font-size: 10px; letter-spacing: 0.08em; font-weight: 700; }
+  .btn.small { font-size: 10px; letter-spacing: 0.08em; font-weight: 700; width: auto; min-width: 42px; padding: 0 8px; }
   .btn.on { border-color: #53C7F0; color: #53C7F0; }
 
   .zoomstack {
@@ -163,6 +164,15 @@
     display: flex; flex-direction: column; gap: 8px;
     z-index: 5;
   }
+  /* satellite view mode: raw GOES-style full-screen image, radar chrome hidden */
+  #cropBtn { display: none; }
+  .screen.satmode #cropBtn { display: flex; }
+  .screen.satmode #zoomIn,
+  .screen.satmode #zoomOut,
+  .screen.satmode #homeBtn,
+  .screen.satmode .botbar,
+  .screen.satmode .legend,
+  .screen.satmode .scalebar { display: none; }
 
   .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; position: relative; }
   .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
@@ -287,7 +297,7 @@
 </style>
 
 <header>
-  <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 800 × 480</div>
+  <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 1024 × 600</div>
   <h1>Home radar console — interactive mockup</h1>
   <p class="sub">Eastern US · GOES-East backdrop · MRMS past → HRRR forecast · KDMX Level&nbsp;2 close-up</p>
 </header>
@@ -295,7 +305,7 @@
 <div class="device">
   <div class="screen-box" id="screenBox">
     <div class="screen" id="screen">
-      <canvas id="map" width="800" height="480"></canvas>
+      <canvas id="map" width="1024" height="600"></canvas>
       <div class="bar topbar">
         <span class="brand">SKYWATCH</span>
         <span class="badge mrms" id="srcBadge">MRMS MOSAIC · 1 KM</span>
@@ -310,7 +320,8 @@
       <div class="zoomstack">
         <button class="btn" id="zoomIn" aria-label="Zoom in">+</button>
         <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
-        <button class="btn small on" id="satBtn" aria-label="Toggle satellite layer">SAT</button>
+        <button class="btn small" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
+        <button class="btn small on" id="cropBtn" aria-label="Toggle satellite crop">EAST</button>
         <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
       </div>
       <div class="scalebar" id="scalebar">
@@ -344,7 +355,7 @@
     <div class="chip"><b>Scroll</b> pinch-zoom</div>
     <div class="chip"><b>Zoom in</b> switches to KDMX Level 2</div>
     <div class="chip"><b>Scrub right of NOW</b> = HRRR forecast</div>
-    <div class="chip"><b>SAT</b> toggles satellite</div>
+    <div class="chip"><b>SAT</b> switches to the GOES-East view</div>
     <div class="chip"><b>⌂</b> reset view</div>
   </div>
   <p class="datanote">
@@ -354,9 +365,11 @@
     to <b>KDMX NEXRAD Level&nbsp;2</b> polar gates (0.5° × 250&nbsp;m) when zoomed in. Right of
     NOW: <b>HRRR simulated reflectivity (REFD)</b> on the model's 3&nbsp;km grid at 15-minute
     steps — on hardware these come as ready-made XYZ tiles from the Iowa Environmental Mesonet.
-    The cloud backdrop emulates <b>GOES-East GeoColor</b> over the eastern US; the real device
-    would pull the live image from NOAA STAR (<i>cdn.star.nesdis.noaa.gov</i>). For actual live
-    data in a browser, open <b>live.html</b> from this repo locally — no sandbox, real tiles.
+    The <b>SAT</b> button switches to a separate full-screen <b>GOES-East GeoColor</b> view —
+    shown as a raw image, not overlaid on the map, since the real GOES frame is in
+    geostationary projection and doesn't line up with a flat map. On hardware that image
+    comes live from NOAA STAR (<i>cdn.star.nesdis.noaa.gov</i>). For actual live data in a
+    browser, open <b>live.html</b> from this repo locally — no sandbox, real tiles.
   </p>
 </section>
 
@@ -575,8 +588,8 @@
   }
 
   // ---------- view / timeline state ----------
-  const W = 800, H = 480;
-  const HOME = { cx: 766, cy: -525, s: 0.28 };   // eastern half of the US
+  const W = 1024, H = 600;
+  const HOME = { cx: 766, cy: -525, s: 0.36 };   // eastern half of the US
   const view = { cx: HOME.cx, cy: HOME.cy, s: HOME.s };
   const L2_THRESHOLD = 3.5;
   const PAST = 12, FUT = 12;                     // 12 x 4 min past, 12 x 15 min future
@@ -586,7 +599,15 @@
   let frame = NOW_I;
   let playing = true;
   let interacting = false;
-  let satOn = true;
+  let satMode = false;
+  let satCrop = "east";
+  // fixed extents for the full-screen GOES-style view (not tied to map pan/zoom)
+  function satProj(lonW, lonE, latC) {
+    const x0 = (lonW - LON0) * KX, x1 = (lonE - LON0) * KX;
+    const s = W / (x1 - x0);
+    return { cx: (x0 + x1) / 2, cy: (latC - LAT0) * KY, s: s };
+  }
+  const SAT_VIEWS = { east: satProj(-100, -66, 36.5), full: satProj(-112, -58, 37.5) };
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduceMotion) playing = false;
 
@@ -601,7 +622,7 @@
   const off = document.createElement("canvas");
   off.width = W; off.height = H;
   const offCtx = off.getContext("2d");
-  const SW = 200, SH = 120;                      // satellite cloud raster (coarse, upscaled)
+  const SW = 256, SH = 150;                      // satellite cloud raster (coarse, upscaled)
   const satOff = document.createElement("canvas");
   satOff.width = SW; satOff.height = SH;
   const satCtx = satOff.getContext("2d");
@@ -624,29 +645,57 @@
     return Math.min(1, cl);
   }
 
-  function renderSat(fi) {
-    const key = "sat|" + Math.min(fi, NOW_I) + "|" + viewKey();
+  // full-screen GOES-East GeoColor emulation (fixed extent, latest clouds only)
+  function drawSatView() {
+    const v = SAT_VIEWS[satCrop];
+    const sx = function (x) { return W / 2 + (x - v.cx) * v.s; };
+    const sy = function (y) { return H / 2 - (y - v.cy) * v.s; };
+
+    // daylight base: ocean, land, lakes
+    ctx.fillStyle = "#14304C";
+    ctx.fillRect(0, 0, W, H);
+    pathT(COAST.concat(LAND_CLOSE), sx, sy);
+    ctx.closePath();
+    ctx.fillStyle = "#2C3826";
+    ctx.fill();
+    ctx.fillStyle = "#14304C";
+    LAKES.forEach(function (lk) {
+      pathT(lk, sx, sy);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // clouds (latest observation; satellites have no forecast frames)
+    const key = "satview|" + satCrop;
     let img = cache.get(key);
     if (!img) {
       img = satCtx.createImageData(SW, SH);
       const d = img.data;
-      const t = frameT(Math.min(fi, NOW_I));
-      const kmPerCellX = W / SW / view.s, kmPerCellY = H / SH / view.s;
+      const kmX = W / SW / v.s, kmY = H / SH / v.s;
       for (let py = 0; py < SH; py++) {
-        const wy = view.cy - (py + 0.5 - SH / 2) * kmPerCellY;
+        const wy = v.cy - (py + 0.5 - SH / 2) * kmY;
         for (let px = 0; px < SW; px++) {
-          const wx = view.cx + (px + 0.5 - SW / 2) * kmPerCellX;
-          const cl = cloudAt(wx, wy, t);
+          const wx = v.cx + (px + 0.5 - SW / 2) * kmX;
+          const cl = cloudAt(wx, wy, 0);
           if (cl < 0.04) continue;
           const o = (py * SW + px) * 4;
-          d[o] = 216; d[o + 1] = 221; d[o + 2] = 228;
-          d[o + 3] = Math.min(255, cl * 215) | 0;
+          d[o] = 226; d[o + 1] = 229; d[o + 2] = 233;
+          d[o + 3] = Math.min(255, cl * 245) | 0;
         }
       }
       if (cache.size > 80) cache.clear();
       cache.set(key, img);
     }
     satCtx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(satOff, 0, 0, W, H);
+
+    // gentle limb vignette so it reads as an image, not a map
+    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 1.05);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,10,0.42)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
   }
 
   // ---------- radar raster ----------
@@ -687,14 +736,16 @@
   // ---------- basemap ----------
   function w2sx(x) { return W / 2 + (x - view.cx) * view.s; }
   function w2sy(y) { return H / 2 - (y - view.cy) * view.s; }
-  function path(pts) {
+  function pathT(pts, sx, sy) {
     ctx.beginPath();
     pts.forEach(function (p, i) {
       const w = ll(p[0], p[1]);
-      if (i === 0) ctx.moveTo(w2sx(w.x), w2sy(w.y));
-      else ctx.lineTo(w2sx(w.x), w2sy(w.y));
+      if (i === 0) ctx.moveTo(sx(w.x), sy(w.y));
+      else ctx.lineTo(sx(w.x), sy(w.y));
     });
   }
+  function path(pts) { pathT(pts, w2sx, w2sy); }
+  const LAND_CLOSE = [[47.5, -67.0], [50.5, -76.0], [51.5, -118.0], [23.5, -118.0], [25.9, -97.2]];
 
   function drawBase() {
     // ocean
@@ -702,7 +753,7 @@
     ctx.fillRect(0, 0, W, H);
 
     // land: coastline closed far inland (W and N edges of the domain)
-    path(COAST.concat([[47.5, -67.0], [50.5, -76.0], [51.5, -105.0], [23.5, -105.0], [25.9, -97.2]]));
+    path(COAST.concat(LAND_CLOSE));
     ctx.closePath();
     ctx.fillStyle = "#111713";
     ctx.fill();
@@ -820,14 +871,13 @@
   }
 
   function draw() {
+    if (satMode) {
+      drawSatView();
+      return;
+    }
     const kind = frameKind(frame);
     const step = interacting ? 3 : (kind === "l2" ? 1 : 2);
     drawBase();
-    if (satOn) {
-      renderSat(frame);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(satOff, 0, 0, W, H);
-    }
     renderRadar(frame, step);
     ctx.globalAlpha = 0.78;
     ctx.drawImage(off, 0, 0);
@@ -862,6 +912,13 @@
     return "+" + Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0");
   }
   function updateChrome() {
+    if (satMode) {
+      srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
+      srcBadge.className = "badge sat";
+      frameTimeEl.textContent = "FETCHED " + fmt(new Date());
+      frameTimeEl.className = "frametime";
+      return;
+    }
     const t = frameT(frame);
     const kind = frameKind(frame);
     const ft = new Date(t0.getTime() + t * 60000);
@@ -915,7 +972,7 @@
   // ---------- animation loop ----------
   let lastAdvance = 0;
   function tick(ts) {
-    if (playing && !interacting) {
+    if (playing && !interacting && !satMode) {
       const dwell = frame === NOW_I ? 1300 : (frame === NFRAMES - 1 ? 1300 : 380);
       if (ts - lastAdvance > dwell) {
         frame = (frame + 1) % NFRAMES;
@@ -947,6 +1004,7 @@
 
   let dragging = false, lastX = 0, lastY = 0;
   screen.addEventListener("pointerdown", function (e) {
+    if (satMode) return;
     if (e.target.closest(".btn") || e.target.closest("input")) return;
     dragging = true; interacting = true;
     lastX = e.clientX; lastY = e.clientY;
@@ -980,11 +1038,13 @@
   }
   screen.addEventListener("wheel", function (e) {
     e.preventDefault();
+    if (satMode) return;
     const r = screen.getBoundingClientRect();
     const k = r.width / W;
     zoomAt((e.clientX - r.left) / k, (e.clientY - r.top) / k, Math.pow(1.0016, -e.deltaY));
   }, { passive: false });
   screen.addEventListener("dblclick", function (e) {
+    if (satMode) return;
     const r = screen.getBoundingClientRect();
     const k = r.width / W;
     zoomAt((e.clientX - r.left) / k, (e.clientY - r.top) / k, 1.9);
@@ -997,9 +1057,19 @@
     refresh();
   });
   const satBtn = document.getElementById("satBtn");
+  const cropBtn = document.getElementById("cropBtn");
   satBtn.addEventListener("click", function () {
-    satOn = !satOn;
-    satBtn.classList.toggle("on", satOn);
+    satMode = !satMode;
+    screen.classList.toggle("satmode", satMode);
+    satBtn.textContent = satMode ? "RADAR" : "SAT";
+    satBtn.classList.toggle("on", satMode);
+    updateChrome();
+    draw();
+  });
+  cropBtn.addEventListener("click", function () {
+    satCrop = satCrop === "east" ? "full" : "east";
+    cropBtn.textContent = satCrop === "east" ? "EAST" : "FULL";
+    cropBtn.classList.toggle("on", satCrop === "east");
     draw();
   });
 
