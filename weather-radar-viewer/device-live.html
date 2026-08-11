@@ -372,7 +372,7 @@
       <input id="zipInput" inputmode="numeric" maxlength="5" placeholder="50021" autocomplete="postal-code">
       <label class="chk">
         <input type="checkbox" id="autoChk">
-        AUTO MODE — RADAR ×2 → SATELLITE 20s → CONDITIONS 20s, LOOPED
+        AUTO MODE — RADAR ×2 → SATELLITE 10s → CONDITIONS 20s, LOOPED
       </label>
       <div class="msg" id="setMsg"></div>
       <div class="btnrow">
@@ -469,7 +469,8 @@
       center: HOME_VIEW.center,
       zoom: HOME_VIEW.zoom,
       minZoom: 4,
-      maxZoom: 9,
+      maxZoom: 10,
+      zoomSnap: 0,               // allow fractional zooms (auto mode targets an exact width)
       zoomControl: false,
       attributionControl: true
     });
@@ -778,15 +779,25 @@
   function refreshWx() {
     if (!loc) { wxPlace.textContent = "LOCAL CONDITIONS"; wxShowHint("TAP TO SET ZIP CODE"); return; }
     wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
-    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + loc.lat +
+    // conservative parameter set (widely supported); hours are sliced client-side
+    const base = "https://api.open-meteo.com/v1/forecast?latitude=" + loc.lat +
       "&longitude=" + loc.lon +
       "&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m," +
       "precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl" +
-      "&hourly=temperature_2m,precipitation_probability,weather_code&forecast_hours=8" +
-      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1" +
-      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto";
-    fetch(url)
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
+      "&timezone=auto&timeformat=unixtime";
+    const full = base +
+      "&hourly=temperature_2m,precipitation_probability,weather_code" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2";
+    fetch(full)
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .catch(function () {
+        // forecast params rejected or a blip — retry with current conditions only
+        return fetch(base).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        });
+      })
       .then(function (j) {
         lastWx = j;
         if (statsMode) renderStats();
@@ -805,9 +816,9 @@
         wxBig.style.display = "flex";
         wxRows.style.display = "grid";
       })
-      .catch(function () {
+      .catch(function (err) {
         lastWx = null;
-        wxShowHint("WEATHER UNAVAILABLE");
+        wxShowHint("WEATHER UNAVAILABLE — " + (err && err.message ? err.message : "NETWORK"));
         if (statsMode) renderStats();
       });
   }
@@ -835,8 +846,14 @@
       "</div></div>";
     let hours = "";
     if (hl && hl.time) {
-      for (let i = 0; i < Math.min(8, hl.time.length); i++) {
-        hours += "<span class='h'>" + hl.time[i].slice(11, 16) + "</span>" +
+      // times arrive as unix seconds (UTC); shift by the location's offset for display
+      const off = lastWx.utc_offset_seconds || 0;
+      const nowS = Date.now() / 1000;
+      let s0 = 0;
+      while (s0 < hl.time.length - 1 && hl.time[s0] < nowS - 3600) s0++;
+      for (let i = s0; i < Math.min(s0 + 8, hl.time.length); i++) {
+        const hh = new Date((hl.time[i] + off) * 1000).toISOString().slice(11, 16);
+        hours += "<span class='h'>" + hh + "</span>" +
                  "<span class='t'>" + Math.round(hl.temperature_2m[i]) + "°</span>" +
                  "<span class='p'>" + (hl.precipitation_probability ? hl.precipitation_probability[i] + "%" : "--") + "</span>";
       }
@@ -860,11 +877,15 @@
     fader.classList.add("show");
     setTimeout(function () { fn(); fader.classList.remove("show"); }, 480);
   }
-  // pass 1: zoomed-out regional view; pass 2: zoomed-in — both centered on the ZIP
+  // pass 1: zoomed-out regional view; pass 2: 175 km across — both centered on the ZIP
+  function zoomForWidthKm(km, lat) {
+    // web-mercator meters/pixel at zoom 0 is 156543 * cos(lat); screen is 1024 px wide
+    return Math.log2(156543.03392 * Math.cos(lat * Math.PI / 180) * 1024 / (km * 1000));
+  }
   function autoRadarView(pass) {
     if (!map) return;
     const c = loc ? [loc.lat, loc.lon] : HOME_VIEW.center;
-    map.setView(c, pass === 0 ? 5 : 7);
+    map.setView(c, pass === 0 ? 5 : zoomForWidthKm(175, c[0]));
   }
   function enterRadarPhase() {
     autoPhase = "radar";
@@ -882,7 +903,7 @@
   function enterSatPhase() {
     autoPhase = "sat";
     fadeSwap(function () { setSatMode(true); });
-    autoTimer = setTimeout(enterStatsPhase, 20000);
+    autoTimer = setTimeout(enterStatsPhase, 10000);
   }
   function enterStatsPhase() {
     autoPhase = "stats";
