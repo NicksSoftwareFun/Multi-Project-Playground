@@ -51,7 +51,11 @@ export function frameAt(Z, right, up, tangent) {
   const tl = Math.hypot(tx, ty, 1);
   const Tx = tx / tl, Ty = ty / tl, Tz = 1 / tl;
 
-  // right = normalize(worldUp x T) with worldUp = (0,1,0)
+  // right = normalize(worldUp x T) with worldUp = (0,1,0).
+  // NOTE: with the corridor running toward +Z the camera looks along +Z, so
+  // this +x axis appears on the LEFT of the screen. The basis stays
+  // right-handed (flipping it would invert winding on every placed mesh);
+  // input.js compensates instead. See SCREEN_X there.
   let rx = 1 * Tz - 0 * Ty;   //  up.y*T.z - up.z*T.y
   let ry = 0 * Tx - 0 * Tz;   //  up.z*T.x - up.x*T.z
   let rz = 0 * Ty - 1 * Tx;   //  up.x*T.y - up.y*T.x

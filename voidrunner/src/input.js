@@ -10,6 +10,12 @@ import { clamp } from './util.js';
 
 const LIM = TUBE_R - SHIP_R - 0.12;
 
+// The corridor runs toward +Z and the camera looks down it, which mirrors the
+// horizontal axis: the tube frame's +x lands on the LEFT of the screen. Every
+// input therefore has to be mapped through this sign, or steering comes out
+// backwards. (+y needs no such flip - it is genuinely up.)
+const SCREEN_X = -1;
+
 export class Input {
   constructor(el) {
     this.el = el;
@@ -49,7 +55,7 @@ export class Input {
         this._direct(e.clientX, e.clientY);
       } else {
         const k = this._unitsPerPx();
-        this.tx += (e.clientX - this.lastX) * k;
+        this.tx += SCREEN_X * (e.clientX - this.lastX) * k;
         this.ty -= (e.clientY - this.lastY) * k;
         this._clamp();
       }
@@ -89,7 +95,7 @@ export class Input {
   _direct(px, py) {
     const w = window.innerWidth, h = window.innerHeight;
     const s = Math.min(w, h) * 0.46 * this.sens;
-    this.tx = clamp(((px - w / 2) / s) * LIM, -LIM * 1.6, LIM * 1.6);
+    this.tx = clamp(SCREEN_X * ((px - w / 2) / s) * LIM, -LIM * 1.6, LIM * 1.6);
     this.ty = clamp((-(py - h * 0.52) / s) * LIM, -LIM * 1.6, LIM * 1.6);
     this._clamp();
   }
@@ -112,8 +118,8 @@ export class Input {
   tick(dt) {
     if (!this.keys.size) return;
     const v = LIM * 2.6 * dt;
-    if (this.keys.has('arrowleft') || this.keys.has('a')) this.tx -= v;
-    if (this.keys.has('arrowright') || this.keys.has('d')) this.tx += v;
+    if (this.keys.has('arrowleft') || this.keys.has('a')) this.tx -= SCREEN_X * v;
+    if (this.keys.has('arrowright') || this.keys.has('d')) this.tx += SCREEN_X * v;
     if (this.keys.has('arrowup') || this.keys.has('w')) this.ty += v;
     if (this.keys.has('arrowdown') || this.keys.has('s')) this.ty -= v;
     this._clamp();
