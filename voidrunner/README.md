@@ -27,6 +27,18 @@ game is made of ES modules.
 On a phone, use **Add to Home Screen** — it is a PWA, so it installs, launches
 fullscreen and works with the radio off.
 
+### One file you can hand to someone
+
+```sh
+node tools/build-single.mjs        # -> dist/voidrunner.html
+```
+
+Bundles every module, the stylesheet, the icon and three.js into a single
+document you can double-click and play with no server and no network. It drops
+the PWA manifest, since installing and offline caching mean nothing from a
+`file://` URL - for those, serve the folder as above. Needs esbuild, which the
+script fetches through `npx` if it is not already installed.
+
 ### Deployment
 
 `.github/workflows/pages.yml` publishes the repository's Pages site. Because a
