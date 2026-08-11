@@ -776,10 +776,14 @@
   }
   function row(k, v) { return "<span class='k'>" + k + "</span><span class='v'>" + v + "</span>"; }
 
-  function refreshWx() {
-    if (!loc) { wxPlace.textContent = "LOCAL CONDITIONS"; wxShowHint("TAP TO SET ZIP CODE"); return; }
-    wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
-    // conservative parameter set (widely supported); hours are sliced client-side
+  // two independent sources, normalized to one shape:
+  //   { src, temp, feels, rh, dew, windTxt, gust, pres, precip, cond,
+  //     hours: [{label, temp, pp}], daily: {hi, lo, pp} }
+  function okJson(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+  function degF(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "°F"; }
+  function pct(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "%"; }
+
+  function omFetch() {
     const base = "https://api.open-meteo.com/v1/forecast?latitude=" + loc.lat +
       "&longitude=" + loc.lon +
       "&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m," +
@@ -789,35 +793,110 @@
     const full = base +
       "&hourly=temperature_2m,precipitation_probability,weather_code" +
       "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2";
-    fetch(full)
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .catch(function () {
-        // forecast params rejected or a blip — retry with current conditions only
-        return fetch(base).then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
+    return fetch(full).then(okJson)
+      .catch(function () { return fetch(base).then(okJson); })
+      .then(function (j) {
+        const c = j.current;
+        const hours = [];
+        const hl = j.hourly;
+        if (hl && hl.time) {
+          const off = j.utc_offset_seconds || 0;
+          const nowS = Date.now() / 1000;
+          let s0 = 0;
+          while (s0 < hl.time.length - 1 && hl.time[s0] < nowS - 3600) s0++;
+          for (let i = s0; i < Math.min(s0 + 8, hl.time.length); i++) {
+            hours.push({
+              label: new Date((hl.time[i] + off) * 1000).toISOString().slice(11, 16),
+              temp: hl.temperature_2m[i],
+              pp: hl.precipitation_probability ? hl.precipitation_probability[i] : null
+            });
+          }
+        }
+        const dl = j.daily;
+        return {
+          src: "OPEN-METEO",
+          temp: c.temperature_2m, feels: c.apparent_temperature,
+          rh: c.relative_humidity_2m, dew: c.dew_point_2m,
+          windTxt: DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH",
+          gust: Math.round(c.wind_gusts_10m) + " MPH",
+          pres: (c.pressure_msl * 0.02953).toFixed(2) + " inHg",
+          precip: (c.precipitation || 0).toFixed(2) + " IN/HR",
+          cond: WMO[c.weather_code] || "",
+          hours: hours,
+          daily: dl && dl.time ? { hi: dl.temperature_2m_max[0], lo: dl.temperature_2m_min[0], pp: dl.precipitation_probability_max[0] } : null
+        };
+      });
+  }
+
+  // fallback: National Weather Service (different domain, also CORS-open, US only)
+  function nwsFetch() {
+    return fetch("https://api.weather.gov/points/" + loc.lat + "," + loc.lon).then(okJson)
+      .then(function (p) {
+        return Promise.all([
+          fetch(p.properties.forecastHourly).then(okJson),
+          fetch(p.properties.forecast).then(okJson)
+        ]);
+      })
+      .then(function (res) {
+        const hp = (res[0].properties.periods || []);
+        const now = hp[0] || {};
+        const hours = hp.slice(0, 8).map(function (per) {
+          return {
+            label: per.startTime.slice(11, 16),
+            temp: per.temperature,
+            pp: per.probabilityOfPrecipitation && per.probabilityOfPrecipitation.value != null
+              ? per.probabilityOfPrecipitation.value : null
+          };
+        });
+        let hi = null, lo = null, ppMax = null;
+        (res[1].properties.periods || []).slice(0, 2).forEach(function (per) {
+          if (per.isDaytime) hi = per.temperature; else lo = per.temperature;
+          const v = per.probabilityOfPrecipitation && per.probabilityOfPrecipitation.value;
+          if (v != null) ppMax = Math.max(ppMax == null ? 0 : ppMax, v);
+        });
+        return {
+          src: "NWS",
+          temp: now.temperature, feels: null,
+          rh: now.relativeHumidity ? now.relativeHumidity.value : null,
+          dew: now.dewpoint && now.dewpoint.value != null ? now.dewpoint.value * 9 / 5 + 32 : null,
+          windTxt: (now.windDirection || "--") + " " + (parseInt(now.windSpeed, 10) || "--") + " MPH",
+          gust: null, pres: null, precip: null,
+          cond: (now.shortForecast || "").toUpperCase(),
+          hours: hours,
+          daily: hi != null || lo != null ? { hi: hi, lo: lo, pp: ppMax } : null
+        };
+      });
+  }
+
+  function refreshWx() {
+    if (!loc) { wxPlace.textContent = "LOCAL CONDITIONS"; wxShowHint("TAP TO SET ZIP CODE"); return; }
+    omFetch()
+      .catch(function (omErr) {
+        return nwsFetch().catch(function (nwsErr) {
+          throw new Error("OM: " + omErr.message + " / NWS: " + nwsErr.message);
         });
       })
-      .then(function (j) {
-        lastWx = j;
-        if (statsMode) renderStats();
-        const c = j.current;
-        wxTemp.textContent = Math.round(c.temperature_2m) + "°F";
-        wxCond.textContent = WMO[c.weather_code] || "";
+      .then(function (n) {
+        lastWx = n;
+        wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src;
+        wxTemp.textContent = degF(n.temp);
+        wxCond.textContent = n.cond;
         wxRows.innerHTML =
-          row("FEELS", Math.round(c.apparent_temperature) + "°F") +
-          row("HUMIDITY", Math.round(c.relative_humidity_2m) + "%") +
-          row("DEW PT", Math.round(c.dew_point_2m) + "°F") +
-          row("WIND", DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH") +
-          row("GUSTS", Math.round(c.wind_gusts_10m) + " MPH") +
-          row("PRESSURE", (c.pressure_msl * 0.02953).toFixed(2) + " inHg") +
-          row("PRECIP", (c.precipitation || 0).toFixed(2) + " IN/HR");
+          row("FEELS", degF(n.feels)) +
+          row("HUMIDITY", pct(n.rh)) +
+          row("DEW PT", degF(n.dew)) +
+          row("WIND", n.windTxt) +
+          row("GUSTS", n.gust || "--") +
+          row("PRESSURE", n.pres || "--") +
+          row("PRECIP", n.precip || "--");
         wxHint.style.display = "none";
         wxBig.style.display = "flex";
         wxRows.style.display = "grid";
+        if (statsMode) renderStats();
       })
       .catch(function (err) {
         lastWx = null;
+        wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
         wxShowHint("WEATHER UNAVAILABLE — " + (err && err.message ? err.message : "NETWORK"));
         if (statsMode) renderStats();
       });
@@ -830,38 +909,31 @@
   function renderStats() {
     if (!loc) { statsEl.innerHTML = "<div class='bigmsg'>SET A ZIP CODE IN SETTINGS</div>"; return; }
     if (!lastWx) { statsEl.innerHTML = "<div class='bigmsg'>WEATHER UNAVAILABLE</div>"; return; }
-    const c = lastWx.current, hl = lastWx.hourly, dl = lastWx.daily;
+    const n = lastWx;
     const left = "<div class='col'>" +
-      "<div class='place'>" + loc.name + ", " + loc.state + " · " + loc.zip + "</div>" +
-      "<div class='bigtemp'>" + Math.round(c.temperature_2m) + "°F</div>" +
-      "<div class='bigcond'>" + (WMO[c.weather_code] || "") + "</div>" +
+      "<div class='place'>" + loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src + "</div>" +
+      "<div class='bigtemp'>" + degF(n.temp) + "</div>" +
+      "<div class='bigcond'>" + n.cond + "</div>" +
       "<div class='grid'>" +
-      row("FEELS LIKE", Math.round(c.apparent_temperature) + "°F") +
-      row("HUMIDITY", Math.round(c.relative_humidity_2m) + "%") +
-      row("DEW POINT", Math.round(c.dew_point_2m) + "°F") +
-      row("WIND", DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH") +
-      row("GUSTS", Math.round(c.wind_gusts_10m) + " MPH") +
-      row("PRESSURE", (c.pressure_msl * 0.02953).toFixed(2) + " inHg") +
-      row("PRECIP", (c.precipitation || 0).toFixed(2) + " IN/HR") +
+      row("FEELS LIKE", degF(n.feels)) +
+      row("HUMIDITY", pct(n.rh)) +
+      row("DEW POINT", degF(n.dew)) +
+      row("WIND", n.windTxt) +
+      row("GUSTS", n.gust || "--") +
+      row("PRESSURE", n.pres || "--") +
+      row("PRECIP", n.precip || "--") +
       "</div></div>";
     let hours = "";
-    if (hl && hl.time) {
-      // times arrive as unix seconds (UTC); shift by the location's offset for display
-      const off = lastWx.utc_offset_seconds || 0;
-      const nowS = Date.now() / 1000;
-      let s0 = 0;
-      while (s0 < hl.time.length - 1 && hl.time[s0] < nowS - 3600) s0++;
-      for (let i = s0; i < Math.min(s0 + 8, hl.time.length); i++) {
-        const hh = new Date((hl.time[i] + off) * 1000).toISOString().slice(11, 16);
-        hours += "<span class='h'>" + hh + "</span>" +
-                 "<span class='t'>" + Math.round(hl.temperature_2m[i]) + "°</span>" +
-                 "<span class='p'>" + (hl.precipitation_probability ? hl.precipitation_probability[i] + "%" : "--") + "</span>";
-      }
-    }
+    n.hours.forEach(function (h) {
+      hours += "<span class='h'>" + h.label + "</span>" +
+               "<span class='t'>" + (h.temp == null ? "--" : Math.round(h.temp) + "°") + "</span>" +
+               "<span class='p'>" + pct(h.pp) + "</span>";
+    });
     let daily = "";
-    if (dl && dl.time) {
-      daily = "TODAY — HI " + Math.round(dl.temperature_2m_max[0]) + "° · LO " +
-        Math.round(dl.temperature_2m_min[0]) + "° · PRECIP " + dl.precipitation_probability_max[0] + "%";
+    if (n.daily) {
+      daily = "TODAY — HI " + (n.daily.hi == null ? "--" : Math.round(n.daily.hi) + "°") +
+        " · LO " + (n.daily.lo == null ? "--" : Math.round(n.daily.lo) + "°") +
+        " · PRECIP " + pct(n.daily.pp);
     }
     const right = "<div class='col'><div class='sect'>PREDICTIONS</div>" +
       (daily ? "<div class='daily'>" + daily + "</div>" : "") +
