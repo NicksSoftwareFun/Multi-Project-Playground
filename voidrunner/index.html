@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VOIDRUNNER</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="VOIDRUNNER - a free, offline, ad-free 3D sci-fi corridor runner. Thread the gaps, graze for multipliers, burn overdrive.">
+<meta name="theme-color" content="#050b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VOIDRUNNER">
+<meta name="color-scheme" content="dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div id="grain" aria-hidden="true"></div>
+<div id="vignette" aria-hidden="true"></div>
+
+<!-- ------------------------------- HUD ------------------------------- -->
+<div id="hud" class="layer hidden" aria-hidden="true">
+  <div class="hud-top">
+    <button id="pauseBtn" class="icon-btn" aria-label="Pause">
+      <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+    <div class="hud-readout">
+      <div id="hudDist" class="dist">0 m</div>
+      <div id="hudScore" class="score">0</div>
+    </div>
+    <div class="hud-cells">
+      <span class="cell-dot"></span><span id="hudCells">0</span>
+    </div>
+  </div>
+
+  <div class="sector">
+    <div id="sectorName">SECTOR 01 · DRIFT</div>
+    <div class="sector-track"><div id="sectorFill"></div></div>
+  </div>
+
+  <div id="hudMultWrap" class="mult">
+    <div id="hudMult">x1</div>
+    <div class="heat-track"><div id="hudHeat"></div></div>
+  </div>
+
+  <div id="hudShields" class="shields"></div>
+
+  <button id="odBtn" class="od charging" aria-label="Overdrive">
+    <span id="odFill"></span>
+    <span id="odLabel">OD</span>
+  </button>
+
+  <div id="banner" class="banner">
+    <div id="bannerMain"></div>
+    <div id="bannerSub"></div>
+  </div>
+  <div id="toasts"></div>
+</div>
+
+<!-- ------------------------------ TITLE ------------------------------ -->
+<div id="menu" class="layer screen">
+  <div class="panel wide">
+    <div class="logo">
+      <div class="logo-rule"></div>
+      <h1>VOIDRUNNER</h1>
+      <div class="logo-rule"></div>
+      <p class="tagline">Thread the corridor. Graze for the multiplier. Burn overdrive.</p>
+    </div>
+
+    <button id="playBtn" class="btn primary big">LAUNCH</button>
+
+    <div class="stat-row">
+      <div><b id="mBest">0</b><span>BEST SCORE</span></div>
+      <div><b id="mDist">0 m</b><span>DEEPEST</span></div>
+      <div><b id="mSector">01</b><span>SECTOR</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span>CONTRACTS</span><small id="cellBank">0 cells</small></div>
+      <div id="contracts" class="contracts"></div>
+    </div>
+
+    <div class="btn-row">
+      <button id="hangarBtn" class="btn">HANGAR</button>
+      <button id="helpBtn" class="btn">HOW TO</button>
+      <button id="setBtn" class="btn">SETTINGS</button>
+    </div>
+
+    <p class="fine">No ads · No tracking · No purchases · Plays offline</p>
+  </div>
+</div>
+
+<!-- ----------------------------- HANGAR ------------------------------ -->
+<div id="hangar" class="layer screen hidden">
+  <div class="panel wide">
+    <div class="head"><button class="icon-btn back" data-back>&larr;</button><h2>HANGAR</h2><small id="hangarBank">0 cells</small></div>
+    <div id="shipList" class="ships"></div>
+  </div>
+</div>
+
+<!-- ---------------------------- SETTINGS ----------------------------- -->
+<div id="settings" class="layer screen hidden">
+  <div class="panel">
+    <div class="head"><button class="icon-btn back" data-back>&larr;</button><h2>SETTINGS</h2><small></small></div>
+    <div class="rows">
+      <label class="row"><span>Music</span><input type="checkbox" id="setMusic"><i class="sw"></i></label>
+      <label class="row"><span>Sound effects</span><input type="checkbox" id="setSfx"><i class="sw"></i></label>
+      <label class="row"><span>Vibration</span><input type="checkbox" id="setHaptics"><i class="sw"></i></label>
+      <label class="row"><span>Corridor roll</span><input type="checkbox" id="setRoll"><i class="sw"></i></label>
+      <div class="row col">
+        <span>Steering</span>
+        <div class="seg" id="setMode">
+          <button data-v="relative">DRAG</button><button data-v="direct">DIRECT</button>
+        </div>
+      </div>
+      <div class="row col">
+        <span>Sensitivity</span>
+        <div class="seg" id="setSens">
+          <button data-v="0.7">LOW</button><button data-v="1">MED</button><button data-v="1.4">HIGH</button>
+        </div>
+      </div>
+      <div class="row col">
+        <span>Graphics</span>
+        <div class="seg" id="setQuality">
+          <button data-v="auto">AUTO</button><button data-v="low">LOW</button><button data-v="high">HIGH</button>
+        </div>
+      </div>
+    </div>
+    <button id="wipeBtn" class="btn danger">ERASE LOCAL SAVE</button>
+    <p class="fine">Everything is stored on this device only.</p>
+  </div>
+</div>
+
+<!-- ------------------------------ HELP ------------------------------- -->
+<div id="help" class="layer screen hidden">
+  <div class="panel">
+    <div class="head"><button class="icon-btn back" data-back>&larr;</button><h2>HOW TO FLY</h2><small></small></div>
+    <ul class="help">
+      <li><b>STEER</b> Drag anywhere. The ship follows your thumb, not the spot you touch.</li>
+      <li><b>GRAZE</b> Skim close to hazards without touching them. Grazing fills the heat bar and raises your multiplier.</li>
+      <li><b>OVERDRIVE</b> Cells and grazes charge it. Tap the round button — or a second finger anywhere — to smash through everything for five seconds at triple score.</li>
+      <li><b>SHIELDS</b> Each hit costs one. Blue pickups give one back.</li>
+      <li><b>SECTORS</b> Every 1500 m the corridor changes hands. It gets faster, tighter and stranger.</li>
+    </ul>
+    <p class="fine">Keyboard: arrows or WASD to steer, space for overdrive, P to pause.</p>
+    <button id="helpGo" class="btn primary">GOT IT</button>
+  </div>
+</div>
+
+<!-- ------------------------------ PAUSE ------------------------------ -->
+<div id="pause" class="layer screen hidden">
+  <div class="panel">
+    <h2 class="center">PAUSED</h2>
+    <button id="resumeBtn" class="btn primary big">RESUME</button>
+    <button id="quitBtn" class="btn">ABANDON RUN</button>
+  </div>
+</div>
+
+<!-- ---------------------------- GAME OVER ---------------------------- -->
+<div id="over" class="layer screen hidden">
+  <div class="panel wide">
+    <div id="newBest" class="badge hidden">NEW RECORD</div>
+    <h2 class="center dim">RUN ENDED</h2>
+    <div id="ovScore" class="bigscore">0</div>
+    <div class="stat-grid">
+      <div><b id="ovDist">0</b><span>DISTANCE</span></div>
+      <div><b id="ovCells">0</b><span>CELLS</span></div>
+      <div><b id="ovGraze">0</b><span>GRAZES</span></div>
+      <div><b id="ovMult">x1</b><span>PEAK MULT</span></div>
+      <div><b id="ovSector">01</b><span>SECTOR</span></div>
+      <div><b id="ovOd">0</b><span>OVERDRIVES</span></div>
+    </div>
+    <div id="ovContracts" class="contracts done"></div>
+    <button id="retryBtn" class="btn primary big">RUN AGAIN</button>
+    <button id="menuBtn" class="btn">MAIN MENU</button>
+  </div>
+</div>
+
+<div id="boot" class="layer screen">
+  <div class="panel center-panel">
+    <h1 class="logo-small">VOIDRUNNER</h1>
+    <div class="loading"><i></i></div>
+    <p class="fine" id="bootMsg">SPINNING UP DRIVE…</p>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+<noscript><p style="color:#fff;padding:2rem;font:16px system-ui">VOIDRUNNER needs JavaScript and WebGL.</p></noscript>
+</body>
+</html>
