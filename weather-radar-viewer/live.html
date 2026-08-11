@@ -9,11 +9,11 @@
   (double-click, or serve locally) — it pulls REAL data:
     - Past radar:   IEM NEXRAD N0Q composite tiles (5-min steps, last 50 min)
     - Forecast:     IEM HRRR simulated reflectivity (REFD) tiles, 15-min steps
-    - Backdrop:     GOES-East (GOES-19) CONUS GeoColor from NOAA STAR
+    - Satellite:    GOES-East (GOES-19) CONUS GeoColor from NOAA STAR,
+                    shown as its own full-screen view (SAT button) — the GOES
+                    image is in geostationary projection, so it is NOT drawn
+                    on the flat radar map.
   Notes:
-    - The GOES image is in geostationary projection; it is overlaid here with
-      approximate bounds, so alignment drifts toward the edges. Good enough
-      for a backdrop; not for navigation.
     - HRRR runs hourly and takes ~1-2 h to appear on IEM; if forecast tiles
       404, the app automatically falls back to an older run.
     - Free-tier friendly: personal use, modest request rates.
@@ -43,7 +43,7 @@
   }
   .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
   .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
-  .badge.warn { color: #F5B85C; border-color: #8A6224; background: rgba(74,52,15,0.55); }
+  .badge.sat  { color: #8FC7F5; border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
   .vtime { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #BFD3E2; }
   .botbar {
     bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -52,12 +52,19 @@
     width: min(640px, calc(100vw - 40px));
   }
   button {
-    width: 38px; height: 38px; border-radius: 8px;
+    height: 38px; min-width: 38px; border-radius: 8px;
     border: 1px solid rgba(140,170,195,0.35);
     background: rgba(16,26,38,0.9); color: #CFE0EE;
     font-size: 16px; cursor: pointer;
+    font-family: inherit;
   }
   button:hover { background: rgba(30,46,64,0.9); }
+  button.txt {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.08em; font-weight: 700;
+    padding: 0 12px;
+  }
+  button.on { border-color: #53C7F0; color: #53C7F0; }
   .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
   input[type=range] {
     width: 100%; -webkit-appearance: none; appearance: none; margin: 0;
@@ -90,14 +97,55 @@
   .status .on { color: #6ADBD0; }
   .status .off { color: #E07A5F; }
   .leaflet-container { background: #0A1018; }
+
+  /* ---- full-screen satellite view (raw GOES image, no georeferencing) ---- */
+  #satview {
+    position: absolute; inset: 0; z-index: 900;
+    background: #000; overflow: hidden;
+    display: none;
+  }
+  body.sat #satview { display: block; }
+  body.sat .botbar { display: none; }
+  body.sat #map { visibility: hidden; }
+  #satview img {
+    position: absolute; top: 50%; right: 0;
+    transform: translateY(-50%);
+    height: 100%;
+  }
+  #satview.full img {
+    height: auto; width: 100%;
+    top: 50%; right: auto; left: 0;
+  }
+  .satcontrols {
+    bottom: 14px; right: 14px;
+    display: flex; gap: 8px; padding: 8px;
+    z-index: 1001;
+  }
+  .satmsg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    color: #8FA5B7; display: none;
+  }
+  #satview.err .satmsg { display: block; }
+  #satview.err img { display: none; }
 </style>
 </head>
 <body>
 <div id="map"></div>
+
+<div id="satview">
+  <img id="satimg" alt="GOES-East GeoColor satellite image">
+  <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
+  <div class="panel satcontrols">
+    <button class="txt on" id="cropBtn">EAST</button>
+  </div>
+</div>
+
 <div class="panel topbar">
   <span class="brand">SKYWATCH LIVE</span>
   <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
   <span class="vtime" id="vtime">--:--</span>
+  <button class="txt" id="viewBtn">SAT</button>
 </div>
 <div class="panel status" id="status">loading…</div>
 <div class="panel botbar">
@@ -114,10 +162,9 @@
 (function () {
   "use strict";
   const IEM = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/";
-  const GOES_URL = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/latest.jpg";
-  // GOES-East CONUS sector, approximate lat/lon bounds (geostationary projection,
-  // so this overlay is a visual backdrop, not a precise georeference).
-  const GOES_BOUNDS = [[14.6, -152.1], [56.8, -52.9]];
+  const GOES_DIR = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/";
+  const GOES_PRIMARY = GOES_DIR + "GOES19-ABI-CONUS-GEOCOLOR-2500x1500.jpg";
+  const GOES_FALLBACK = GOES_DIR + "latest.jpg";
 
   const PAST = 11;   // t = -50 .. 0 min, 5-min steps
   const FUT = 11;    // t = +15 .. +165 min, 15-min steps
@@ -125,34 +172,50 @@
   const NFRAMES = PAST + FUT;
   function frameT(i) { return i < PAST ? -(PAST - 1 - i) * 5 : (i - PAST + 1) * 15; }
 
-  const map = L.map("map", {
-    center: [38.5, -86],
-    zoom: 5,
-    minZoom: 4,
-    maxZoom: 10,
-    maxBounds: [[22, -108], [52, -58]],
-    zoomControl: true,
-    attributionControl: true
-  });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: "&copy; OpenStreetMap &copy; CARTO · Radar: IEM/NOAA · Sat: NOAA STAR",
-    subdomains: "abcd"
-  }).addTo(map);
+  // Leaflet comes from a CDN; if it failed to load (offline, blocked), keep the
+  // rest of the app — including the SAT view — alive and say so in the status.
+  let map = null;
+  if (window.L) {
+    map = L.map("map", {
+      center: [38.5, -86],
+      zoom: 5,
+      minZoom: 3,
+      maxZoom: 10,
+      zoomControl: true,
+      attributionControl: true
+    });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OpenStreetMap &copy; CARTO · Radar: IEM/NOAA · Sat: NOAA STAR",
+      subdomains: "abcd"
+    }).addTo(map);
+  }
 
-  // ---- GOES-East backdrop, refreshed every 5 minutes ----
-  let goesLayer = null;
+  // ---- full-screen GOES-East view (raw image, refreshed every 5 min) ----
+  const satview = document.getElementById("satview");
+  const satimg = document.getElementById("satimg");
   let goesOk = false;
+  let goesFetched = null;
+  let triedFallback = false;
+  satimg.addEventListener("load", function () {
+    goesOk = true;
+    goesFetched = new Date();
+    satview.classList.remove("err");
+    updateStatus();
+    if (satMode) updateChrome();
+  });
+  satimg.addEventListener("error", function () {
+    if (!triedFallback) {
+      triedFallback = true;
+      satimg.src = GOES_FALLBACK + "?t=" + Date.now();
+      return;
+    }
+    goesOk = false;
+    satview.classList.add("err");
+    updateStatus();
+  });
   function loadGoes() {
-    const url = GOES_URL + "?t=" + Date.now();
-    const probe = new Image();
-    probe.onload = function () {
-      goesOk = true;
-      if (goesLayer) map.removeLayer(goesLayer);
-      goesLayer = L.imageOverlay(url, GOES_BOUNDS, { opacity: 0.8, zIndex: 200 }).addTo(map);
-      updateStatus();
-    };
-    probe.onerror = function () { goesOk = false; updateStatus(); };
-    probe.src = url;
+    triedFallback = false;
+    satimg.src = GOES_PRIMARY + "?t=" + Date.now();
   }
   loadGoes();
   setInterval(loadGoes, 5 * 60 * 1000);
@@ -190,6 +253,7 @@
 
   const layers = new Array(NFRAMES).fill(null);
   function buildLayer(i) {
+    if (!map) return null;
     const lyr = L.tileLayer(layerUrl(i), { opacity: 0, zIndex: 400, maxNativeZoom: 9 });
     lyr.on("tileerror", function () {
       if (i < PAST) { radarErrors++; }
@@ -221,7 +285,7 @@
     }
     if (!layers[i]) {
       layers[i] = buildLayer(i);
-      layers[i].setOpacity(0.75);
+      if (layers[i]) layers[i].setOpacity(0.75);
     }
     // preload the next frame in the loop
     const nx = (i + 1) % NFRAMES;
@@ -235,8 +299,17 @@
   const srcBadge = document.getElementById("srcBadge");
   const vtime = document.getElementById("vtime");
   const statusEl = document.getElementById("status");
+  const viewBtn = document.getElementById("viewBtn");
+  const cropBtn = document.getElementById("cropBtn");
+  let satMode = false;
   function fmt(d) { return pad(d.getHours(), 2) + ":" + pad(d.getMinutes(), 2); }
   function updateChrome() {
+    if (satMode) {
+      srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
+      srcBadge.className = "badge sat";
+      vtime.textContent = goesFetched ? "FETCHED " + fmt(goesFetched) : "--:--";
+      return;
+    }
     scrub.value = String(frame);
     const t = frameT(frame);
     const d = new Date(Date.now() + t * 60000);
@@ -252,11 +325,28 @@
   }
   function updateStatus() {
     statusEl.innerHTML =
-      "RADAR  <span class='" + (radarErrors < 20 ? "on'>ok" : "off'>errors") + "</span><br>" +
+      "RADAR  <span class='" + (map ? (radarErrors < 20 ? "on'>ok" : "off'>errors") : "off'>map lib unavailable") + "</span><br>" +
       "HRRR   <span class='on'>run -" + hrrrRunOffsetHrs + "h</span><br>" +
       "GOES-E <span class='" + (goesOk ? "on'>ok" : "off'>unavailable") + "</span>";
   }
   updateStatus();
+
+  viewBtn.addEventListener("click", function () {
+    satMode = !satMode;
+    document.body.classList.toggle("sat", satMode);
+    viewBtn.textContent = satMode ? "RADAR" : "SAT";
+    viewBtn.classList.toggle("on", satMode);
+    // refresh the image if it's stale when entering sat view
+    if (satMode && (!goesFetched || Date.now() - goesFetched.getTime() > 5 * 60 * 1000)) {
+      loadGoes();
+    }
+    updateChrome();
+  });
+  cropBtn.addEventListener("click", function () {
+    const full = satview.classList.toggle("full");
+    cropBtn.textContent = full ? "FULL" : "EAST";
+    cropBtn.classList.toggle("on", !full);
+  });
 
   let playing = true;
   playBtn.addEventListener("click", function () {
@@ -269,7 +359,7 @@
     show(parseInt(scrub.value, 10));
   });
   setInterval(function () {
-    if (playing) show((frame + 1) % NFRAMES);
+    if (playing && !satMode) show((frame + 1) % NFRAMES);
   }, 700);
 
   show(NOW_I);
