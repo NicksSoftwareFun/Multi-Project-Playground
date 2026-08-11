@@ -85,11 +85,11 @@
     padding: 4px 9px; border-radius: 4px; border: 1px solid; white-space: nowrap;
   }
   .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
-  .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
+  .badge.fcst { color: #F5D06A; border-color: #9E7E24; background: rgba(74,58,12,0.55); }
   .badge.sat  { color: #8FC7F5; border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
   .topbar .spacer { flex: 1; }
   .frametime { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #BFD3E2; }
-  .frametime.fcst { color: #C9A6F5; }
+  .frametime.fcst { color: #F5D06A; }
   .clockbox {
     text-align: right; font-family: ui-monospace, Consolas, monospace;
     font-size: 11px; line-height: 1.5; color: #7E93A5;
@@ -119,24 +119,29 @@
   }
 
   .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; }
-  .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
-  input.scrub {
-    width: 100%; -webkit-appearance: none; appearance: none; margin: 0;
-    height: 4px; border-radius: 2px;
+  /* time-proportional custom scrubber: -50 min history | +165 min forecast,
+     so NOW sits at 50/215 = 23.3% of the track, not the middle */
+  .trackbox {
+    flex: 1; position: relative; height: 28px;
+    display: flex; align-items: center;
+    cursor: pointer; touch-action: none;
+  }
+  .track {
+    position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px;
     background: linear-gradient(to right,
-      rgba(120,170,200,0.45) 0 47.6%, rgba(160,120,220,0.4) 47.6% 100%);
-    cursor: pointer;
+      rgba(120,170,200,0.5) 0 23.3%,
+      rgba(245,197,66,0.45) 23.3% 100%);
   }
-  input.scrub::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  .thumb {
+    position: absolute; top: 50%; left: 23.3%;
+    width: 16px; height: 16px; border-radius: 50%;
     background: #53C7F0; border: 2px solid #0A1018;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
   }
-  input.scrub::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: #53C7F0; border: 2px solid #0A1018;
-  }
+  .trackbox:focus-visible { outline: 2px solid #53C7F0; outline-offset: 2px; border-radius: 4px; }
   .nowmark {
-    position: absolute; left: 47.6%; top: -13px; transform: translateX(-50%);
+    position: absolute; left: 23.3%; top: -7px; transform: translateX(-50%);
     font-family: ui-monospace, Consolas, monospace;
     font-size: 8.5px; letter-spacing: 0.1em; color: #9FB4C6;
     pointer-events: none; text-align: center; line-height: 1.1;
@@ -149,7 +154,24 @@
     font-family: ui-monospace, Consolas, monospace;
     font-size: 10px; letter-spacing: 0.08em; color: #7E93A5; white-space: nowrap;
   }
-  .spanlabel.fcst { color: #A88BD8; }
+  .spanlabel.fcst { color: #D8B44A; }
+
+  /* prediction mode: yellow outline around the whole screen, PREDICTION tab top-center */
+  #predFrame {
+    position: absolute; inset: 0; z-index: 800;
+    border: 3px solid #F5C542;
+    pointer-events: none; display: none;
+  }
+  .screen.pred #predFrame { display: block; }
+  #predFrame .tab {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    background: #F5C542; color: #221A04;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+    padding: 4px 16px; border-radius: 0 0 7px 7px;
+    white-space: nowrap;
+  }
+  .screen.pred .frametime { visibility: hidden; }  /* the tab carries the valid time */
 
   .legend { position: absolute; left: 12px; bottom: 66px; z-index: 700; pointer-events: none; }
   .legend .swatches { display: flex; height: 8px; border-radius: 2px; overflow: hidden; }
@@ -219,6 +241,8 @@
       <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
     </div>
 
+    <div id="predFrame"><span class="tab" id="predTab">PREDICTION</span></div>
+
     <div class="bar topbar">
       <span class="brand">SKYWATCH</span>
       <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
@@ -250,9 +274,12 @@
       <button class="btn" id="playBtn" aria-label="Play or pause">⏸</button>
       <div class="scrubwrap">
         <span class="spanlabel">-50 MIN</span>
-        <div class="trackbox">
+        <div class="trackbox" id="trackbox" tabindex="0" role="slider"
+             aria-label="Radar timeline" aria-valuemin="-50" aria-valuemax="165"
+             aria-valuenow="0" aria-valuetext="now">
+          <div class="track"></div>
           <div class="nowmark">NOW</div>
-          <input class="scrub" id="scrub" type="range" min="0" max="21" value="10" step="1" aria-label="Radar timeline">
+          <div class="thumb" id="thumb"></div>
         </div>
         <span class="spanlabel fcst">+2:45</span>
       </div>
@@ -419,7 +446,9 @@
   }
 
   // ---- chrome ----
-  const scrub = document.getElementById("scrub");
+  const trackbox = document.getElementById("trackbox");
+  const thumb = document.getElementById("thumb");
+  const predTab = document.getElementById("predTab");
   const playBtn = document.getElementById("playBtn");
   const srcBadge = document.getElementById("srcBadge");
   const frameTimeEl = document.getElementById("frameTime");
@@ -430,7 +459,10 @@
   let satMode = false;
   function fmt(d) { return pad(d.getHours(), 2) + ":" + pad(d.getMinutes(), 2); }
 
+  // time-proportional thumb position: -50 .. +165 min over the track width
+  const T_MIN = frameT(0), T_SPAN = frameT(NFRAMES - 1) - T_MIN;
   function updateChrome() {
+    screenEl.classList.toggle("pred", frame >= PAST && !satMode);
     if (satMode) {
       srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
       srcBadge.className = "badge sat";
@@ -438,8 +470,10 @@
       frameTimeEl.className = "frametime";
       return;
     }
-    scrub.value = String(frame);
     const t = frameT(frame);
+    thumb.style.left = ((t - T_MIN) / T_SPAN * 100) + "%";
+    trackbox.setAttribute("aria-valuenow", String(t));
+    trackbox.setAttribute("aria-valuetext", t === 0 ? "now" : (t < 0 ? t + " minutes" : "+" + t + " minutes forecast"));
     const d = new Date(Date.now() + t * 60000);
     if (frame < PAST) {
       srcBadge.textContent = "NEXRAD N0Q · IEM COMPOSITE";
@@ -451,6 +485,7 @@
       srcBadge.className = "badge fcst";
       frameTimeEl.textContent = "FCST " + fmt(d);
       frameTimeEl.className = "frametime fcst";
+      predTab.textContent = "PREDICTION · " + fmt(d);
     }
   }
   function updateStatus() {
@@ -501,10 +536,38 @@
     playing = !playing;
     playBtn.textContent = playing ? "⏸" : "▶";
   });
-  scrub.addEventListener("input", function () {
+  // scrubbing: pick the frame whose time is nearest to the pointer position
+  function frameAtFraction(frac) {
+    const t = T_MIN + Math.max(0, Math.min(1, frac)) * T_SPAN;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < NFRAMES; i++) {
+      const d = Math.abs(frameT(i) - t);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+  function scrubTo(i) {
     playing = false;
     playBtn.textContent = "▶";
-    show(parseInt(scrub.value, 10));
+    if (i !== frame) show(i); else updateChrome();
+  }
+  let scrubbing = false;
+  trackbox.addEventListener("pointerdown", function (e) {
+    scrubbing = true;
+    trackbox.setPointerCapture(e.pointerId);
+    const r = trackbox.getBoundingClientRect();
+    scrubTo(frameAtFraction((e.clientX - r.left) / r.width));
+  });
+  trackbox.addEventListener("pointermove", function (e) {
+    if (!scrubbing) return;
+    const r = trackbox.getBoundingClientRect();
+    scrubTo(frameAtFraction((e.clientX - r.left) / r.width));
+  });
+  trackbox.addEventListener("pointerup", function () { scrubbing = false; });
+  trackbox.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft" && frame > 0) { e.preventDefault(); scrubTo(frame - 1); }
+    if (e.key === "ArrowRight" && frame < NFRAMES - 1) { e.preventDefault(); scrubTo(frame + 1); }
+    if (e.key === "Home") { e.preventDefault(); scrubTo(NOW_I); }
   });
   setInterval(function () {
     if (playing && !satMode) show((frame + 1) % NFRAMES);
