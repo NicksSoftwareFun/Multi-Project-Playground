@@ -1,0 +1,845 @@
+<title>Home Radar Console — 7″ Panel Mockup</title>
+<style>
+  :root {
+    --bg: #E9ECEF;
+    --ink: #20272F;
+    --sub: #5A6673;
+    --accent: #2E8FA3;
+    --chip-bg: #DDE2E7;
+    --chip-ink: #3B4650;
+    --rule: #C9D0D6;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181D;
+      --ink: #DCE3EA;
+      --sub: #8B96A1;
+      --accent: #4FB3C8;
+      --chip-bg: #1F262D;
+      --chip-ink: #AEB9C4;
+      --rule: #2A323A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181D;
+    --ink: #DCE3EA;
+    --sub: #8B96A1;
+    --accent: #4FB3C8;
+    --chip-bg: #1F262D;
+    --chip-ink: #AEB9C4;
+    --rule: #2A323A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 28px 16px 48px;
+  }
+  header { text-align: center; margin-bottom: 20px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 6px 0 4px;
+    font-size: clamp(22px, 3.4vw, 30px);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .sub { margin: 0; color: var(--sub); font-size: 14px; }
+
+  /* ---- device ---- */
+  .device {
+    background: linear-gradient(160deg, #1A1D21, #0A0B0D 70%);
+    border-radius: 18px;
+    padding: 16px 16px 22px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.38), 0 2px 6px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.07);
+    position: relative;
+  }
+  .device::after {
+    content: "ESP32-S3 · 7.0-INCH IPS · CAPACITIVE TOUCH";
+    position: absolute;
+    bottom: 6px; left: 0; right: 0;
+    text-align: center;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8px;
+    letter-spacing: 0.22em;
+    color: #4A4F55;
+  }
+  .screen-box { overflow: hidden; border-radius: 6px; background: #000; }
+  .screen {
+    width: 800px; height: 480px;
+    transform-origin: top left;
+    position: relative;
+    background: #0A1018;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    cursor: grab;
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  .screen.dragging { cursor: grabbing; }
+  .screen canvas { position: absolute; inset: 0; }
+
+  /* on-screen chrome */
+  .bar {
+    position: absolute; left: 0; right: 0;
+    display: flex; align-items: center;
+    color: #D7E2EC;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .topbar {
+    top: 0; height: 44px;
+    padding: 0 14px;
+    gap: 12px;
+    background: linear-gradient(rgba(6,10,16,0.88), rgba(6,10,16,0.55) 70%, rgba(6,10,16,0));
+  }
+  .brand {
+    font-weight: 700; font-size: 15px; letter-spacing: 0.08em;
+    color: #EAF2F8;
+  }
+  .badge {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    padding: 4px 9px; border-radius: 4px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
+  .badge.l2   { color: #F5B85C; border-color: #8A6224; background: rgba(74,52,15,0.55); }
+  .topbar .spacer { flex: 1; }
+  .frametime {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px; color: #BFD3E2;
+  }
+  .clockbox {
+    text-align: right;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; line-height: 1.5; color: #7E93A5;
+  }
+  .clockbox .clock { font-size: 13px; color: #D7E2EC; }
+
+  .botbar {
+    bottom: 0; height: 58px;
+    padding: 0 14px 8px;
+    gap: 10px;
+    background: linear-gradient(rgba(6,10,16,0), rgba(6,10,16,0.6) 30%, rgba(6,10,16,0.9));
+  }
+  .btn {
+    width: 42px; height: 42px;
+    border-radius: 8px;
+    border: 1px solid rgba(140,170,195,0.35);
+    background: rgba(16,26,38,0.82);
+    color: #CFE0EE;
+    font-size: 19px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .btn:hover { background: rgba(30,46,64,0.9); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid #53C7F0; outline-offset: 1px; }
+
+  .zoomstack {
+    position: absolute; right: 12px; top: 58px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 5;
+  }
+
+  .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; }
+  input.scrub {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 2px;
+    background: rgba(140,170,195,0.35);
+    cursor: pointer;
+  }
+  input.scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  input.scrub::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  .spanlabel {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; letter-spacing: 0.08em; color: #7E93A5;
+    white-space: nowrap;
+  }
+
+  .legend {
+    position: absolute; left: 12px; bottom: 66px;
+    z-index: 5; pointer-events: none;
+  }
+  .legend .swatches { display: flex; height: 8px; border-radius: 2px; overflow: hidden; }
+  .legend .swatches i { width: 13px; }
+  .legend .marks {
+    display: flex; justify-content: space-between;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; color: #8FA5B7; margin-top: 3px;
+  }
+  .legend .cap {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; letter-spacing: 0.1em; color: #6E8496; margin-bottom: 4px;
+  }
+
+  .scalebar {
+    position: absolute; left: 12px; bottom: 112px;
+    z-index: 5; pointer-events: none;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; color: #A9BDCD;
+  }
+  .scalebar .rule {
+    height: 3px; background: #A9BDCD; border-radius: 1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    margin-bottom: 3px;
+  }
+
+  .toast {
+    position: absolute; top: 54px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,18,28,0.92);
+    border: 1px solid rgba(140,170,195,0.4);
+    color: #DCE9F4;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    padding: 8px 14px; border-radius: 6px;
+    z-index: 8;
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .toast { transition: none; }
+  }
+
+  /* ---- notes below device ---- */
+  .notes {
+    margin-top: 22px;
+    max-width: 820px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: var(--chip-bg);
+    color: var(--chip-ink);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .datanote {
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+    color: var(--sub);
+    font-size: 13.5px;
+    line-height: 1.55;
+    max-width: 68ch;
+    margin: 0 auto;
+  }
+  .datanote b { color: var(--ink); font-weight: 600; }
+</style>
+
+<header>
+  <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 800 × 480</div>
+  <h1>Home radar console — interactive mockup</h1>
+  <p class="sub">MRMS mosaic wide, KDMX Level&nbsp;2 super-res close. Mouse stands in for touch.</p>
+</header>
+
+<div class="device">
+  <div class="screen-box" id="screenBox">
+    <div class="screen" id="screen">
+      <canvas id="map" width="800" height="480"></canvas>
+      <div class="bar topbar">
+        <span class="brand">SKYWATCH</span>
+        <span class="badge mrms" id="srcBadge">MRMS MOSAIC · 1 KM</span>
+        <span class="spacer"></span>
+        <span class="frametime" id="frameTime">--:--</span>
+        <span class="spacer"></span>
+        <div class="clockbox">
+          <div class="clock" id="clock">--:--</div>
+          <div>UPD <span id="updCount">2:00</span></div>
+        </div>
+      </div>
+      <div class="zoomstack">
+        <button class="btn" id="zoomIn" aria-label="Zoom in">+</button>
+        <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
+        <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
+      </div>
+      <div class="scalebar" id="scalebar">
+        <div class="rule" id="scaleRule" style="width:80px"></div>
+        <span id="scaleText">50 km</span>
+      </div>
+      <div class="legend">
+        <div class="cap">REFLECTIVITY dBZ</div>
+        <div class="swatches" id="legendSwatches"></div>
+        <div class="marks"><span>10</span><span>25</span><span>40</span><span>55</span><span>70</span></div>
+      </div>
+      <div class="bar botbar">
+        <button class="btn" id="playBtn" aria-label="Play or pause">⏸</button>
+        <div class="scrubwrap">
+          <span class="spanlabel" id="spanStart">-44 MIN</span>
+          <input class="scrub" id="scrub" type="range" min="0" max="11" value="11" step="1" aria-label="Radar history">
+          <span class="spanlabel">NOW</span>
+        </div>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<section class="notes">
+  <div class="chips">
+    <div class="chip"><b>Drag</b> pan</div>
+    <div class="chip"><b>Scroll</b> pinch-zoom</div>
+    <div class="chip"><b>Double-click</b> zoom in</div>
+    <div class="chip"><b>Zoom in past ~200 km view</b> switches to KDMX Level 2</div>
+    <div class="chip"><b>⌂</b> reset to regional view</div>
+  </div>
+  <p class="datanote">
+    <b>About the data:</b> the storm on screen is a procedural simulation (this page can't
+    reach NOAA's servers), but the two rendering modes model the real sources faithfully.
+    Wide views sample a <b>1&nbsp;km Cartesian grid at a 2-minute cadence — MRMS composite
+    reflectivity</b>, pulled as tiles from NOAA's map services. Past the zoom threshold the
+    panel switches to <b>NEXRAD Level&nbsp;2 super-resolution</b> from the KDMX (Des&nbsp;Moines)
+    radar: polar gates 0.5° × 250&nbsp;m fetched from the open AWS <i>noaa-nexrad-level2</i>
+    bucket — note the radial beam texture and the 230&nbsp;km range ring. On the real device
+    the ESP32-S3 would fetch pre-rendered tiles over Wi-Fi and blit them to the 800×480 panel.
+  </p>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- deterministic noise ----------
+  function hash2(ix, iy) {
+    let n = (ix * 374761393 + iy * 668265263) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n = n ^ (n >>> 16);
+    return (n >>> 0) / 4294967295;
+  }
+  function vnoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+    const a = hash2(ix, iy), b = hash2(ix + 1, iy);
+    const c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  function fbm(x, y, oct) {
+    let s = 0, amp = 0.5, f = 1;
+    for (let i = 0; i < oct; i++) { s += amp * vnoise(x * f, y * f); f *= 2; amp *= 0.5; }
+    return s;
+  }
+
+  // ---------- storm model (world coords in km, KDMX radar at origin, +x east, +y north) ----------
+  const VX = 0.75, VY = 0.15;                 // squall line motion, km per minute (~46 km/h ENE)
+  const U = { x: 0.38, y: 0.925 };            // unit vector along the line (SSW→NNE)
+  const N = { x: 0.925, y: -0.38 };           // line normal, pointing east (ahead of line)
+  const P0 = { x: 22, y: -8 };                // line anchor at t = 0
+
+  const CELLS = [];
+  for (let i = 0; i < 9; i++) {
+    const s = -115 + i * 28 + (hash2(i, 7) - 0.5) * 14;
+    CELLS.push({
+      s: s,
+      offn: (hash2(i, 19) - 0.5) * 8,
+      peak: 47 + hash2(i, 11) * 16,           // 47–63 dBZ cores
+      rl: 9 + hash2(i, 13) * 8,               // radius along line
+      rw: 4.5 + hash2(i, 17) * 3.5            // radius across line
+    });
+  }
+  // scattered small cells ahead of the line
+  const POPS = [];
+  for (let i = 0; i < 5; i++) {
+    POPS.push({
+      x: P0.x + 45 + hash2(i, 23) * 60,
+      y: -70 + hash2(i, 29) * 150,
+      peak: 32 + hash2(i, 31) * 14,
+      r: 3.5 + hash2(i, 37) * 3
+    });
+  }
+
+  function stormField(ax, ay, t) {
+    // ax, ay are storm-frame coords; t in minutes (0 = now, negative = past)
+    const rx = ax - P0.x, ry = ay - P0.y;
+    const dl = rx * U.x + ry * U.y;
+    const dn = rx * N.x + ry * N.y;
+    let dbz = -25;
+
+    // trailing stratiform shield
+    if (dn < 10 && dn > -150 && Math.abs(dl) < 170) {
+      const f1 = Math.min(1, (10 - dn) / 20);
+      const f2 = Math.min(1, (dn + 150) / 55);
+      const f3 = Math.min(1, (170 - Math.abs(dl)) / 55);
+      const strat = 27 * f1 * f2 * f3 + (fbm(ax * 0.045, ay * 0.045, 4) - 0.5) * 24;
+      if (strat > dbz) dbz = strat;
+    }
+
+    // convective line cells (with slow pulsing)
+    for (let i = 0; i < CELLS.length; i++) {
+      const c = CELLS[i];
+      const cx = P0.x + U.x * c.s + N.x * c.offn;
+      const cy = P0.y + U.y * c.s + N.y * c.offn;
+      const ddl = (ax - cx) * U.x + (ay - cy) * U.y;
+      const ddn = (ax - cx) * N.x + (ay - cy) * N.y;
+      const q = (ddl * ddl) / (c.rl * c.rl) + (ddn * ddn) / (c.rw * c.rw);
+      if (q < 9) {
+        const pulse = 0.84 + 0.32 * vnoise(i * 13.7 + 3.1, t * 0.09);
+        const v = c.peak * pulse * Math.exp(-q);
+        if (v > dbz) dbz = v;
+      }
+    }
+
+    // pop-up cells ahead
+    for (let i = 0; i < POPS.length; i++) {
+      const p = POPS[i];
+      const dx = ax - p.x, dy = ay - p.y;
+      const q = (dx * dx + dy * dy) / (p.r * p.r);
+      if (q < 9) {
+        const v = p.peak * Math.exp(-q);
+        if (v > dbz) dbz = v;
+      }
+    }
+    return dbz;
+  }
+
+  function fieldMRMS(x, y, t) {
+    // 1 km Cartesian grid sample (quantize), km-scale texture
+    const qx = Math.floor(x) + 0.5, qy = Math.floor(y) + 0.5;
+    const ax = qx - VX * t, ay = qy - VY * t;
+    let v = stormField(ax, ay, t);
+    v += (fbm(ax * 0.16, ay * 0.16, 3) - 0.5) * 9;
+    return v;
+  }
+
+  const AZ_STEP = Math.PI / 360;   // 0.5 degrees
+  const GATE = 0.25;               // 250 m
+  const L2_MAX_R = 230;            // km
+
+  function fieldL2(x, y, t) {
+    const r = Math.hypot(x, y);
+    if (r > L2_MAX_R || r < 0.8) return -999;   // beyond range / cone of silence
+    const azBin = Math.round(Math.atan2(y, x) / AZ_STEP);
+    const az = azBin * AZ_STEP;
+    const rq = (Math.floor(r / GATE) + 0.5) * GATE;
+    const gx = rq * Math.cos(az), gy = rq * Math.sin(az);
+    const ax = gx - VX * t, ay = gy - VY * t;
+    let v = stormField(ax, ay, t);
+    v += (fbm(ax * 0.16, ay * 0.16, 3) - 0.5) * 9;
+    v += (fbm(ax * 0.85 + 40, ay * 0.85 - 40, 3) - 0.5) * 8;      // fine-scale structure
+    v += (hash2(azBin & 2047, Math.floor(r * 4) + ((t * 7) | 0)) - 0.5) * 4;  // gate speckle
+    return v;
+  }
+
+  // ---------- NWS reflectivity palette (stepped, 5 dBZ bins) ----------
+  const PAL = [
+    [5,  0x04, 0xE9, 0xE7], [10, 0x01, 0x9F, 0xF4], [15, 0x03, 0x00, 0xF4],
+    [20, 0x02, 0xFD, 0x02], [25, 0x01, 0xC5, 0x01], [30, 0x00, 0x8E, 0x00],
+    [35, 0xFD, 0xF8, 0x02], [40, 0xE5, 0xBC, 0x00], [45, 0xFD, 0x95, 0x00],
+    [50, 0xFD, 0x00, 0x00], [55, 0xD4, 0x00, 0x00], [60, 0xBC, 0x00, 0x00],
+    [65, 0xF8, 0x00, 0xFD], [70, 0x98, 0x54, 0xC6], [75, 0xFD, 0xFD, 0xFD]
+  ];
+  function palIndex(v) {
+    if (v < 5) return -1;
+    let idx = Math.floor((v - 5) / 5);
+    if (idx >= PAL.length) idx = PAL.length - 1;
+    return idx;
+  }
+
+  // ---------- geography ----------
+  const CITIES = [
+    { n: "Des Moines",  x: 3,    y: -13,  t: 1 },
+    { n: "Omaha",       x: -180, y: -25,  t: 1 },
+    { n: "Cedar Rapids",x: 185,  y: 40,   t: 1 },
+    { n: "Mason City",  x: 25,   y: 155,  t: 1 },
+    { n: "Ottumwa",     x: 85,   y: -75,  t: 2 },
+    { n: "Fort Dodge",  x: -45,  y: 95,   t: 2 },
+    { n: "Ames",        x: 6,    y: 37,   t: 2 },
+    { n: "Marshalltown",x: 58,   y: 32,   t: 2 },
+    { n: "Creston",     x: -60,  y: -70,  t: 2 },
+    { n: "Ankeny",      x: 7,    y: -2,   t: 3 },
+    { n: "Boone",       x: -18,  y: 40,   t: 3 },
+    { n: "Perry",       x: -28,  y: 18,   t: 3 },
+    { n: "Newton",      x: 48,   y: -8,   t: 3 },
+    { n: "Grinnell",    x: 75,   y: -5,   t: 3 },
+    { n: "Winterset",   x: -28,  y: -45,  t: 3 },
+    { n: "Indianola",   x: 12,   y: -40,  t: 3 },
+    { n: "Pella",       x: 58,   y: -35,  t: 3 }
+  ];
+  const RIVER = [
+    [-42, 95], [-30, 70], [-24, 52], [-14, 38], [-8, 22], [-2, 8],
+    [2, -6], [6, -14], [14, -26], [22, -42], [30, -58], [38, -72]
+  ];
+
+  // ---------- view / state ----------
+  const W = 800, H = 480;
+  const HOME = { cx: 12, cy: -4, s: 1.5 };
+  const view = { cx: HOME.cx, cy: HOME.cy, s: HOME.s };
+  const L2_THRESHOLD = 3.5;       // px per km
+  const NFRAMES = 12, FRAME_MIN = 4;   // 12 frames, 4-minute spacing
+
+  let frame = NFRAMES - 1;        // current frame index (11 = now)
+  let playing = true;
+  let interacting = false;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduceMotion) playing = false;
+
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d");
+  const off = document.createElement("canvas");
+  off.width = W; off.height = H;
+  const offCtx = off.getContext("2d");
+
+  const frameCache = new Map();   // key -> ImageData
+  function viewKey() {
+    return view.cx.toFixed(2) + "," + view.cy.toFixed(2) + "," + view.s.toFixed(3);
+  }
+  function mode() { return view.s >= L2_THRESHOLD ? "l2" : "mrms"; }
+  function frameT(i) { return -(NFRAMES - 1 - i) * FRAME_MIN; }
+
+  // ---------- radar raster ----------
+  function renderRadar(fi, step) {
+    const key = mode() + "|" + fi + "|" + step + "|" + viewKey();
+    let img = frameCache.get(key);
+    if (!img) {
+      img = offCtx.createImageData(W, H);
+      const d = img.data;
+      const t = frameT(fi);
+      const isL2 = mode() === "l2";
+      const invS = 1 / view.s;
+      for (let py = 0; py < H; py += step) {
+        const wy = view.cy - (py + step * 0.5 - H / 2) * invS;
+        for (let px = 0; px < W; px += step) {
+          const wx = view.cx + (px + step * 0.5 - W / 2) * invS;
+          const v = isL2 ? fieldL2(wx, wy, t) : fieldMRMS(wx, wy, t);
+          const pi = palIndex(v);
+          if (pi < 0) continue;
+          const c = PAL[pi];
+          const yMax = Math.min(H, py + step), xMax = Math.min(W, px + step);
+          for (let yy = py; yy < yMax; yy++) {
+            let o = (yy * W + px) * 4;
+            for (let xx = px; xx < xMax; xx++) {
+              d[o] = c[1]; d[o + 1] = c[2]; d[o + 2] = c[3]; d[o + 3] = 255;
+              o += 4;
+            }
+          }
+        }
+      }
+      if (frameCache.size > 40) frameCache.clear();
+      frameCache.set(key, img);
+    }
+    offCtx.putImageData(img, 0, 0);
+  }
+
+  // ---------- basemap ----------
+  function w2sx(x) { return W / 2 + (x - view.cx) * view.s; }
+  function w2sy(y) { return H / 2 - (y - view.cy) * view.s; }
+
+  function drawBase() {
+    ctx.fillStyle = "#0A1018";
+    ctx.fillRect(0, 0, W, H);
+
+    // county-ish grid every 40 km
+    ctx.strokeStyle = "rgba(70,90,110,0.22)";
+    ctx.lineWidth = 1;
+    const g = 40;
+    const x0 = Math.floor((view.cx - W / 2 / view.s) / g) * g;
+    const x1 = view.cx + W / 2 / view.s;
+    const y0 = Math.floor((view.cy - H / 2 / view.s) / g) * g;
+    const y1 = view.cy + H / 2 / view.s;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += g) { ctx.moveTo(w2sx(x), 0); ctx.lineTo(w2sx(x), H); }
+    for (let y = y0; y <= y1; y += g) { ctx.moveTo(0, w2sy(y)); ctx.lineTo(W, w2sy(y)); }
+    ctx.stroke();
+
+    // river
+    ctx.strokeStyle = "rgba(60,110,150,0.5)";
+    ctx.lineWidth = Math.max(1, view.s * 0.35);
+    ctx.beginPath();
+    RIVER.forEach(function (p, i) {
+      if (i === 0) ctx.moveTo(w2sx(p[0]), w2sy(p[1]));
+      else ctx.lineTo(w2sx(p[0]), w2sy(p[1]));
+    });
+    ctx.stroke();
+
+    // interstates
+    ctx.strokeStyle = "rgba(150,160,150,0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, w2sy(-16)); ctx.lineTo(W, w2sy(-16));   // I-80
+    ctx.moveTo(w2sx(5), 0); ctx.lineTo(w2sx(5), H);       // I-35
+    ctx.stroke();
+    if (view.s > 2.2) {
+      ctx.fillStyle = "rgba(170,180,170,0.75)";
+      ctx.font = "10px ui-monospace, Consolas, monospace";
+      ctx.fillText("I-80", 8, w2sy(-16) - 5);
+      ctx.fillText("I-35", w2sx(5) + 5, 14);
+    }
+  }
+
+  function drawOverlays() {
+    const isL2 = mode() === "l2";
+
+    // range rings (always faint, brighter in L2)
+    const ringAlpha = isL2 ? 0.4 : 0.15;
+    ctx.strokeStyle = "rgba(120,160,190," + ringAlpha + ")";
+    ctx.lineWidth = 1;
+    [50, 100, 150, 200].forEach(function (r) {
+      ctx.beginPath();
+      ctx.arc(w2sx(0), w2sy(0), r * view.s, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    if (isL2) {
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = "rgba(245,184,92,0.55)";
+      ctx.beginPath();
+      ctx.arc(w2sx(0), w2sy(0), L2_MAX_R * view.s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // radar site
+    const rx = w2sx(0), ry = w2sy(0);
+    ctx.fillStyle = "#F5B85C";
+    ctx.beginPath();
+    ctx.arc(rx, ry, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#0A1018"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = "rgba(245,200,130,0.95)";
+    ctx.font = "bold 11px ui-monospace, Consolas, monospace";
+    ctx.fillText("KDMX", rx + 8, ry - 6);
+
+    // cities
+    ctx.font = "11px system-ui, sans-serif";
+    CITIES.forEach(function (c) {
+      const show = c.t === 1 || (c.t === 2 && view.s > 1.1) || (c.t === 3 && view.s > 3);
+      if (!show) return;
+      const sx = w2sx(c.x), sy = w2sy(c.y);
+      if (sx < -30 || sx > W + 30 || sy < -20 || sy > H + 20) return;
+      ctx.fillStyle = "rgba(215,230,240,0.9)";
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(200,215,228,0.85)";
+      ctx.shadowColor = "rgba(0,0,0,0.9)"; ctx.shadowBlur = 3;
+      ctx.fillText(c.n, sx + 6, sy + 4);
+      ctx.shadowBlur = 0;
+    });
+  }
+
+  function draw() {
+    const step = interacting ? 3 : (mode() === "l2" ? 1 : 2);
+    drawBase();
+    renderRadar(frame, step);
+    ctx.globalAlpha = 0.78;
+    ctx.drawImage(off, 0, 0);
+    ctx.globalAlpha = 1;
+    drawOverlays();
+  }
+
+  // ---------- UI chrome ----------
+  const srcBadge = document.getElementById("srcBadge");
+  const frameTimeEl = document.getElementById("frameTime");
+  const clockEl = document.getElementById("clock");
+  const updEl = document.getElementById("updCount");
+  const toastEl = document.getElementById("toast");
+  const scrub = document.getElementById("scrub");
+  const playBtn = document.getElementById("playBtn");
+  const spanStart = document.getElementById("spanStart");
+  spanStart.textContent = "-" + ((NFRAMES - 1) * FRAME_MIN) + " MIN";
+
+  // legend swatches
+  (function () {
+    const box = document.getElementById("legendSwatches");
+    PAL.forEach(function (c) {
+      const i = document.createElement("i");
+      i.style.background = "rgb(" + c[1] + "," + c[2] + "," + c[3] + ")";
+      box.appendChild(i);
+    });
+  })();
+
+  const t0 = new Date();
+  function fmt(d) {
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  function updateChrome() {
+    const ft = new Date(t0.getTime() + frameT(frame) * 60000);
+    frameTimeEl.textContent = fmt(ft) + (frame === NFRAMES - 1 ? " · LATEST" : "");
+    scrub.value = String(frame);
+    const isL2 = mode() === "l2";
+    srcBadge.textContent = isL2 ? "KDMX LEVEL II · 250 M" : "MRMS MOSAIC · 1 KM";
+    srcBadge.className = "badge " + (isL2 ? "l2" : "mrms");
+    // scale bar: nice round distance close to 100 screen px
+    const kmTarget = 100 / view.s;
+    const nice = [5, 10, 20, 25, 50, 100, 200].reduce(function (a, b) {
+      return Math.abs(b - kmTarget) < Math.abs(a - kmTarget) ? b : a;
+    });
+    document.getElementById("scaleRule").style.width = (nice * view.s) + "px";
+    document.getElementById("scaleText").textContent = nice + " km";
+  }
+
+  let lastMode = mode();
+  let toastTimer = null;
+  function checkModeSwitch() {
+    const m = mode();
+    if (m !== lastMode) {
+      lastMode = m;
+      toastEl.textContent = m === "l2"
+        ? "▲ KDMX LEVEL II — SUPER-RES 0.5° × 250 M"
+        : "▼ MRMS COMPOSITE — 1 KM NATIONAL MOSAIC";
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+    }
+  }
+
+  // wall clock + fake update countdown
+  let updSecs = 120;
+  setInterval(function () {
+    clockEl.textContent = fmt(new Date());
+    updSecs -= 1;
+    if (updSecs < 0) updSecs = 120;
+    updEl.textContent = Math.floor(updSecs / 60) + ":" + String(updSecs % 60).padStart(2, "0");
+  }, 1000);
+  clockEl.textContent = fmt(new Date());
+
+  // ---------- animation loop ----------
+  let lastAdvance = 0;
+  function tick(ts) {
+    if (playing && !interacting) {
+      const dwell = frame === NFRAMES - 1 ? 1400 : 380;
+      if (ts - lastAdvance > dwell) {
+        frame = (frame + 1) % NFRAMES;
+        lastAdvance = ts;
+        updateChrome();
+        draw();
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- interaction (mouse standing in for touch) ----------
+  const screen = document.getElementById("screen");
+  let settleTimer = null;
+  function interactionDone() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(function () {
+      interacting = false;
+      draw();
+    }, 160);
+  }
+  function refresh() {
+    frameCache.clear();
+    checkModeSwitch();
+    updateChrome();
+    draw();
+    interactionDone();
+  }
+
+  let dragging = false, lastX = 0, lastY = 0;
+  screen.addEventListener("pointerdown", function (e) {
+    if (e.target.closest(".btn") || e.target.closest("input")) return;
+    dragging = true; interacting = true;
+    lastX = e.clientX; lastY = e.clientY;
+    screen.classList.add("dragging");
+    screen.setPointerCapture(e.pointerId);
+  });
+  screen.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    const k = screen.getBoundingClientRect().width / W;
+    view.cx -= (e.clientX - lastX) / k / view.s;
+    view.cy += (e.clientY - lastY) / k / view.s;
+    lastX = e.clientX; lastY = e.clientY;
+    refresh();
+  });
+  screen.addEventListener("pointerup", function () {
+    dragging = false;
+    screen.classList.remove("dragging");
+    interactionDone();
+  });
+
+  function zoomAt(px, py, factor) {
+    const ns = Math.min(40, Math.max(0.7, view.s * factor));
+    if (ns === view.s) return;
+    const wx = view.cx + (px - W / 2) / view.s;
+    const wy = view.cy - (py - H / 2) / view.s;
+    view.s = ns;
+    view.cx = wx - (px - W / 2) / view.s;
+    view.cy = wy + (py - H / 2) / view.s;
+    interacting = true;
+    refresh();
+  }
+  screen.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    const r = screen.getBoundingClientRect();
+    const k = r.width / W;
+    zoomAt((e.clientX - r.left) / k, (e.clientY - r.top) / k, Math.pow(1.0016, -e.deltaY));
+  }, { passive: false });
+  screen.addEventListener("dblclick", function (e) {
+    const r = screen.getBoundingClientRect();
+    const k = r.width / W;
+    zoomAt((e.clientX - r.left) / k, (e.clientY - r.top) / k, 1.9);
+  });
+
+  document.getElementById("zoomIn").addEventListener("click", function () { zoomAt(W / 2, H / 2, 1.6); });
+  document.getElementById("zoomOut").addEventListener("click", function () { zoomAt(W / 2, H / 2, 1 / 1.6); });
+  document.getElementById("homeBtn").addEventListener("click", function () {
+    view.cx = HOME.cx; view.cy = HOME.cy; view.s = HOME.s;
+    refresh();
+  });
+
+  scrub.addEventListener("input", function () {
+    playing = false;
+    playBtn.textContent = "▶";
+    frame = parseInt(scrub.value, 10);
+    updateChrome();
+    draw();
+  });
+  playBtn.addEventListener("click", function () {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸" : "▶";
+  });
+  playBtn.textContent = playing ? "⏸" : "▶";
+
+  // ---------- scale device to fit viewport ----------
+  const box = document.getElementById("screenBox");
+  function fit() {
+    const pad = 72;
+    const maxW = Math.min(document.documentElement.clientWidth - pad, 1040);
+    const maxH = window.innerHeight * 0.72;
+    const k = Math.max(0.35, Math.min(maxW / W, maxH / H));
+    screen.style.transform = "scale(" + k + ")";
+    box.style.width = (W * k) + "px";
+    box.style.height = (H * k) + "px";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  // ---------- go ----------
+  updateChrome();
+  draw();
+  requestAnimationFrame(tick);
+})();
+</script>
