@@ -780,6 +780,14 @@
   //   { src, temp, feels, rh, dew, windTxt, gust, pres, precip, cond,
   //     hours: [{label, temp, pp}], daily: {hi, lo, pp} }
   function okJson(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+  // a blocked domain often hangs instead of failing — time out so the fallback engages fast
+  function fetchT(url) {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 8000);
+    return fetch(url, { signal: ctl.signal })
+      .catch(function (e) { throw (e && e.name === "AbortError") ? new Error("TIMEOUT") : e; })
+      .finally(function () { clearTimeout(t); });
+  }
   function degF(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "°F"; }
   function pct(x) { return x == null || isNaN(x) ? "--" : Math.round(x) + "%"; }
 
@@ -793,8 +801,13 @@
     const full = base +
       "&hourly=temperature_2m,precipitation_probability,weather_code" +
       "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=2";
-    return fetch(full).then(okJson)
-      .catch(function () { return fetch(base).then(okJson); })
+    return fetchT(full).then(okJson)
+      .catch(function (e) {
+        // retry without forecast params only if the API rejected them;
+        // an unreachable domain (timeout/network) goes straight to the NWS fallback
+        if (!(e && /^HTTP 4/.test(e.message))) throw e;
+        return fetchT(base).then(okJson);
+      })
       .then(function (j) {
         const c = j.current;
         const hours = [];
@@ -830,11 +843,11 @@
 
   // fallback: National Weather Service (different domain, also CORS-open, US only)
   function nwsFetch() {
-    return fetch("https://api.weather.gov/points/" + loc.lat + "," + loc.lon).then(okJson)
+    return fetchT("https://api.weather.gov/points/" + loc.lat + "," + loc.lon).then(okJson)
       .then(function (p) {
         return Promise.all([
-          fetch(p.properties.forecastHourly).then(okJson),
-          fetch(p.properties.forecast).then(okJson)
+          fetchT(p.properties.forecastHourly).then(okJson),
+          fetchT(p.properties.forecast).then(okJson)
         ]);
       })
       .then(function (res) {
