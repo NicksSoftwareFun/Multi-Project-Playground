@@ -218,6 +218,62 @@
   #satview.err .satmsg { display: block; }
   #satview.err img { display: none; }
 
+  /* ---- current conditions block (bottom right, opposite the legend) ---- */
+  .wx {
+    position: absolute; right: 12px; bottom: 66px; z-index: 700;
+    background: rgba(8,14,22,0.85);
+    border: 1px solid rgba(140,170,195,0.25); border-radius: 8px;
+    padding: 10px 13px; min-width: 196px;
+    font-family: ui-monospace, Consolas, monospace;
+    cursor: pointer;
+  }
+  .screen.satmode .wx { display: none; }
+  .wx .place {
+    font-size: 10px; letter-spacing: 0.1em; color: #6E8496;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .wx .big { display: flex; align-items: baseline; gap: 9px; }
+  .wx .temp { font-size: 26px; font-weight: 700; color: #EAF2F8; }
+  .wx .cond { font-size: 11px; color: #8FC7F5; }
+  .wx .rows {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 14px;
+    margin-top: 7px;
+  }
+  .wx .rows .k { font-size: 10px; color: #7E93A5; letter-spacing: 0.06em; }
+  .wx .rows .v { font-size: 11px; color: #CFE0EE; text-align: right; }
+  .wx .hint { font-size: 11px; color: #F5D06A; letter-spacing: 0.06em; }
+
+  /* ---- settings page ---- */
+  #settings {
+    position: absolute; inset: 0; z-index: 950;
+    background: rgba(6,10,16,0.96);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+  }
+  .screen.settings #settings { display: flex; }
+  #settings .title {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px; letter-spacing: 0.22em; color: #8FA5B7;
+  }
+  #settings label {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.12em; color: #7E93A5;
+  }
+  #settings input {
+    background: rgba(16,26,38,0.9); color: #EAF2F8;
+    border: 1px solid rgba(140,170,195,0.4); border-radius: 8px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 22px; letter-spacing: 0.2em; text-align: center;
+    width: 150px; padding: 10px 6px; outline: none;
+  }
+  #settings input:focus { border-color: #53C7F0; }
+  #settings .msg {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; color: #8FA5B7; min-height: 16px;
+  }
+  #settings .msg.err { color: #E07A5F; }
+  #settings .btnrow { display: flex; gap: 12px; }
+
   .footnote {
     margin-top: 16px; max-width: 72ch; text-align: center;
     color: #8B96A1; font-size: 12.5px; line-height: 1.5;
@@ -243,6 +299,27 @@
 
     <div id="predFrame"><span class="tab" id="predTab">PREDICTION</span></div>
 
+    <div class="wx" id="wxPanel" title="Tap to change ZIP">
+      <div class="place" id="wxPlace">LOCAL CONDITIONS</div>
+      <div class="hint" id="wxHint">TAP TO SET ZIP CODE</div>
+      <div class="big" style="display:none" id="wxBig">
+        <span class="temp" id="wxTemp">--°</span>
+        <span class="cond" id="wxCond"></span>
+      </div>
+      <div class="rows" style="display:none" id="wxRows"></div>
+    </div>
+
+    <div id="settings">
+      <div class="title">SETTINGS</div>
+      <label for="zipInput">ZIP CODE</label>
+      <input id="zipInput" inputmode="numeric" maxlength="5" placeholder="50021" autocomplete="postal-code">
+      <div class="msg" id="setMsg"></div>
+      <div class="btnrow">
+        <button class="btn small" id="saveBtn">SAVE</button>
+        <button class="btn small" id="cancelBtn">CANCEL</button>
+      </div>
+    </div>
+
     <div class="bar topbar">
       <span class="brand">SKYWATCH</span>
       <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
@@ -262,6 +339,7 @@
       <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
       <button class="btn small" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
       <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
+      <button class="btn" id="settingsBtn" aria-label="Settings" style="font-size:15px">⚙</button>
     </div>
 
     <div class="legend">
@@ -520,7 +598,9 @@
   document.getElementById("zoomIn").addEventListener("click", function () { if (map) map.zoomIn(); });
   document.getElementById("zoomOut").addEventListener("click", function () { if (map) map.zoomOut(); });
   document.getElementById("homeBtn").addEventListener("click", function () {
-    if (map) map.setView(HOME_VIEW.center, HOME_VIEW.zoom);
+    if (!map) return;
+    if (loc) map.setView([loc.lat, loc.lon], 6);
+    else map.setView(HOME_VIEW.center, HOME_VIEW.zoom);
   });
   satBtn.addEventListener("click", function () {
     satMode = !satMode;
@@ -572,6 +652,122 @@
   setInterval(function () {
     if (playing && !satMode) show((frame + 1) % NFRAMES);
   }, 700);
+
+  // ---- local conditions (ZIP -> Zippopotam.us geocode -> Open-Meteo current) ----
+  const WX_REFRESH_MS = 10 * 60 * 1000;
+  let loc = null;
+  try { loc = JSON.parse(localStorage.getItem("skywatch_loc") || "null"); } catch (e) { loc = null; }
+
+  const wxPanel = document.getElementById("wxPanel");
+  const wxPlace = document.getElementById("wxPlace");
+  const wxHint = document.getElementById("wxHint");
+  const wxBig = document.getElementById("wxBig");
+  const wxTemp = document.getElementById("wxTemp");
+  const wxCond = document.getElementById("wxCond");
+  const wxRows = document.getElementById("wxRows");
+
+  const WMO = {
+    0: "CLEAR", 1: "MOSTLY CLEAR", 2: "PARTLY CLOUDY", 3: "OVERCAST",
+    45: "FOG", 48: "FREEZING FOG",
+    51: "LIGHT DRIZZLE", 53: "DRIZZLE", 55: "HEAVY DRIZZLE",
+    56: "FRZ DRIZZLE", 57: "FRZ DRIZZLE",
+    61: "LIGHT RAIN", 63: "RAIN", 65: "HEAVY RAIN",
+    66: "FREEZING RAIN", 67: "FREEZING RAIN",
+    71: "LIGHT SNOW", 73: "SNOW", 75: "HEAVY SNOW", 77: "SNOW GRAINS",
+    80: "SHOWERS", 81: "SHOWERS", 82: "HEAVY SHOWERS",
+    85: "SNOW SHOWERS", 86: "SNOW SHOWERS",
+    95: "THUNDERSTORM", 96: "T-STORM + HAIL", 99: "T-STORM + HAIL"
+  };
+  const DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+  function wxShowHint(text) {
+    wxHint.textContent = text;
+    wxHint.style.display = "block";
+    wxBig.style.display = "none";
+    wxRows.style.display = "none";
+  }
+  function row(k, v) { return "<span class='k'>" + k + "</span><span class='v'>" + v + "</span>"; }
+
+  function refreshWx() {
+    if (!loc) { wxPlace.textContent = "LOCAL CONDITIONS"; wxShowHint("TAP TO SET ZIP CODE"); return; }
+    wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + loc.lat +
+      "&longitude=" + loc.lon +
+      "&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m," +
+      "precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl" +
+      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto";
+    fetch(url)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        const c = j.current;
+        wxTemp.textContent = Math.round(c.temperature_2m) + "°F";
+        wxCond.textContent = WMO[c.weather_code] || "";
+        wxRows.innerHTML =
+          row("FEELS", Math.round(c.apparent_temperature) + "°F") +
+          row("HUMIDITY", Math.round(c.relative_humidity_2m) + "%") +
+          row("DEW PT", Math.round(c.dew_point_2m) + "°F") +
+          row("WIND", DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH") +
+          row("GUSTS", Math.round(c.wind_gusts_10m) + " MPH") +
+          row("PRESSURE", (c.pressure_msl * 0.02953).toFixed(2) + " inHg") +
+          row("PRECIP", (c.precipitation || 0).toFixed(2) + " IN/HR");
+        wxHint.style.display = "none";
+        wxBig.style.display = "flex";
+        wxRows.style.display = "grid";
+      })
+      .catch(function () { wxShowHint("WEATHER UNAVAILABLE"); });
+  }
+  refreshWx();
+  setInterval(refreshWx, WX_REFRESH_MS);
+
+  // ---- settings page ----
+  const settingsBtn = document.getElementById("settingsBtn");
+  const zipInput = document.getElementById("zipInput");
+  const setMsg = document.getElementById("setMsg");
+  function openSettings() {
+    zipInput.value = loc ? loc.zip : "";
+    setMsg.textContent = "";
+    setMsg.className = "msg";
+    screenEl.classList.add("settings");
+    zipInput.focus();
+  }
+  function closeSettings() { screenEl.classList.remove("settings"); }
+  settingsBtn.addEventListener("click", openSettings);
+  wxPanel.addEventListener("click", openSettings);
+  document.getElementById("cancelBtn").addEventListener("click", closeSettings);
+  document.getElementById("saveBtn").addEventListener("click", saveZip);
+  zipInput.addEventListener("keydown", function (e) { if (e.key === "Enter") saveZip(); });
+
+  function saveZip() {
+    const zip = zipInput.value.trim();
+    if (!/^\d{5}$/.test(zip)) {
+      setMsg.textContent = "ENTER A 5-DIGIT ZIP";
+      setMsg.className = "msg err";
+      return;
+    }
+    setMsg.textContent = "LOOKING UP " + zip + "…";
+    setMsg.className = "msg";
+    fetch("https://api.zippopotam.us/us/" + zip)
+      .then(function (r) { if (!r.ok) throw new Error("notfound"); return r.json(); })
+      .then(function (j) {
+        const p = j.places[0];
+        loc = {
+          zip: zip,
+          lat: parseFloat(p.latitude),
+          lon: parseFloat(p.longitude),
+          name: p["place name"],
+          state: p["state abbreviation"]
+        };
+        localStorage.setItem("skywatch_loc", JSON.stringify(loc));
+        closeSettings();
+        refreshWx();
+        if (map) map.setView([loc.lat, loc.lon], 6);
+      })
+      .catch(function (e) {
+        setMsg.textContent = e.message === "notfound" ? "ZIP NOT FOUND" : "LOOKUP FAILED — CHECK CONNECTION";
+        setMsg.className = "msg err";
+      });
+  }
+  if (loc && map) map.setView([loc.lat, loc.lon], 6);
 
   show(NOW_I);
 })();
