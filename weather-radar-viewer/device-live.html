@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKYWATCH Device — Live Data on the 7″ Panel</title>
+<!--
+  The device-frame simulation (Waveshare ESP32-S3 Touch LCD 7B, 1024x600)
+  running on REAL data. Open this file locally in a browser:
+    - Past radar:  IEM NEXRAD N0Q composite tiles, 5-min steps, last 50 min
+    - Forecast:    IEM HRRR simulated reflectivity (REFD), 15-min steps
+    - Satellite:   GOES-East CONUS GeoColor from NOAA STAR (SAT button,
+                   shown as the raw image - geostationary projection does
+                   not fit a flat map)
+  The screen is rendered at a true 1024x600 CSS pixels (1:1 with the
+  panel), so what you see is exactly the real estate the hardware has.
+  Note: no NEXRAD Level 2 close-up here - that needs a home server to
+  render; map zoom stays within the N0Q composite's useful range.
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100vh;
+    background: #14181D; color: #DCE3EA;
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 12px 40px;
+  }
+  header { text-align: center; margin-bottom: 18px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.14em; color: #4FB3C8;
+    text-transform: uppercase;
+  }
+  h1 { margin: 6px 0 2px; font-size: 24px; font-weight: 650; }
+  .sub { margin: 0; color: #8B96A1; font-size: 13.5px; }
+
+  /* ---- device ---- */
+  .device {
+    background: linear-gradient(160deg, #1A1D21, #0A0B0D 70%);
+    border-radius: 18px;
+    padding: 16px 16px 22px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.38), 0 2px 6px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.07);
+    position: relative;
+    flex: none;
+  }
+  .device::after {
+    content: "ESP32-S3 · 7.0-INCH IPS · 1024 × 600 · CAPACITIVE TOUCH";
+    position: absolute; bottom: 6px; left: 0; right: 0;
+    text-align: center;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8px; letter-spacing: 0.22em; color: #4A4F55;
+  }
+  .screen {
+    width: 1024px; height: 600px;
+    position: relative; overflow: hidden;
+    border-radius: 6px; background: #0A1018;
+    user-select: none; -webkit-user-select: none;
+  }
+  #lmap { position: absolute; inset: 0; background: #0A1018; }
+  .leaflet-container { background: #0A1018; font-family: inherit; }
+  .leaflet-control-attribution {
+    background: rgba(8,14,22,0.7) !important; color: #6E8496 !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a { color: #8FA5B7 !important; }
+
+  /* ---- on-screen chrome (over the map) ---- */
+  .bar {
+    position: absolute; left: 0; right: 0;
+    display: flex; align-items: center;
+    color: #D7E2EC; z-index: 700; pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .topbar {
+    top: 0; height: 44px; padding: 0 14px; gap: 12px;
+    background: linear-gradient(rgba(6,10,16,0.88), rgba(6,10,16,0.55) 70%, rgba(6,10,16,0));
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.08em; color: #EAF2F8; }
+  .badge {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    padding: 4px 9px; border-radius: 4px; border: 1px solid; white-space: nowrap;
+  }
+  .badge.mrms { color: #6ADBD0; border-color: #2E6E68; background: rgba(23,61,58,0.55); }
+  .badge.fcst { color: #C9A6F5; border-color: #6C4E9E; background: rgba(48,32,76,0.55); }
+  .badge.sat  { color: #8FC7F5; border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
+  .topbar .spacer { flex: 1; }
+  .frametime { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #BFD3E2; }
+  .frametime.fcst { color: #C9A6F5; }
+  .clockbox {
+    text-align: right; font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; line-height: 1.5; color: #7E93A5;
+  }
+  .clockbox .clock { font-size: 13px; color: #D7E2EC; }
+
+  .botbar {
+    bottom: 0; height: 58px; padding: 0 14px 8px; gap: 10px;
+    background: linear-gradient(rgba(6,10,16,0), rgba(6,10,16,0.6) 30%, rgba(6,10,16,0.9));
+  }
+  .btn {
+    height: 42px; min-width: 42px; border-radius: 8px;
+    border: 1px solid rgba(140,170,195,0.35);
+    background: rgba(16,26,38,0.82); color: #CFE0EE;
+    font-size: 19px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { background: rgba(30,46,64,0.9); }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 2px solid #53C7F0; outline-offset: 1px; }
+  .btn.small { font-size: 10px; letter-spacing: 0.08em; font-weight: 700; padding: 0 8px; }
+  .btn.on { border-color: #53C7F0; color: #53C7F0; }
+
+  .zoomstack {
+    position: absolute; right: 12px; top: 58px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 700;
+  }
+
+  .scrubwrap { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .trackbox { flex: 1; position: relative; display: flex; align-items: center; }
+  input.scrub {
+    width: 100%; -webkit-appearance: none; appearance: none; margin: 0;
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right,
+      rgba(120,170,200,0.45) 0 47.6%, rgba(160,120,220,0.4) 47.6% 100%);
+    cursor: pointer;
+  }
+  input.scrub::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  input.scrub::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #53C7F0; border: 2px solid #0A1018;
+  }
+  .nowmark {
+    position: absolute; left: 47.6%; top: -13px; transform: translateX(-50%);
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 8.5px; letter-spacing: 0.1em; color: #9FB4C6;
+    pointer-events: none; text-align: center; line-height: 1.1;
+  }
+  .nowmark::after {
+    content: ""; display: block; width: 1px; height: 8px;
+    background: #9FB4C6; margin: 1px auto 0;
+  }
+  .spanlabel {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; letter-spacing: 0.08em; color: #7E93A5; white-space: nowrap;
+  }
+  .spanlabel.fcst { color: #A88BD8; }
+
+  .legend { position: absolute; left: 12px; bottom: 66px; z-index: 700; pointer-events: none; }
+  .legend .swatches { display: flex; height: 8px; border-radius: 2px; overflow: hidden; }
+  .legend .swatches i { width: 13px; }
+  .legend .marks {
+    display: flex; justify-content: space-between;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; color: #8FA5B7; margin-top: 3px;
+  }
+  .legend .cap {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 9px; letter-spacing: 0.1em; color: #6E8496; margin-bottom: 4px;
+  }
+
+  .status {
+    position: absolute; left: 12px; top: 54px; z-index: 700;
+    background: rgba(8,14,22,0.8);
+    border: 1px solid rgba(140,170,195,0.25); border-radius: 6px;
+    padding: 6px 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 10px; line-height: 1.6; color: #8FA5B7;
+    pointer-events: none;
+  }
+  .status .on { color: #6ADBD0; }
+  .status .off { color: #E07A5F; }
+
+  /* ---- satellite view ---- */
+  #satview {
+    position: absolute; inset: 0; z-index: 600;
+    background: #000; overflow: hidden; display: none;
+  }
+  .screen.satmode #satview { display: block; }
+  .screen.satmode .botbar, .screen.satmode .legend,
+  .screen.satmode #zoomIn, .screen.satmode #zoomOut, .screen.satmode #homeBtn,
+  .screen.satmode .status { display: none; }
+  #cropBtn { display: none; }
+  .screen.satmode #cropBtn { display: flex; }
+  #satview img { position: absolute; top: 50%; right: 0; transform: translateY(-50%); height: 100%; }
+  #satview.full img { height: auto; width: 100%; top: 50%; right: auto; left: 0; }
+  .satmsg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    color: #8FA5B7; display: none;
+  }
+  #satview.err .satmsg { display: block; }
+  #satview.err img { display: none; }
+
+  .footnote {
+    margin-top: 16px; max-width: 72ch; text-align: center;
+    color: #8B96A1; font-size: 12.5px; line-height: 1.5;
+  }
+  .footnote b { color: #DCE3EA; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Waveshare ESP32-S3 Touch LCD 7B · 1024 × 600 · Live Data</div>
+  <h1>SKYWATCH — device simulation, real feeds</h1>
+  <p class="sub">Screen rendered 1:1 at panel resolution. Mouse stands in for touch.</p>
+</header>
+
+<div class="device">
+  <div class="screen" id="screen">
+    <div id="lmap"></div>
+
+    <div id="satview">
+      <img id="satimg" alt="GOES-East GeoColor satellite image">
+      <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
+    </div>
+
+    <div class="bar topbar">
+      <span class="brand">SKYWATCH</span>
+      <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
+      <span class="spacer"></span>
+      <span class="frametime" id="frameTime">--:--</span>
+      <span class="spacer"></span>
+      <div class="clockbox">
+        <div class="clock" id="clock">--:--</div>
+        <div>UPD <span id="updCount">-:--</span></div>
+      </div>
+    </div>
+
+    <div class="status" id="status">loading…</div>
+
+    <div class="zoomstack">
+      <button class="btn" id="zoomIn" aria-label="Zoom in">+</button>
+      <button class="btn" id="zoomOut" aria-label="Zoom out">−</button>
+      <button class="btn small" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
+      <button class="btn small on" id="cropBtn" aria-label="Toggle satellite crop">EAST</button>
+      <button class="btn" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
+    </div>
+
+    <div class="legend">
+      <div class="cap">REFLECTIVITY dBZ</div>
+      <div class="swatches" id="legendSwatches"></div>
+      <div class="marks"><span>10</span><span>25</span><span>40</span><span>55</span><span>70</span></div>
+    </div>
+
+    <div class="bar botbar">
+      <button class="btn" id="playBtn" aria-label="Play or pause">⏸</button>
+      <div class="scrubwrap">
+        <span class="spanlabel">-50 MIN</span>
+        <div class="trackbox">
+          <div class="nowmark">NOW</div>
+          <input class="scrub" id="scrub" type="range" min="0" max="21" value="10" step="1" aria-label="Radar timeline">
+        </div>
+        <span class="spanlabel fcst">+2:45</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">
+  <b>Live feeds:</b> IEM NEXRAD N0Q composite (past, 5-min steps) and IEM HRRR REFD forecast
+  tiles (15-min steps, auto-falls back to an older run while the newest processes);
+  <b>SAT</b> shows the current GOES-East CONUS GeoColor image from NOAA STAR as-is.
+  No Level 2 close-up in this build — that needs a home server to render the raw volumes.
+</p>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  "use strict";
+  const IEM = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/";
+  const GOES_DIR = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/";
+  const GOES_PRIMARY = GOES_DIR + "GOES19-ABI-CONUS-GEOCOLOR-2500x1500.jpg";
+  const GOES_FALLBACK = GOES_DIR + "latest.jpg";
+  const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  const PAST = 11;   // t = -50 .. 0 min, 5-min steps
+  const FUT = 11;    // t = +15 .. +165 min, 15-min steps
+  const NOW_I = PAST - 1;
+  const NFRAMES = PAST + FUT;
+  function frameT(i) { return i < PAST ? -(PAST - 1 - i) * 5 : (i - PAST + 1) * 15; }
+
+  // dBZ legend swatches (NWS ramp)
+  const PAL = ["#04E9E7","#019FF4","#0300F4","#02FD02","#01C501","#008E00","#FDF802",
+               "#E5BC00","#FD9500","#FD0000","#D40000","#BC0000","#F800FD","#9854C6","#FDFDFD"];
+  (function () {
+    const box = document.getElementById("legendSwatches");
+    PAL.forEach(function (c) {
+      const i = document.createElement("i");
+      i.style.background = c;
+      box.appendChild(i);
+    });
+  })();
+
+  // ---- map (guarded: keep the UI alive if the Leaflet CDN is unreachable) ----
+  let map = null;
+  if (window.L) {
+    map = L.map("lmap", {
+      center: HOME_VIEW.center,
+      zoom: HOME_VIEW.zoom,
+      minZoom: 4,
+      maxZoom: 9,
+      zoomControl: false,
+      attributionControl: true
+    });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OSM &copy; CARTO · IEM/NOAA · NOAA STAR",
+      subdomains: "abcd"
+    }).addTo(map);
+  }
+
+  // ---- GOES-East (raw image, refreshed every 5 min) ----
+  const screenEl = document.getElementById("screen");
+  const satview = document.getElementById("satview");
+  const satimg = document.getElementById("satimg");
+  let goesOk = false, goesFetched = null, triedFallback = false;
+  satimg.addEventListener("load", function () {
+    goesOk = true; goesFetched = new Date();
+    satview.classList.remove("err");
+    updateStatus(); if (satMode) updateChrome();
+  });
+  satimg.addEventListener("error", function () {
+    if (!triedFallback) {
+      triedFallback = true;
+      satimg.src = GOES_FALLBACK + "?t=" + Date.now();
+      return;
+    }
+    goesOk = false; satview.classList.add("err"); updateStatus();
+  });
+  function loadGoes() {
+    triedFallback = false;
+    satimg.src = GOES_PRIMARY + "?t=" + Date.now();
+  }
+  loadGoes();
+  setInterval(loadGoes, REFRESH_MS);
+
+  // ---- radar frame layers ----
+  function pad(n, w) { return String(n).padStart(w, "0"); }
+  function utcStamp(d, minStep) {
+    const m = Math.floor(d.getUTCMinutes() / minStep) * minStep;
+    return "" + d.getUTCFullYear() + pad(d.getUTCMonth() + 1, 2) + pad(d.getUTCDate(), 2) +
+           pad(d.getUTCHours(), 2) + pad(m, 2);
+  }
+  let hrrrRunOffsetHrs = 2, hrrrErrors = 0, radarErrors = 0;
+  function hrrrInit() {
+    const d = new Date(Date.now() - hrrrRunOffsetHrs * 3600 * 1000);
+    d.setUTCMinutes(0, 0, 0);
+    return d;
+  }
+  function layerUrl(i) {
+    const t = frameT(i);
+    if (i < PAST) {
+      // explicit timestamps for every frame (~3 min processing lag) — the
+      // "-0" current alias mixes per-tile cache ages and tears at tile seams
+      const d = new Date(Date.now() - 180000 + t * 60000);
+      return IEM + "ridge::USCOMP-N0Q-" + utcStamp(d, 5) + "/{z}/{x}/{y}.png";
+    }
+    const init = hrrrInit();
+    const validMs = Date.now() + t * 60000;
+    let fmin = Math.round((validMs - init.getTime()) / 900000) * 15;
+    fmin = Math.max(0, Math.min(1080, fmin));
+    return IEM + "hrrr::REFD-F" + pad(fmin, 4) + "-" + utcStamp(init, 60) + "/{z}/{x}/{y}.png";
+  }
+
+  const layers = new Array(NFRAMES).fill(null);
+  function buildLayer(i) {
+    if (!map) return null;
+    const lyr = L.tileLayer(layerUrl(i), {
+      opacity: 0, zIndex: 400, maxNativeZoom: 9,
+      updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 0
+    });
+    lyr.on("tileerror", function () {
+      if (i < PAST) { radarErrors++; }
+      else {
+        hrrrErrors++;
+        if (hrrrErrors > 12 && hrrrRunOffsetHrs < 6) {
+          hrrrErrors = 0;
+          hrrrRunOffsetHrs++;
+          rebuildFuture();
+        }
+      }
+      updateStatus();
+    });
+    lyr.addTo(map);
+    return lyr;
+  }
+  function rebuildFuture() {
+    for (let i = PAST; i < NFRAMES; i++) {
+      if (layers[i]) {
+        if (map && map.hasLayer(layers[i])) map.removeLayer(layers[i]);
+        layers[i] = null;
+      }
+    }
+    if (frame >= PAST) show(frame);
+  }
+
+  let frame = NOW_I;
+  function show(i) {
+    frame = i;
+    const nx = (i + 1) % NFRAMES;
+    if (!layers[i]) layers[i] = buildLayer(i);
+    if (!layers[nx]) layers[nx] = buildLayer(nx);
+    // only the visible + preloading frame stay attached (request hygiene)
+    for (let j = 0; j < NFRAMES; j++) {
+      const lyr = layers[j];
+      if (!lyr || !map) continue;
+      if (j === i || j === nx) {
+        if (!map.hasLayer(lyr)) lyr.addTo(map);
+        lyr.setOpacity(j === i ? 0.75 : 0);
+      } else if (map.hasLayer(lyr)) {
+        map.removeLayer(lyr);
+      }
+    }
+    updateChrome();
+  }
+
+  // ---- chrome ----
+  const scrub = document.getElementById("scrub");
+  const playBtn = document.getElementById("playBtn");
+  const srcBadge = document.getElementById("srcBadge");
+  const frameTimeEl = document.getElementById("frameTime");
+  const clockEl = document.getElementById("clock");
+  const updEl = document.getElementById("updCount");
+  const statusEl = document.getElementById("status");
+  const satBtn = document.getElementById("satBtn");
+  const cropBtn = document.getElementById("cropBtn");
+  let satMode = false;
+  function fmt(d) { return pad(d.getHours(), 2) + ":" + pad(d.getMinutes(), 2); }
+
+  function updateChrome() {
+    if (satMode) {
+      srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
+      srcBadge.className = "badge sat";
+      frameTimeEl.textContent = goesFetched ? "FETCHED " + fmt(goesFetched) : "--:--";
+      frameTimeEl.className = "frametime";
+      return;
+    }
+    scrub.value = String(frame);
+    const t = frameT(frame);
+    const d = new Date(Date.now() + t * 60000);
+    if (frame < PAST) {
+      srcBadge.textContent = "NEXRAD N0Q · IEM COMPOSITE";
+      srcBadge.className = "badge mrms";
+      frameTimeEl.textContent = fmt(d) + (frame === NOW_I ? " · LATEST" : "");
+      frameTimeEl.className = "frametime";
+    } else {
+      srcBadge.textContent = "HRRR REFD · +" + Math.floor(t / 60) + ":" + pad(t % 60, 2);
+      srcBadge.className = "badge fcst";
+      frameTimeEl.textContent = "FCST " + fmt(d);
+      frameTimeEl.className = "frametime fcst";
+    }
+  }
+  function updateStatus() {
+    statusEl.innerHTML =
+      "RADAR  <span class='" + (map ? (radarErrors < 20 ? "on'>ok" : "off'>errors") : "off'>map lib unavailable") + "</span><br>" +
+      "HRRR   <span class='on'>run -" + hrrrRunOffsetHrs + "h</span><br>" +
+      "GOES-E <span class='" + (goesOk ? "on'>ok" : "off'>…") + "</span>";
+  }
+  updateStatus();
+
+  // clock + countdown to the next radar rebuild (a real deadline, not cosmetic)
+  let nextRefresh = Date.now() + REFRESH_MS;
+  setInterval(function () {
+    clockEl.textContent = fmt(new Date());
+    const s = Math.max(0, Math.round((nextRefresh - Date.now()) / 1000));
+    updEl.textContent = Math.floor(s / 60) + ":" + pad(s % 60, 2);
+  }, 1000);
+  clockEl.textContent = fmt(new Date());
+
+  setInterval(function () {
+    nextRefresh = Date.now() + REFRESH_MS;
+    for (let i = 0; i < PAST; i++) {
+      if (layers[i]) {
+        if (map && map.hasLayer(layers[i])) map.removeLayer(layers[i]);
+        layers[i] = null;
+      }
+    }
+    show(frame);
+  }, REFRESH_MS);
+
+  // ---- controls ----
+  document.getElementById("zoomIn").addEventListener("click", function () { if (map) map.zoomIn(); });
+  document.getElementById("zoomOut").addEventListener("click", function () { if (map) map.zoomOut(); });
+  document.getElementById("homeBtn").addEventListener("click", function () {
+    if (map) map.setView(HOME_VIEW.center, HOME_VIEW.zoom);
+  });
+  satBtn.addEventListener("click", function () {
+    satMode = !satMode;
+    screenEl.classList.toggle("satmode", satMode);
+    satBtn.textContent = satMode ? "RADAR" : "SAT";
+    satBtn.classList.toggle("on", satMode);
+    if (satMode && (!goesFetched || Date.now() - goesFetched.getTime() > REFRESH_MS)) loadGoes();
+    updateChrome();
+  });
+  cropBtn.addEventListener("click", function () {
+    const full = satview.classList.toggle("full");
+    cropBtn.textContent = full ? "FULL" : "EAST";
+    cropBtn.classList.toggle("on", !full);
+  });
+
+  let playing = true;
+  playBtn.addEventListener("click", function () {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸" : "▶";
+  });
+  scrub.addEventListener("input", function () {
+    playing = false;
+    playBtn.textContent = "▶";
+    show(parseInt(scrub.value, 10));
+  });
+  setInterval(function () {
+    if (playing && !satMode) show((frame + 1) % NFRAMES);
+  }, 700);
+
+  show(NOW_I);
+})();
+</script>
+</body>
+</html>
