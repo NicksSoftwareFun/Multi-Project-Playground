@@ -273,6 +273,60 @@
   }
   #settings .msg.err { color: #E07A5F; }
   #settings .btnrow { display: flex; gap: 12px; }
+  #settings .chk {
+    display: flex; align-items: center; gap: 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.08em; color: #AEB9C4;
+    cursor: pointer; max-width: 460px;
+  }
+  #settings .chk input { width: 18px; height: 18px; accent-color: #53C7F0; cursor: pointer; }
+
+  /* ---- fade layer for auto-mode transitions ---- */
+  #fader {
+    position: absolute; inset: 0; z-index: 940;
+    background: #000; opacity: 0; pointer-events: none;
+    transition: opacity 0.45s;
+  }
+  #fader.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { #fader { transition: none; } }
+
+  /* ---- full-screen conditions & forecast board (auto-mode phase 3) ---- */
+  #statsview {
+    position: absolute; inset: 0; z-index: 620;
+    background: #0A1018;
+    display: none;
+    padding: 64px 70px 40px;
+    font-family: ui-monospace, Consolas, monospace;
+    gap: 80px; justify-content: center;
+  }
+  .screen.stats #statsview { display: flex; }
+  .screen.stats .botbar, .screen.stats .legend, .screen.stats .wx,
+  .screen.stats .status, .screen.stats #zoomIn, .screen.stats #zoomOut,
+  .screen.stats #homeBtn, .screen.stats #satBtn { display: none; }
+  #statsview .col { display: flex; flex-direction: column; min-width: 330px; }
+  #statsview .place {
+    font-size: 14px; letter-spacing: 0.14em; color: #6E8496;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  #statsview .bigtemp { font-size: 84px; font-weight: 700; color: #EAF2F8; line-height: 1; }
+  #statsview .bigcond { font-size: 17px; color: #8FC7F5; letter-spacing: 0.1em; margin: 10px 0 24px; }
+  #statsview .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; }
+  #statsview .grid .k { font-size: 13px; color: #7E93A5; letter-spacing: 0.08em; }
+  #statsview .grid .v { font-size: 15px; color: #DCE9F4; text-align: right; }
+  #statsview .sect {
+    font-size: 12px; letter-spacing: 0.18em; color: #D8B44A;
+    margin: 0 0 12px; border-bottom: 1px solid rgba(216,180,74,0.35);
+    padding-bottom: 6px;
+  }
+  #statsview .daily { font-size: 15px; color: #DCE9F4; margin-bottom: 18px; }
+  #statsview .hours { display: grid; grid-template-columns: auto auto auto; gap: 8px 26px; }
+  #statsview .hours .h { font-size: 14px; color: #7E93A5; }
+  #statsview .hours .t { font-size: 15px; color: #DCE9F4; text-align: right; }
+  #statsview .hours .p { font-size: 14px; color: #6AA8D8; text-align: right; }
+  #statsview .bigmsg {
+    align-self: center; margin: auto;
+    font-size: 14px; color: #8FA5B7; letter-spacing: 0.1em;
+  }
 
   .footnote {
     margin-top: 16px; max-width: 72ch; text-align: center;
@@ -309,10 +363,17 @@
       <div class="rows" style="display:none" id="wxRows"></div>
     </div>
 
+    <div id="statsview"></div>
+    <div id="fader"></div>
+
     <div id="settings">
       <div class="title">SETTINGS</div>
       <label for="zipInput">ZIP CODE</label>
       <input id="zipInput" inputmode="numeric" maxlength="5" placeholder="50021" autocomplete="postal-code">
+      <label class="chk">
+        <input type="checkbox" id="autoChk">
+        AUTO MODE — RADAR ×2 → SATELLITE 20s → CONDITIONS 20s, LOOPED
+      </label>
       <div class="msg" id="setMsg"></div>
       <div class="btnrow">
         <button class="btn small" id="saveBtn">SAVE</button>
@@ -540,7 +601,14 @@
   // time-proportional thumb position: -50 .. +165 min over the track width
   const T_MIN = frameT(0), T_SPAN = frameT(NFRAMES - 1) - T_MIN;
   function updateChrome() {
-    screenEl.classList.toggle("pred", frame >= PAST && !satMode);
+    screenEl.classList.toggle("pred", frame >= PAST && !satMode && !statsMode);
+    if (statsMode) {
+      srcBadge.textContent = "CONDITIONS + FORECAST";
+      srcBadge.className = "badge mrms";
+      frameTimeEl.textContent = loc ? loc.name.toUpperCase() + ", " + loc.state : "";
+      frameTimeEl.className = "frametime";
+      return;
+    }
     if (satMode) {
       srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
       srcBadge.className = "badge sat";
@@ -602,14 +670,23 @@
     if (loc) map.setView([loc.lat, loc.lon], 6);
     else map.setView(HOME_VIEW.center, HOME_VIEW.zoom);
   });
-  satBtn.addEventListener("click", function () {
-    satMode = !satMode;
+  function setSatMode(on) {
+    satMode = on;
     screenEl.classList.toggle("satmode", satMode);
     satBtn.textContent = satMode ? "RADAR" : "SAT";
     satBtn.classList.toggle("on", satMode);
     if (satMode && (!goesFetched || Date.now() - goesFetched.getTime() > REFRESH_MS)) loadGoes();
     updateChrome();
-  });
+  }
+  satBtn.addEventListener("click", function () { setSatMode(!satMode); });
+
+  let statsMode = false;
+  function setStats(on) {
+    statsMode = on;
+    screenEl.classList.toggle("stats", on);
+    if (on) renderStats();
+    updateChrome();
+  }
 
   let playing = true;
   playBtn.addEventListener("click", function () {
@@ -650,12 +727,22 @@
     if (e.key === "Home") { e.preventDefault(); scrubTo(NOW_I); }
   });
   setInterval(function () {
-    if (playing && !satMode) show((frame + 1) % NFRAMES);
+    if (screenEl.classList.contains("settings")) return;
+    if (satMode || statsMode) return;
+    if (!(playing || (autoOn && autoPhase === "radar"))) return;
+    const nx = (frame + 1) % NFRAMES;
+    if (autoOn && autoPhase === "radar" && nx === 0) {
+      autoLoops++;
+      if (autoLoops >= 2) { enterSatPhase(); return; }
+      autoRadarView(autoLoops);      // second pass: zoom in on the ZIP
+    }
+    show(nx);
   }, 700);
 
   // ---- local conditions (ZIP -> Zippopotam.us geocode -> Open-Meteo current) ----
   const WX_REFRESH_MS = 10 * 60 * 1000;
   let loc = null;
+  let lastWx = null;
   try { loc = JSON.parse(localStorage.getItem("skywatch_loc") || "null"); } catch (e) { loc = null; }
 
   const wxPanel = document.getElementById("wxPanel");
@@ -695,10 +782,14 @@
       "&longitude=" + loc.lon +
       "&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m," +
       "precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl" +
+      "&hourly=temperature_2m,precipitation_probability,weather_code&forecast_hours=8" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1" +
       "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto";
     fetch(url)
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (j) {
+        lastWx = j;
+        if (statsMode) renderStats();
         const c = j.current;
         wxTemp.textContent = Math.round(c.temperature_2m) + "°F";
         wxCond.textContent = WMO[c.weather_code] || "";
@@ -714,17 +805,99 @@
         wxBig.style.display = "flex";
         wxRows.style.display = "grid";
       })
-      .catch(function () { wxShowHint("WEATHER UNAVAILABLE"); });
+      .catch(function () {
+        lastWx = null;
+        wxShowHint("WEATHER UNAVAILABLE");
+        if (statsMode) renderStats();
+      });
   }
   refreshWx();
   setInterval(refreshWx, WX_REFRESH_MS);
+
+  // ---- full-screen conditions & forecast board ----
+  const statsEl = document.getElementById("statsview");
+  function renderStats() {
+    if (!loc) { statsEl.innerHTML = "<div class='bigmsg'>SET A ZIP CODE IN SETTINGS</div>"; return; }
+    if (!lastWx) { statsEl.innerHTML = "<div class='bigmsg'>WEATHER UNAVAILABLE</div>"; return; }
+    const c = lastWx.current, hl = lastWx.hourly, dl = lastWx.daily;
+    const left = "<div class='col'>" +
+      "<div class='place'>" + loc.name + ", " + loc.state + " · " + loc.zip + "</div>" +
+      "<div class='bigtemp'>" + Math.round(c.temperature_2m) + "°F</div>" +
+      "<div class='bigcond'>" + (WMO[c.weather_code] || "") + "</div>" +
+      "<div class='grid'>" +
+      row("FEELS LIKE", Math.round(c.apparent_temperature) + "°F") +
+      row("HUMIDITY", Math.round(c.relative_humidity_2m) + "%") +
+      row("DEW POINT", Math.round(c.dew_point_2m) + "°F") +
+      row("WIND", DIRS[Math.round(c.wind_direction_10m / 22.5) % 16] + " " + Math.round(c.wind_speed_10m) + " MPH") +
+      row("GUSTS", Math.round(c.wind_gusts_10m) + " MPH") +
+      row("PRESSURE", (c.pressure_msl * 0.02953).toFixed(2) + " inHg") +
+      row("PRECIP", (c.precipitation || 0).toFixed(2) + " IN/HR") +
+      "</div></div>";
+    let hours = "";
+    if (hl && hl.time) {
+      for (let i = 0; i < Math.min(8, hl.time.length); i++) {
+        hours += "<span class='h'>" + hl.time[i].slice(11, 16) + "</span>" +
+                 "<span class='t'>" + Math.round(hl.temperature_2m[i]) + "°</span>" +
+                 "<span class='p'>" + (hl.precipitation_probability ? hl.precipitation_probability[i] + "%" : "--") + "</span>";
+      }
+    }
+    let daily = "";
+    if (dl && dl.time) {
+      daily = "TODAY — HI " + Math.round(dl.temperature_2m_max[0]) + "° · LO " +
+        Math.round(dl.temperature_2m_min[0]) + "° · PRECIP " + dl.precipitation_probability_max[0] + "%";
+    }
+    const right = "<div class='col'><div class='sect'>PREDICTIONS</div>" +
+      (daily ? "<div class='daily'>" + daily + "</div>" : "") +
+      "<div class='hours'>" + hours + "</div></div>";
+    statsEl.innerHTML = left + right;
+  }
+
+  // ---- auto mode: radar x2 -> satellite 20s -> conditions 20s, looped ----
+  const fader = document.getElementById("fader");
+  let autoOn = localStorage.getItem("skywatch_auto") === "1";
+  let autoPhase = "radar", autoLoops = 0, autoTimer = null;
+  function fadeSwap(fn) {
+    fader.classList.add("show");
+    setTimeout(function () { fn(); fader.classList.remove("show"); }, 480);
+  }
+  // pass 1: zoomed-out regional view; pass 2: zoomed-in — both centered on the ZIP
+  function autoRadarView(pass) {
+    if (!map) return;
+    const c = loc ? [loc.lat, loc.lon] : HOME_VIEW.center;
+    map.setView(c, pass === 0 ? 5 : 7);
+  }
+  function enterRadarPhase() {
+    autoPhase = "radar";
+    clearTimeout(autoTimer);
+    fadeSwap(function () {
+      setStats(false);
+      setSatMode(false);
+      autoLoops = 0;
+      playing = true;
+      playBtn.textContent = "⏸";
+      autoRadarView(0);
+      show(0);
+    });
+  }
+  function enterSatPhase() {
+    autoPhase = "sat";
+    fadeSwap(function () { setSatMode(true); });
+    autoTimer = setTimeout(enterStatsPhase, 20000);
+  }
+  function enterStatsPhase() {
+    autoPhase = "stats";
+    fadeSwap(function () { setSatMode(false); setStats(true); });
+    autoTimer = setTimeout(enterRadarPhase, 20000);
+  }
 
   // ---- settings page ----
   const settingsBtn = document.getElementById("settingsBtn");
   const zipInput = document.getElementById("zipInput");
   const setMsg = document.getElementById("setMsg");
+  const autoChk = document.getElementById("autoChk");
   function openSettings() {
     zipInput.value = loc ? loc.zip : "";
+    autoChk.checked = autoOn;
     setMsg.textContent = "";
     setMsg.className = "msg";
     screenEl.classList.add("settings");
@@ -737,8 +910,27 @@
   document.getElementById("saveBtn").addEventListener("click", saveZip);
   zipInput.addEventListener("keydown", function (e) { if (e.key === "Enter") saveZip(); });
 
+  function applyAuto() {
+    const want = autoChk.checked;
+    localStorage.setItem("skywatch_auto", want ? "1" : "0");
+    if (want && !autoOn) {
+      autoOn = true;
+      enterRadarPhase();
+    } else if (!want && autoOn) {
+      autoOn = false;
+      clearTimeout(autoTimer);
+      if (satMode || statsMode) {
+        fadeSwap(function () { setStats(false); setSatMode(false); });
+      }
+    }
+  }
   function saveZip() {
     const zip = zipInput.value.trim();
+    if (zip === "") {          // no ZIP change — just apply the auto-mode choice
+      applyAuto();
+      closeSettings();
+      return;
+    }
     if (!/^\d{5}$/.test(zip)) {
       setMsg.textContent = "ENTER A 5-DIGIT ZIP";
       setMsg.className = "msg err";
@@ -758,6 +950,7 @@
           state: p["state abbreviation"]
         };
         localStorage.setItem("skywatch_loc", JSON.stringify(loc));
+        applyAuto();
         closeSettings();
         refreshWx();
         if (map) map.setView([loc.lat, loc.lon], 6);
@@ -770,6 +963,7 @@
   if (loc && map) map.setView([loc.lat, loc.lon], 6);
 
   show(NOW_I);
+  if (autoOn) enterRadarPhase();
 })();
 </script>
 </body>
