@@ -1,7 +1,5 @@
 # VOIDRUNNER
 
-**Play it: https://nickssoftwarefun.github.io/Multi-Project-Playground/voidrunner/**
-
 A 3D sci-fi corridor runner for phones, built with three.js. One folder, no
 build step, no dependencies to install, no server to run. Open `index.html`
 over HTTP and play.
@@ -45,6 +43,14 @@ script fetches through `npx` if it is not already installed.
 repo only gets one site and this one holds several projects, the workflow checks
 out each project branch and assembles them side by side — the radar PWA at `/`
 and this game at `/voidrunner/` — so deploying one never removes the other.
+
+It is wired up but has not run yet: the `github-pages` environment only permits
+the repository's default branch to deploy, and this game lives on its own
+branch. Allowing `claude/*` under **Settings → Environments → github-pages →
+Deployment branches**, or merging this branch into the default one, is enough to
+publish it at
+
+    https://nickssoftwarefun.github.io/Multi-Project-Playground/voidrunner/
 
 ### Controls
 
