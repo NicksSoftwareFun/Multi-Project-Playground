@@ -283,7 +283,7 @@ function nextTwoHoursSection(c) {
   activeCharts.push(chart(host, {
     height: 70,
     now: Date.now(),
-    y: { unit: "IN" },
+    y: { unit: "IN", min: 0 },        // rainfall has a floor; a dry day is flat at 0, not -1
     cursor: true,
     series: [{ type: "bars", data: c.base.data.precip15, token: "--info", label: "PRECIP" }]
   }));

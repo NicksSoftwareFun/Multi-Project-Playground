@@ -53,7 +53,15 @@ function extent(series, axis) {
     }
   }
   if (lo === Infinity) return null;
-  if (lo === hi) { lo -= 1; hi += 1; }
+  // A flat series has no span to scale against. Widening it by a fixed +/-1 was
+  // wrong for any quantity that cannot go negative: a dry day makes every
+  // precipitation value 0, so the axis opened at -1 IN of rain. Pad
+  // proportionally, and let the caller's declared floor clamp it (see yLo).
+  if (lo === hi) {
+    const pad = Math.abs(lo) > 1 ? Math.abs(lo) * 0.05 : 1;
+    lo -= pad;
+    hi += pad;
+  }
   return [lo, hi];
 }
 
@@ -142,8 +150,13 @@ export function chart(container, spec) {
 
     const yE = extent(series, "y") || [0, 1];
     const y2E = extent(series, "y2") || [0, 1];
-    const yLo = (s.y && s.y.min) != null ? s.y.min : yE[0] - (yE[1] - yE[0]) * 0.12;
-    const yHi = (s.y && s.y.max) != null ? s.y.max : yE[1] + (yE[1] - yE[0]) * 0.12;
+    // A declared min is a floor, not just a starting value: the 12% headroom
+    // below the data must never push the axis through it into impossible
+    // territory (negative rainfall, a negative AQI).
+    const yFloor = s.y && s.y.min != null ? s.y.min : null;
+    let yLo = yFloor != null ? yFloor : yE[0] - (yE[1] - yE[0]) * 0.12;
+    let yHi = (s.y && s.y.max) != null ? s.y.max : yE[1] + (yE[1] - yE[0]) * 0.12;
+    if (yFloor != null && yHi <= yFloor) yHi = yFloor + 1;   // flat series sitting on the floor
     const y2Lo = (s.y2 && s.y2.min) != null ? s.y2.min : 0;
     const y2Hi = (s.y2 && s.y2.max) != null ? s.y2.max : Math.max(1, y2E[1]);
 

@@ -278,7 +278,7 @@ function renderBoard(data, activeLoc) {
     height: 170,
     now,
     x: { min: now - 24 * 3600 * 1000, max: now + 24 * 3600 * 1000 },
-    y: { unit: "AQI" },
+    y: { unit: "AQI", min: 0 },       // AQI has a floor of 0
     series: [{ type: "line", data: data.hourlyAqi, token: "--accent", width: 1.5, label: "AQI" }],
     cursor: true
   });
