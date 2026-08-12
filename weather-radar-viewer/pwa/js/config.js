@@ -4,7 +4,11 @@ export const IEM = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/";
 export const GOES_DIR = "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/";
 export const GOES_PRIMARY = GOES_DIR + "GOES19-ABI-CONUS-GEOCOLOR-2500x1500.jpg";
 export const GOES_FALLBACK = GOES_DIR + "latest.jpg";
-export const BASEMAP = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+// Basemap split in two: geography underneath the radar, place labels on a pane
+// above it. A wide swath of 60 dBZ returns used to bury every city name in the
+// state, which is exactly when you most want to know what is under the storm.
+export const BASEMAP = "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png";
+export const BASEMAP_LABELS = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png";
 export const BASEMAP_ATTRIB = "&copy; OSM &copy; CARTO · IEM/NOAA · NOAA STAR";
 export const OM_FORECAST = "https://api.open-meteo.com/v1/forecast";
 export const NWS_POINTS = "https://api.weather.gov/points/";
@@ -53,6 +57,47 @@ export const EVENT_ABBR = {
   "special weather statement": "SPS", "hurricane": "HUR", "tropical storm": "TRO",
   "storm surge": "SURGE", "wind chill": "CHILL", "freeze": "FRZ", "frost": "FROST"
 };
+
+// --- forecast depth (M3) ---
+export const OM_ENSEMBLE = "https://ensemble-api.open-meteo.com/v1/ensemble";
+export const CAST_TTL_MS = 30 * 60 * 1000;      // on-demand board data, cached between opens
+export const ENSEMBLE_TTL_MS = 60 * 60 * 1000;
+
+// Deterministic models for the disagreement view. HRRR only reaches ~48h, so it
+// simply ends early on the chart — an honest gap, not an error.
+export const COMPARE_MODELS = [
+  { id: "best_match", label: "BEST", token: "--accent" },
+  { id: "ncep_hrrr_conus", label: "HRRR", token: "--ok" },
+  { id: "ncep_nbm_conus", label: "NBM", token: "--pred-soft" },
+  { id: "gfs_seamless", label: "GFS", token: "--info" },
+  { id: "ecmwf_ifs025", label: "ECMWF", token: "--sev-watch" }
+];
+// Ensemble members give the confidence band (verified 31 KB for 7 days of one variable).
+export const ENSEMBLE_MODELS = [
+  { id: "gfs025", label: "GEFS", members: 31 },
+  { id: "ecmwf_ifs025", label: "ECMWF ENS", members: 51 }
+];
+
+// --- air quality (M4) ---
+export const OM_AIR = "https://air-quality-api.open-meteo.com/v1/air-quality";
+export const AIR_REFRESH_MS = 60 * 60 * 1000;
+// US EPA AQI breakpoints (official category colors)
+export const AQI_CATS = [
+  { max: 50,  label: "GOOD", color: "#00E400" },
+  { max: 100, label: "MODERATE", color: "#FFFF00" },
+  { max: 150, label: "UNHEALTHY — SENSITIVE GROUPS", color: "#FF7E00" },
+  { max: 200, label: "UNHEALTHY", color: "#FF0000" },
+  { max: 300, label: "VERY UNHEALTHY", color: "#8F3F97" },
+  { max: Infinity, label: "HAZARDOUS", color: "#7E0023" }
+];
+export function aqiCat(v) {
+  if (v == null || isNaN(v)) return null;
+  return AQI_CATS.find((c) => v <= c.max);
+}
+// Open-Meteo's pollen fields come from CAMS Europe and are null across CONUS
+// (verified over 3 points in CI) — the AIR board omits pollen rather than
+// printing a column of "--".
+export const POLLEN_AVAILABLE_US = false;
 
 // SPC categorical outlook fill colors (official SPC palette)
 export const SPC_CAT_COLORS = {

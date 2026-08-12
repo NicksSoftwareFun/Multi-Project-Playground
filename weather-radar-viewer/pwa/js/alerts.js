@@ -18,6 +18,20 @@ import * as locations from "./locations.js";
 // location owning a timer — N locations must not mean N drifting schedules.
 const TICK_MS = 30 * 1000;
 
+// ---- MAP alerts config ------------------------------------------------------
+// NOAA's pre-joined watch/warning/advisory polygons, queried by the current
+// map bbox — this is what actually draws on the radar (see "MAP alerts"
+// below). Layer ids on this service move without notice, same story as
+// spc.js's outlook layers, so nothing here is hardcoded that isn't a
+// last-resort fallback (see wwaLayerIds()).
+const ARCGIS_WWA = "https://mapservices.weather.noaa.gov/eventdriven/rest/services/WWA/watch_warn_adv/MapServer";
+const MAP_CATALOG_KEY = "skywatch_alerts_map_layers";
+const MAP_CATALOG_TTL = 24 * 60 * 60 * 1000;
+const MAP_META_MS = 10000;
+const MAP_QUERY_MS = 10000;
+const MOVE_DEBOUNCE_MS = 600;
+const BBOX_PAD = 0.2;             // pad the requested bbox so small pans don't refetch
+
 const recs = new Map();       // locId -> { alerts, etag, fetchedAt, lastTry, err }
 const openIds = new Set();    // alert ids whose card body is expanded (survives re-render)
 const zoneMem = new Map();    // zone id -> Promise<geometry|null>, dedupes in-flight lookups
@@ -35,6 +49,15 @@ let emitSig = null;           // last announced active-location alert set
 // tick and settle() notice an alert expiring on the clock (no poll involved)
 // and promote that into a real publish() instead of only repainting the chip.
 let liveSig = "";
+
+// ---- MAP alerts state --------------------------------------------------------
+// mapCache.ok: null = ArcGIS has never yet answered, true = the last query
+// succeeded (an empty alerts list is a legitimate answer, not a failure),
+// false = the last query failed and syncLayer() is drawing the point-query
+// fallback instead.
+let mapCache = { bbox: null, fetchedAt: 0, alerts: [], ok: null };
+let mapFetchInFlight = false;
+let moveTimer = null;
 
 function recFor(id) {
   let r = recs.get(id);
@@ -185,6 +208,10 @@ function prune() {
 }
 
 function tick(force) {
+  // MAP alerts follow the same cadence as MY alerts; fetchMapAlerts() itself
+  // no-ops when the layer is off or the viewport/data are still fresh, so
+  // this is cheap on the common (nothing changed) path.
+  fetchMapAlerts();
   const list = locations.list();
   if (!list.length) {
     setHealth("alerts", "ALERTS", true, "no location");
@@ -217,14 +244,13 @@ function tick(force) {
 function settle(results) {
   const anyOk = results.some((r) => r.ok);
   const count = unionAlerts().length;
+  // The "alerts" layer's own health (the ≡ drawer dot) is owned by
+  // fetchMapAlerts() now — it reflects the viewport query, not this point
+  // poll, which answers a different question (see "MAP alerts" below).
   if (anyOk) {
     setHealth("alerts", "ALERTS", true, count + " active");
-    layers.setHealth("alerts", true);
   } else {
     setHealth("alerts", "ALERTS", false, "down");
-    // Only call the layer unavailable when there is nothing left to draw;
-    // last-good polygons on screen are still real, still worth showing.
-    if (!count) layers.setHealth("alerts", false, "down");
   }
   if (results.some((r) => r.changed)) { publish(); return; }
   // No poll reported a changed id set, but local expiry runs on the same
@@ -305,13 +331,198 @@ function ensurePane(m) {
   p.style.pointerEvents = "auto";
 }
 
+// ---- MAP alerts: NOAA's viewport-queryable watch/warning/advisory service --
+//
+// The point-query alerts above answer "does MY saved location have an
+// alert" — a radar view spanning five states needs "what alerts touch the
+// area on screen right now", a different question with a different feed.
+// This service ships pre-joined geometry per feature (no per-alert zone
+// lookup needed, unlike the point feed's watches). Layer ids on it are
+// renumbered without notice, so discovery follows spc.js's approach: ask
+// /layers?f=json, cache the catalog, and fall back to id 0 only if discovery
+// itself fails — never trust one hardcoded id as the only option.
+
+function readWwaPersisted() {
+  try {
+    const j = JSON.parse(localStorage.getItem(MAP_CATALOG_KEY) || "null");
+    if (j && j.map && typeof j.t === "number") return j;
+  } catch { /* corrupt entry — refetch */ }
+  return null;
+}
+
+let wwaCatalogP = null;    // Promise<catalog|null>, memoized for the session
+function wwaCatalog() {
+  if (wwaCatalogP) return wwaCatalogP;
+  const stored = readWwaPersisted();
+  if (stored && Date.now() - stored.t < MAP_CATALOG_TTL) {
+    wwaCatalogP = Promise.resolve(stored);
+    return wwaCatalogP;
+  }
+  wwaCatalogP = fetchT(ARCGIS_WWA + "/layers?f=json", MAP_META_MS).then(okJson).then((j) => {
+    if (!j || !Array.isArray(j.layers) || !j.layers.length) throw new Error("no layers");
+    const cat = { t: Date.now(), map: {}, group: [], geom: {} };
+    for (const l of j.layers) {
+      cat.map[l.id] = String(l.name || "");
+      cat.geom[l.id] = String(l.geometryType || "");
+      if (Array.isArray(l.subLayerIds) && l.subLayerIds.length) cat.group.push(l.id);
+    }
+    try { localStorage.setItem(MAP_CATALOG_KEY, JSON.stringify(cat)); } catch { /* quota */ }
+    return cat;
+  }).catch(() => {
+    wwaCatalogP = null;      // transient failure: let the next attempt retry
+    return stored;           // an expired catalog still beats guessing (null if none)
+  });
+  return wwaCatalogP;
+}
+
+// Prefer layers whose name reads like an actual hazard product; if none of
+// the discovered polygon layers match, query all of them (still capped at 3)
+// rather than guess which single one is right.
+async function wwaLayerIds() {
+  const cat = await wwaCatalog();
+  if (!cat || !cat.map) return [0];
+  const groups = new Set(cat.group || []);
+  const polys = Object.keys(cat.map).map(Number).filter((n) =>
+    !groups.has(n) && /polygon/i.test(cat.geom[n] || "esriGeometryPolygon"));
+  if (!polys.length) return [0];
+  const named = polys.filter((n) => /warning|watch|advisory|hazard/i.test(cat.map[n] || ""));
+  return (named.length ? named : polys).slice(0, 3);
+}
+
+function wwaQueryUrl(id, b) {
+  const geom = b.w.toFixed(4) + "," + b.s.toFixed(4) + "," + b.e.toFixed(4) + "," + b.n.toFixed(4);
+  return ARCGIS_WWA + "/" + id + "/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson" +
+    "&geometry=" + geom + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects";
+}
+
+function mapBBox(m) {
+  const b = m.getBounds();
+  return { w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth() };
+}
+function padBBox(b) {
+  const dw = (b.e - b.w) * BBOX_PAD, dh = (b.n - b.s) * BBOX_PAD;
+  return { w: b.w - dw, s: b.s - dh, e: b.e + dw, n: b.n + dh };
+}
+function bboxContains(outer, inner) {
+  return !!outer && inner.w >= outer.w && inner.s >= outer.s && inner.e <= outer.e && inner.n <= outer.n;
+}
+
+// The ArcGIS field carrying the plain-English event name varies by service
+// revision — prod_type and event both show up in the wild. Sniff by key
+// first; only fall back to scanning values for a hazard-shaped string when
+// neither key is present, so a payload that isn't alert data at all (wrong
+// layer, a renamed field — e.g. an outlook categorical fixture in tests)
+// degrades to "skip this feature" instead of inventing an event name.
+function sniffEventName(p) {
+  const keys = Object.keys(p);
+  for (const want of ["prod_type", "event", "phenomena", "hazard"]) {
+    const hit = keys.find((k) => k.toLowerCase() === want);
+    if (hit && p[hit]) return String(p[hit]);
+  }
+  for (const k of keys) {
+    const v = p[k];
+    if (typeof v === "string" && /warning|watch|advisory/i.test(v)) return v;
+  }
+  return null;
+}
+function sniffAreaText(p) {
+  const hit = Object.keys(p).find((k) => /area/i.test(k) && typeof p[k] === "string" && p[k]);
+  return hit ? p[hit] : "";
+}
+
+function normalizeMapFeature(f, layerId) {
+  const p = f && f.properties;
+  if (!p) return null;
+  const event = sniffEventName(p);
+  if (!event) return null;     // nothing alert-ish here — drop it, never guess
+  const idVal = p.OBJECTID ?? p.objectid ?? p.GLOBALID ?? p.globalid ?? f.id;
+  return {
+    id: "wwa:" + layerId + ":" + (idVal != null ? idVal : event + "|" + sniffAreaText(p)),
+    event,
+    cls: alertClass(event),
+    areaDesc: sniffAreaText(p),
+    geometry: f.geometry || null
+  };
+}
+
+function mapCadenceMs() { return anyActive() ? ALERT_POLL_ACTIVE_MS : ALERT_POLL_QUIET_MS; }
+
+function needsMapFetch(m) {
+  if (!mapCache.bbox) return true;
+  const fresh = Date.now() - mapCache.fetchedAt < mapCadenceMs();
+  return !(fresh && bboxContains(mapCache.bbox, mapBBox(m)));
+}
+
+// Fetch every alert touching the current viewport. Never throws: a query
+// failure leaves last-good mapCache data in place (syncLayer() falls back to
+// the point-query geometry once there is nothing usable left) and is
+// reported honestly through layers.setHealth rather than silently emptying
+// the layer.
+async function fetchMapAlerts() {
+  const m = mapMod.getMap();
+  if (!m || !window.L) { layers.setHealth("alerts", false, "map unavailable"); return; }
+  if (!layers.isOn("alerts")) return;
+  if (mapFetchInFlight || !needsMapFetch(m)) return;
+  mapFetchInFlight = true;
+  const padded = padBBox(mapBBox(m));
+  try {
+    const ids = await wwaLayerIds();
+    const sets = await Promise.all(ids.map((id) =>
+      fetchT(wwaQueryUrl(id, padded), MAP_QUERY_MS).then(okJson)
+        .then((j) => ({ id, j })).catch(() => null)));
+    const good = sets.filter(Boolean);
+    if (!good.length) throw new Error("query failed");
+    const seen = new Map();
+    for (const { id, j } of good) {
+      for (const f of (j && j.features) || []) {
+        const a = normalizeMapFeature(f, id);
+        if (a && a.geometry && !seen.has(a.id)) seen.set(a.id, a);
+      }
+    }
+    mapCache = { bbox: padded, fetchedAt: Date.now(), alerts: [...seen.values()], ok: true };
+    layers.setHealth("alerts", true, mapCache.alerts.length + " in view");
+  } catch {
+    mapCache = { bbox: mapCache.bbox, fetchedAt: mapCache.fetchedAt, alerts: mapCache.alerts, ok: false };
+    layers.setHealth("alerts", true, "my alerts only");
+  } finally {
+    mapFetchInFlight = false;
+  }
+  syncLayer();
+}
+
+function onMapMoveEnd() {
+  if (moveTimer) clearTimeout(moveTimer);
+  moveTimer = setTimeout(() => { moveTimer = null; fetchMapAlerts(); }, MOVE_DEBOUNCE_MS);
+}
+
+// A map alert has no NWS id to match against — cross-reference by event name
+// + area text instead, so a click on the viewport layer can still open the
+// matching SEVERE card when the clicked alert is also one of MY alerts.
+function matchMine(a) {
+  const ev = String(a.event || "").toLowerCase().trim();
+  if (!ev) return null;
+  const ar = String(a.areaDesc || "").toLowerCase();
+  return unionAlerts().find((x) => {
+    if (String(x.event || "").toLowerCase().trim() !== ev) return false;
+    if (!ar || !x.areaDesc) return true;      // no area text to cross-check — event match is enough
+    const xa = x.areaDesc.toLowerCase();
+    return xa.includes(ar) || ar.includes(xa);
+  }) || null;
+}
+
 function syncLayer() {
   const m = mapMod.getMap();
   if (!m || !window.L) return;          // Leaflet unavailable: chip and board carry on alone
   if (group) { m.removeLayer(group); group = null; }
   if (!layers.isOn("alerts")) return;
 
-  const drawable = unionAlerts().filter((a) => a.geometry);
+  // Trust the viewport layer once it has ever answered successfully — a
+  // genuine "nothing in view" from ArcGIS must not be papered over with the
+  // (unrelated) saved-location set. Only fall back when ArcGIS has never
+  // succeeded, so the map is never emptier than it was before this feature
+  // existed.
+  const useMap = mapCache.ok === true;
+  const drawable = (useMap ? mapCache.alerts : unionAlerts()).filter((a) => a.geometry);
   if (!drawable.length) return;
   ensurePane(m);
 
@@ -328,7 +539,8 @@ function syncLayer() {
       });
     } catch { continue; }              // malformed geometry: skip this one, keep the rest
     lyr.on("click", () => {
-      openIds.add(a.id);
+      const mine = useMap ? matchMine(a) : a;
+      if (mine) openIds.add(mine.id);
       boards.show("severe");
     });
     group.addLayer(lyr);
@@ -441,6 +653,20 @@ function renderBoard() {
 
 // ---- init ------------------------------------------------------------------
 
+// onToggle runs synchronously inside layers.register(), so the viewport
+// fetch is deferred to a microtask — registration (and therefore boot) never
+// waits on the network, and nothing is requested while the layer is off.
+function alertsToggle(on) {
+  if (!on) {
+    const m = mapMod.getMap();
+    if (group && m) m.removeLayer(group);
+    group = null;
+    return;
+  }
+  syncLayer();                                          // paint whatever is already cached
+  Promise.resolve().then(fetchMapAlerts).catch(() => {});
+}
+
 export function init() {
   chipEl = document.getElementById("alertChip");
   boardEl = document.getElementById("board-severe");
@@ -449,7 +675,12 @@ export function init() {
   if (boardEl) {
     boards.register({ id: "severe", label: "SEVERE", el: boardEl, render: renderBoard });
   }
-  layers.register({ id: "alerts", label: "ALERT POLYGONS", defaultOn: true, onToggle: syncLayer });
+  layers.register({ id: "alerts", label: "ALERT POLYGONS", defaultOn: true, onToggle: alertsToggle });
+
+  // Viewport-driven MAP alerts refetch on pan/zoom, debounced so a drag
+  // gesture doesn't fire a request per frame.
+  const mm = mapMod.getMap();
+  if (mm) mm.on("moveend", onMapMoveEnd);
 
   locations.onChange(() => {
     prune();

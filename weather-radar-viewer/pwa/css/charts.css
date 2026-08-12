@@ -1,7 +1,29 @@
-/* Chart styling for the SVG chart util (js/charts.js, arrives in M3).
-   Established now so the stylesheet set is stable for the service-worker SHELL. */
-.chart { width: 100%; }
-.chart text { font-family: var(--mono); font-size: 9px; fill: var(--sub); }
-.chart .grid line { stroke: rgba(140, 170, 195, 0.12); }
-.chart .nowline { stroke: var(--sub-faint); stroke-dasharray: 3 3; }
+/* SVG chart styling for js/charts.js — colors come from the series tokens,
+   everything structural lives here. */
+.chart { width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.chart .plot { width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { font-family: var(--mono); font-size: 9px; fill: var(--sub-dim); }
+.chart text.major { fill: var(--sub); }
+.chart .grid line { stroke: rgba(140, 170, 195, 0.12); stroke-width: 1; }
+.chart .nowline { stroke: var(--sub-faint); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .cursorline { stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.7; }
 .chart .future { fill: var(--pred); opacity: 0.06; }
+.chart .readout {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+  color: var(--sub); min-height: 13px; white-space: nowrap; overflow: hidden;
+}
+.chart .chartempty {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--sub-dim); padding: 18px 0; text-align: center;
+}
+
+/* chip legend shared by the model-compare and ensemble sections */
+.chiplegend { display: flex; flex-wrap: wrap; gap: 6px; }
+.chiplegend .lchip {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em;
+  border: 1px solid var(--panel-line); border-radius: 999px;
+  padding: 3px 9px; background: var(--btn-bg); color: var(--sub);
+  cursor: pointer;
+}
+.chiplegend .lchip.on { color: var(--ink-hi); }

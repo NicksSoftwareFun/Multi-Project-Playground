@@ -42,6 +42,41 @@ const SPC_LAYERS = fixture("spc-layers.json").toString("utf8");
 const SPC_OUTLOOK = fixture("spc-outlook.json").toString("utf8");
 const TROPICAL_SERVICES = fixture("arcgis-tropical-services.json").toString("utf8");
 
+// forecast depth + air quality (M3/M4)
+//
+// The CAST/AIR fixtures store their hourly/minutely_15/daily "time" arrays as
+// offsets from a fixed ANCHOR (2030-01-01T00:00:00Z, matching om-forecast.json's
+// own fixed-future convention) instead of real timestamps, because a static
+// file can't know what day the suite will run on. anchoredFixture() re-parses
+// the fixture on every request and shifts every "time" array by a delta that
+// lands ANCHOR on the current hour, so the series always straddles the real
+// Date.now() the page sees — which is what makes the NOW rule / future tint
+// in charts.js exercise-able at all. Non-time fields are untouched.
+const OM_ANCHOR = 1893456000; // 2030-01-01T00:00:00Z
+function anchorDelta() {
+  return Math.floor(Date.now() / 3600000) * 3600 - OM_ANCHOR;
+}
+function shiftTimeArray(arr, delta) {
+  return arr.map((t) => (t == null ? t : t + delta));
+}
+function reanchor(obj, delta) {
+  for (const key of ["hourly", "minutely_15", "daily"]) {
+    const bucket = obj[key];
+    if (bucket && Array.isArray(bucket.time)) bucket.time = shiftTimeArray(bucket.time, delta);
+  }
+  if (obj.current && typeof obj.current.time === "number") obj.current.time += delta;
+  return obj;
+}
+function anchoredFixture(name) {
+  const raw = JSON.parse(fixture(name).toString("utf8"));
+  // fresh clone + shift per call so every request gets today's anchoring
+  return () => JSON.stringify(reanchor(JSON.parse(JSON.stringify(raw)), anchorDelta()));
+}
+const OM_CAST = anchoredFixture("om-cast.json");
+const OM_MODELS = anchoredFixture("om-models.json");
+const OM_ENSEMBLE = anchoredFixture("om-ensemble.json");
+const OM_AIR = anchoredFixture("om-air.json");
+
 // Leaflet, served from the PWA's vendor copy when present (post-refactor it
 // is loaded same-origin anyway; pre-refactor the page pulls it from unpkg and
 // we answer with the same files). Falls back to a stub that leaves window.L
@@ -88,8 +123,17 @@ async function routeAll(page, opts) {
       host === "cdn.star.nesdis.noaa.gov"
     ) return png(route);
 
-    // conditions + forecast
-    if (host === "api.open-meteo.com") return json(route, OM_FORECAST);
+    // conditions + forecast. The CAST board makes two extra request shapes
+    // against this same host (multi-model compare, base meteogram) — branch
+    // on the query string so the plain conditions fetch (wx.js) is untouched.
+    if (host === "api.open-meteo.com") {
+      const qs = url.search;
+      if (qs.includes("models=")) return json(route, OM_MODELS());
+      if (qs.includes("minutely_15") || qs.includes("forecast_days=7")) return json(route, OM_CAST());
+      return json(route, OM_FORECAST);
+    }
+    if (host === "ensemble-api.open-meteo.com") return json(route, OM_ENSEMBLE());
+    if (host === "air-quality-api.open-meteo.com") return json(route, OM_AIR());
     if (host === "api.weather.gov") {
       // alerts + zones first: /zones/forecast/IAZ060 would otherwise be caught
       // by the "forecast" branch below
@@ -151,4 +195,5 @@ async function boot(page, opts) {
 module.exports = {
   routeAll, boot, DEFAULT_LOC, HOSTILE, OM_FORECAST, ZIPPO,
   ALERTS_ACTIVE, ALERTS_EMPTY, ALERTS_ZONE, SPC_LAYERS, SPC_OUTLOOK, TROPICAL_SERVICES,
+  OM_CAST, OM_MODELS, OM_ENSEMBLE, OM_AIR, CORS,
 };

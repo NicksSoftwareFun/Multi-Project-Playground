@@ -1,6 +1,6 @@
 // Leaflet map + the radar frame engine (window-of-two tile layers).
 
-import { IEM, BASEMAP, BASEMAP_ATTRIB, HOME_VIEW, DEFAULT_VIEW_KM,
+import { IEM, BASEMAP, BASEMAP_LABELS, BASEMAP_ATTRIB, HOME_VIEW, DEFAULT_VIEW_KM,
          PAST, NFRAMES, NOW_I, frameT, REFRESH_MS, PAL } from "./config.js";
 import { pad, utcStamp, el } from "./util.js";
 import * as net from "./net.js";
@@ -45,6 +45,13 @@ export function init() {
       attributionControl: true
     });
     L.tileLayer(BASEMAP, { attribution: BASEMAP_ATTRIB, subdomains: "abcd" }).addTo(map);
+    // Labels ride in their own pane above radar, alerts, and outlook fills, so
+    // no amount of reflectivity can hide which county you are looking at.
+    // pointer-events: none keeps drags and polygon taps reaching the layers below.
+    const lab = map.createPane("labels");
+    lab.style.zIndex = 465;
+    lab.style.pointerEvents = "none";
+    L.tileLayer(BASEMAP_LABELS, { pane: "labels", subdomains: "abcd" }).addTo(map);
     net.setHealth("radar", "RADAR ", true, "ok");
   } else {
     net.setHealth("radar", "RADAR ", false, "map lib unavailable");
@@ -55,7 +62,6 @@ export function init() {
 
   document.getElementById("zoomIn").addEventListener("click", () => { if (map) map.zoomIn(); });
   document.getElementById("zoomOut").addEventListener("click", () => { if (map) map.zoomOut(); });
-  document.getElementById("homeBtn").addEventListener("click", goDefaultView);
 
   window.addEventListener("resize", () => { if (map) map.invalidateSize(); });
   window.addEventListener("orientationchange", () => {

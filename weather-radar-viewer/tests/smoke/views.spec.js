@@ -1,4 +1,4 @@
-// View switching smoke: radar ↔ satellite, settings open/close.
+// View switching smoke: radar ↔ satellite, location sheet open/close.
 //
 // The refactored app exposes the active view as data-view="radar"|"sat"|"board"
 // on #screen and closes overlays on Escape; the pre-refactor app uses the
@@ -53,19 +53,28 @@ test("SAT button switches to satellite view and back", async ({ page }) => {
   await expect(page.locator("#satview")).toBeHidden();
 });
 
-test("settings opens from the gear button and closes again", async ({ page }) => {
-  const settings = page.locator("#settings");
-  await expect(settings).toBeHidden();
+test("the location sheet opens from the conditions panel and closes again", async ({ page }) => {
+  const sheet = page.locator("#locsheet");
+  await expect(sheet).toBeHidden();
 
-  await page.locator("#settingsBtn").click();
-  await expect(settings).toBeVisible();
-  await expect(page.locator("#zipInput")).toBeVisible();
+  await page.locator("#wxPanel").click();
+  await expect(sheet).toBeVisible();
+  await expect(page.locator("#locZip")).toBeVisible();
 
-  // Escape closes it (refactor); pre-refactor: CANCEL button
-  await escapeOr(
-    page,
-    () => page.locator("#cancelBtn").click(),
-    () => settings.isHidden()
-  );
-  await expect(settings).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});
+
+// The bug this guards: opening the layers drawer first used to strand you on a
+// board, because Back consumed the drawer's history entry instead of the view's.
+test("Back leaves a board even when the layers drawer was opened first", async ({ page }) => {
+  await page.locator("#layersBtn").click();
+  await expect(page.locator("#layersdrawer")).toBeVisible();
+
+  await page.locator("#boardsBtn").click();
+  await expect.poll(() => viewState(page)).toBe("board");
+  await expect(page.locator("#layersdrawer")).toBeHidden();   // drawer closed on entry
+
+  await page.keyboard.press("Escape");
+  await expect.poll(() => viewState(page)).toBe("radar");
 });

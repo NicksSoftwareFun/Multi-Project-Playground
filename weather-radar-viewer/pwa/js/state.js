@@ -1,5 +1,13 @@
 // View state, pub/sub bus, overlay stack, and the history sentinel that makes
 // Escape and the Android Back button walk backwards through the UI.
+//
+// Navigation model: "root" is the radar view with nothing open. Any time the UI
+// is away from root we hold exactly ONE history entry. Pressing Back consumes
+// it, we unwind one level (topmost overlay, else the view), and if we are still
+// away from root we re-arm. One entry rather than one-per-level keeps the stack
+// honest no matter what order views and overlays were opened in — an earlier
+// version pushed only on view changes and could strand you on a board with no
+// way back once a drawer had been opened first.
 
 export const View = Object.freeze({ RADAR: "radar", SAT: "sat", BOARD: "board" });
 export const Board = Object.freeze({
@@ -20,11 +28,21 @@ export function emit(evt, data) {
 let screenEl = null;
 let view = View.RADAR;
 let board = Board.NOW;
-const overlays = [];          // e.g. ["settings"] — topmost last
+const overlays = [];          // e.g. ["layers"] — topmost last
+let armed = false;            // true while we hold the history entry
 
 export function getView() { return view; }
 export function getBoard() { return board; }
 export function overlayOpen(name) { return name ? overlays.includes(name) : overlays.length > 0; }
+
+function atRoot() { return view === View.RADAR && overlays.length === 0; }
+
+function arm() {
+  if (!atRoot() && !armed) {
+    history.pushState({ sw: 1 }, "");
+    armed = true;
+  }
+}
 
 export function init(screen) {
   screenEl = screen;
@@ -32,7 +50,7 @@ export function init(screen) {
   history.replaceState({ sw: "root" }, "");
   window.addEventListener("popstate", onPop);
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && (overlays.length || view !== View.RADAR)) {
+    if (e.key === "Escape" && !atRoot()) {
       e.preventDefault();
       goBack();
     }
@@ -40,13 +58,15 @@ export function init(screen) {
 }
 
 export function setView(v, b) {
-  const wasRoot = view === View.RADAR && overlays.length === 0;
   view = v;
   if (b) board = b;
   screenEl.dataset.view = view;
   if (view === View.BOARD) screenEl.dataset.board = board;
   else delete screenEl.dataset.board;
-  if (view !== View.RADAR && wasRoot) history.pushState({ sw: "view" }, "");
+  // Map-only drawers make no sense over a full-screen view; close them so Back
+  // means "leave this view" rather than "close a drawer you can't even see".
+  if (view !== View.RADAR && overlays.length) closeAllOverlays();
+  arm();
   emit("view", { view, board });
 }
 
@@ -54,17 +74,33 @@ export function openOverlay(name) {
   if (overlays.includes(name)) return;
   overlays.push(name);
   screenEl.classList.add(name);
-  history.pushState({ sw: "overlay" }, "");
+  arm();
   emit("overlay", { name, open: true });
 }
+
 export function closeOverlay(name) {
-  // programmatic close — collapse the history entry it pushed
-  if (overlays.includes(name)) history.back();
+  const i = overlays.indexOf(name);
+  if (i < 0) return;
+  overlays.splice(i, 1);
+  screenEl.classList.remove(name);
+  emit("overlay", { name, open: false });
+  if (atRoot() && armed) history.back();   // give the entry back
 }
 
-export function goBack() { history.back(); }
+function closeAllOverlays() {
+  while (overlays.length) {
+    const name = overlays.pop();
+    screenEl.classList.remove(name);
+    emit("overlay", { name, open: false });
+  }
+}
 
-function onPop() {
+export function goBack() {
+  if (armed) history.back();               // unwinds through onPop
+  else unwindOne();
+}
+
+function unwindOne() {
   if (overlays.length) {
     const name = overlays.pop();
     screenEl.classList.remove(name);
@@ -77,5 +113,10 @@ function onPop() {
     delete screenEl.dataset.board;
     emit("view", { view, board });
   }
-  // at root: let the platform handle it (Android exits, browser navigates away)
+}
+
+function onPop() {
+  armed = false;        // the entry we held is gone
+  unwindOne();
+  arm();                // still away from root? take another
 }

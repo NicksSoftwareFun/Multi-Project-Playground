@@ -114,7 +114,15 @@ test("SPC strip renders inside #spcStrip with the day rows for this location", a
   await expect(days.first()).toBeVisible({ timeout: 15_000 });
   expect(await days.count()).toBeGreaterThanOrEqual(1);
   await expect(strip).toContainText("SLGT");
-  await expect(days.first().locator(".d")).toHaveText(/DAY 1/);
+  // Day 1 is labelled with today's actual date, not "DAY 1"
+  const today = await page.evaluate(() => {
+    const d = new Date();
+    const dow = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()];
+    const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                 "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][d.getMonth()];
+    return dow + " " + mon + " " + d.getDate();
+  });
+  await expect(days.first().locator(".d")).toHaveText(today);
 
   expect(errors).toEqual([]);
 });

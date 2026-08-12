@@ -224,6 +224,19 @@ async function dayCategory(day, lat, lon) {
   return cat;
 }
 
+const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+             "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+// SPC outlook periods run 12Z-to-12Z, so Day 1 is today, Day 2 tomorrow, and so
+// on in the user's local calendar. Naming the date beats "DAY 2", which forces
+// the reader to do the arithmetic.
+function dayLabel(day) {
+  const d = new Date();
+  d.setDate(d.getDate() + day - 1);
+  return DOW[d.getDay()] + " " + MON[d.getMonth()] + " " + d.getDate();
+}
+
 function dayRow(r) {
   let val;
   if (r.err) {
@@ -234,7 +247,7 @@ function dayRow(r) {
     val = el("span", { class: "cat" }, r.cat + " — " + (CAT_LABEL[r.cat] || "RISK"));
     val.style.background = SPC_CAT_COLORS[r.cat] || NEUTRAL;
   }
-  return el("div", { class: "spcday" }, el("span", { class: "d" }, "DAY " + r.day), val);
+  return el("div", { class: "spcday" }, el("span", { class: "d" }, dayLabel(r.day)), val);
 }
 
 export function renderStrip(container) {

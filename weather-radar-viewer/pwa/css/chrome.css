@@ -37,7 +37,17 @@
 @media (prefers-reduced-motion: reduce) { .badge.alertchip { animation: none; } }
 
 .topbar .spacer { flex: 1; }
-.frametime { font-family: var(--mono); font-size: 13px; color: var(--ink-mid); }
+/* Nothing in the top bar may shove its neighbours off-screen. Flex items default
+   to min-width:auto, so a long source badge plus an event chip plus a place name
+   used to push the clock past the right edge and leave a clipped half-word
+   hanging there on narrow screens. Let them shrink and ellipsize instead. */
+.topbar > * { min-width: 0; }
+.topbar .badge, .topbar .frametime { overflow: hidden; text-overflow: ellipsis; }
+.topbar .clockbox { flex: none; }
+.frametime {
+  font-family: var(--mono); font-size: 13px; color: var(--ink-mid);
+  white-space: nowrap;
+}
 .frametime.fcst { color: var(--pred-soft); }
 .clockbox {
   text-align: right; font-family: var(--mono);
@@ -156,9 +166,11 @@
 .status .on { color: var(--ok); }
 .status .off { color: var(--err); }
 
-/* Current conditions block (bottom right, opposite the legend). It clears the
-   button rail on the right: on short screens the two used to overlap and the
-   panel swallowed taps meant for the buttons. */
+/* Current conditions block. Portrait keeps it bottom-right, clear of the button
+   rail — the two used to overlap and the panel swallowed taps meant for the
+   buttons. Landscape moves it to the left column (see the orientation query
+   below) so the drawers that open off the right rail have the whole right side
+   to themselves. */
 .wx {
   position: absolute; z-index: 700;
   right: calc(64px + env(safe-area-inset-right));
@@ -189,6 +201,15 @@
 @media (max-width: 740px), (max-height: 480px) {
   .brand { display: none; }
   .clockbox div:last-child { display: none; }
+  .topbar { gap: 8px; padding-left: 10px; padding-right: 10px; }
+  /* narrow bars have no room for a centered tab on the same line as the badges:
+     drop it just below the bar rather than letting it sit on top of them */
+  #predFrame .tab {
+    top: calc(44px + env(safe-area-inset-top));
+    border-radius: 7px;
+  }
+  .topbar .badge { font-size: 10px; padding: 4px 7px; }
+  .frametime { font-size: 12px; }
   .status { display: none; }
   .legend .swatches i { width: 8px; }
   .legend .marks, .legend .cap { font-size: 8px; }
@@ -199,4 +220,15 @@
   .btn { height: 36px; min-width: 36px; font-size: 16px; }
   .zoomstack { gap: 6px; }
   .wx { right: calc(52px + env(safe-area-inset-right)); max-width: calc(100% - 72px); }
+}
+
+/* Landscape: the button rail and the drawers it opens own the right edge, so
+   the conditions panel moves to the left column and stacks above the legend. */
+@media (orientation: landscape) {
+  .wx {
+    left: calc(12px + env(safe-area-inset-left));
+    right: auto;
+    bottom: calc(112px + env(safe-area-inset-bottom));
+    max-width: calc(100% - 90px);
+  }
 }

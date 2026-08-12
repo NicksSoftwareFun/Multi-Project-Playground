@@ -47,10 +47,10 @@ test("hostile API strings are rendered inert", async ({ page }) => {
   await expect(page.locator("#wxTemp")).toHaveText("73°F", { timeout: 15_000 });
 
   // exercise the live geocode path: saving a ZIP pulls the hostile place name
-  await page.locator("#settingsBtn").click();
-  await expect(page.locator("#settings")).toBeVisible();
-  await page.locator("#zipInput").fill("50021");
-  await page.locator("#saveBtn").click();
+  await page.locator("#wxPanel").click();
+  await expect(page.locator("#locsheet")).toBeVisible();
+  await page.locator("#locZip").fill("50021");
+  await page.locator("#locAdd").click();
 
   // the hostile place name must appear as literal, inert text
   await expect(page.locator("#wxPlace")).toContainText("Evil City", { timeout: 15_000 });

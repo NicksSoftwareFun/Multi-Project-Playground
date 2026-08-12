@@ -2,7 +2,6 @@
 
 const K_LOC_V1 = "skywatch_loc";     // legacy single location — kept this release for rollback
 const K_LOCS = "skywatch_locs";      // v2 multi-location
-const K_AUTO = "skywatch_auto";
 const SNAP_PREFIX = "skywatch_snap_";
 
 function readJson(key) {
@@ -32,9 +31,6 @@ export function saveLocs(locs) { localStorage.setItem(K_LOCS, JSON.stringify(loc
 
 // legacy accessors (still used to mirror the active ZIP for rollback safety)
 export function saveLoc(loc) { localStorage.setItem(K_LOC_V1, JSON.stringify(loc)); }
-
-export function loadAuto() { return localStorage.getItem(K_AUTO) === "1"; }
-export function saveAuto(on) { localStorage.setItem(K_AUTO, on ? "1" : "0"); }
 
 // last-good normalized wx record per location — instant paint on switch/offline
 export function loadSnap(locId) { return readJson(SNAP_PREFIX + locId); }

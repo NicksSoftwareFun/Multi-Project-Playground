@@ -7,7 +7,6 @@ import * as state from "./state.js";
 import { View } from "./state.js";
 import * as sat from "./sat.js";
 import * as wx from "./wx.js";
-import * as auto from "./auto.js";
 
 let playing = true;
 let screenEl, trackbox, thumb, predTab, playBtn, srcBadge, frameTimeEl;
@@ -57,14 +56,12 @@ export function init() {
     if (e.key === "Home") { e.preventDefault(); scrubTo(NOW_I); }
   });
 
-  // animation loop — drives the map's frame engine; auto mode can consume wraps
+  // animation loop — drives the map's frame engine
   setInterval(() => {
     if (state.overlayOpen()) return;
     if (state.getView() !== View.RADAR) return;
-    if (!(playing || auto.driving())) return;
-    const nx = (map.getFrame() + 1) % NFRAMES;
-    if (nx === 0 && auto.handleWrap()) return;   // auto phase change — don't advance
-    map.show(nx);
+    if (!playing) return;
+    map.show((map.getFrame() + 1) % NFRAMES);
   }, FRAME_MS);
 
   state.on("frame", updateChrome);

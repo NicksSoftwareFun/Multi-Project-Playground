@@ -40,7 +40,9 @@
 
     <div id="boards">
       <div class="board" id="statsview" data-board="now"></div>
+      <div class="board" id="board-cast" data-board="cast"></div>
       <div class="board" id="board-severe" data-board="severe"></div>
+      <div class="board" id="board-air" data-board="air"></div>
       <div class="boarddots" id="boardDots"></div>
     </div>
 
@@ -67,8 +69,6 @@
       <button class="btn chrome-radar" id="layersBtn" aria-label="Map layers" style="font-size:15px">≡</button>
       <button class="btn small chrome-map" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
       <button class="btn chrome-all" id="boardsBtn" aria-label="Data boards" style="font-size:15px">▤</button>
-      <button class="btn chrome-radar" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
-      <button class="btn chrome-all" id="settingsBtn" aria-label="Settings" style="font-size:15px">⚙</button>
     </div>
 
     <div id="layersdrawer">
@@ -107,21 +107,6 @@
       </div>
     </div>
 
-    <div id="fader"></div>
-
-    <div id="settings">
-      <div class="title">SETTINGS</div>
-      <label for="zipInput">ZIP CODE</label>
-      <input id="zipInput" inputmode="numeric" maxlength="5" placeholder="50021" autocomplete="postal-code">
-      <label class="chk">
-        <input type="checkbox" id="autoChk">
-        AUTO MODE — RADAR ×2 → SATELLITE 10s → CONDITIONS 20s, LOOPED
-      </label>
-      <div class="msg" id="setMsg"></div>
-      <div class="btnrow">
-        <button class="btn small" id="saveBtn">SAVE</button>
-        <button class="btn small" id="cancelBtn">CANCEL</button>
-      </div>
     </div>
   </div>
 </div>
