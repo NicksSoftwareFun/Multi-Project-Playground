@@ -139,3 +139,21 @@ test("pointercancel mid-drag returns to now, not x=-10 (reported bug)", async ({
 
   await page.mouse.up(); // release the real mouse button so it doesn't leak into later tests
 });
+
+// The regression that survived the first fix: touch-action was set on the SVG
+// <rect> hit area, and touch-action has no effect on elements that generate no
+// CSS layout box — inner SVG elements are exactly that. The browser ignored it,
+// took the drag for scrolling once it passed the touch-slop threshold, and the
+// line snapped back to NOW a few pixels in. It must live on the wrapper div and
+// the <svg> root, both of which do generate boxes.
+test("touch-action:none sits on elements that can actually honor it", async ({ page }) => {
+  await setup(page);
+  await openCast(page);
+  const chartEl = meteogram(page);
+  await expect(chartEl.locator(".plot svg")).toBeAttached({ timeout: 15_000 });
+
+  const plot = await chartEl.locator(".plot").evaluate((el) => getComputedStyle(el).touchAction);
+  const root = await chartEl.locator(".plot svg").evaluate((el) => getComputedStyle(el).touchAction);
+  expect(plot).toBe("none");
+  expect(root).toBe("none");
+});

@@ -258,6 +258,9 @@ export function chart(container, spec) {
   function attachCursor(root, s, series, sx, xMin, xMax, plotW, plotH) {
     const line = svg("line", { class: "cursorline", y1: PAD.top, y2: PAD.top + plotH, x1: -10, x2: -10 });
     root.append(line);
+    // The hit rect only has to be hit-testable; the touch-action that keeps the
+    // browser from stealing the drag lives on .plot/svg in charts.css, because
+    // touch-action has no effect on inner SVG elements.
     const hit = svg("rect", {
       class: "hitarea", x: PAD.left, y: PAD.top, width: plotW, height: plotH,
       fill: "transparent", style: "cursor:crosshair"

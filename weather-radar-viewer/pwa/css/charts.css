@@ -9,9 +9,14 @@
 .chart .nowline { stroke: var(--sub-faint); stroke-width: 1; stroke-dasharray: 3 3; }
 .chart .cursorline { stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.7; }
 /* The chart claims the touch gesture for itself (crosshair drag) instead of
-   letting the browser start a page scroll mid-drag — see attachCursor()'s
-   comment in charts.js for why that matters. */
-.chart .hitarea { touch-action: none; }
+   letting the browser start a page scroll mid-drag.
+   This MUST live on the wrapper div and the <svg> root, never on the inner
+   <rect> hit area: touch-action only applies to elements that generate a CSS
+   layout box, and inner SVG elements do not — the browser silently ignores it
+   there. With it on the <rect>, a drag tracked for the first few pixels and
+   then died the instant it passed the touch-slop threshold, because the
+   scroller took the gesture and fired pointercancel. */
+.chart .plot, .chart svg { touch-action: none; }
 .chart .future { fill: var(--pred); opacity: 0.06; }
 .chart .readout {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
