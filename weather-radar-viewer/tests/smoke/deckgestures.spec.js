@@ -46,7 +46,7 @@ test("scrolling a long board downward does not dismiss the deck", async ({ page 
   // a short viewport guarantees CAST overflows and can actually scroll
   await page.setViewportSize({ width: 390, height: 500 });
   await openDeck(page);
-  await page.locator("#boardDots .dot", { hasText: "CAST" }).click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
   const board = page.locator("#board-cast");
   await expect(board).toBeVisible();
   await expect(board.locator(".castday").first()).toBeVisible({ timeout: 15_000 });

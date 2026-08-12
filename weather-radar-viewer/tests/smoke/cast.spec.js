@@ -30,7 +30,7 @@ async function setup(page) {
 async function openCast(page) {
   await page.locator("#wxPanel").click();
   await expect(page.locator("#screen")).toHaveAttribute("data-view", "board");
-  await page.locator("#boardDots .dot", { hasText: "CAST" }).click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
   await expect(page.locator(BOARD)).toHaveClass(/\bactive\b/);
 }
 

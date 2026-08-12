@@ -190,12 +190,12 @@ function fetchBase(loc) {
   fetchT(baseUrl(loc)).then(okJson).then((j) => {
     if (c.baseSeq !== seq) return;
     c.base = { t: Date.now(), data: parseBase(j), err: null };
-    setHealth("cast", "CAST  ", true, "ok");
+    setHealth("cast", "FCAST ", true, "ok");
     repaintIfActive(loc);
   }).catch((e) => {
     if (c.baseSeq !== seq) return;
     c.base = { t: Date.now(), data: null, err: msg(e) };
-    setHealth("cast", "CAST  ", false, msg(e));
+    setHealth("cast", "FCAST ", false, msg(e));
     repaintIfActive(loc);
   });
 }
@@ -206,12 +206,12 @@ function fetchCompare(loc) {
   fetchT(compareUrl(loc)).then(okJson).then((j) => {
     if (c.compareSeq !== seq) return;
     c.compare = { t: Date.now(), data: parseCompare(j), err: null };
-    setHealth("cast", "CAST  ", true, "compare ok");
+    setHealth("cast", "FCAST ", true, "compare ok");
     repaintIfActive(loc);
   }).catch((e) => {
     if (c.compareSeq !== seq) return;
     c.compare = { t: Date.now(), data: null, err: msg(e) };
-    setHealth("cast", "CAST  ", false, "compare " + msg(e));
+    setHealth("cast", "FCAST ", false, "compare " + msg(e));
     repaintIfActive(loc);
   });
 }
@@ -222,12 +222,12 @@ function fetchEnsemble(loc) {
   fetchT(ensembleUrl(loc), 15000).then(okJson).then((j) => {
     if (c.ensembleSeq !== seq) return;
     c.ensemble = { t: Date.now(), data: parseEnsemble(j), err: null };
-    setHealth("cast", "CAST  ", true, "ensemble ok");
+    setHealth("cast", "FCAST ", true, "ensemble ok");
     repaintIfActive(loc);
   }).catch((e) => {
     if (c.ensembleSeq !== seq) return;
     c.ensemble = { t: Date.now(), data: null, err: msg(e) };
-    setHealth("cast", "CAST  ", false, "ensemble " + msg(e));
+    setHealth("cast", "FCAST ", false, "ensemble " + msg(e));
     repaintIfActive(loc);
   });
 }
@@ -403,7 +403,7 @@ function onEnter() { ensureFresh(locations.active()); }
 export function init() {
   boardEl = document.getElementById("board-cast");
   if (!boardEl) return;
-  boards.register({ id: "cast", label: "CAST", el: boardEl, render, onEnter });
+  boards.register({ id: "cast", label: "FCAST", el: boardEl, render, onEnter });
 
   locations.onChange(() => {
     if (boards.current() !== "cast") return;

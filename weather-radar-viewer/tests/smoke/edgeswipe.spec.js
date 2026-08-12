@@ -13,7 +13,7 @@ const activeDot = (page) => page.locator("#boardDots .dot.on");
 async function openCast(page) {
   await page.locator("#wxPanel").click();
   await expect.poll(() => viewState(page)).toBe("board");
-  await page.locator("#boardDots .dot", { hasText: "CAST" }).click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
   await expect(page.locator("#board-cast .chart .plot svg").first()).toBeAttached({ timeout: 15_000 });
 }
 
@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
 
 test("an edge drag over a chart switches boards and leaves the cursor alone", async ({ page }) => {
   await openCast(page);
-  expect(await activeDot(page).textContent()).toBe("CAST");
+  expect(await activeDot(page).textContent()).toBe("FCAST");
 
   const chart = page.locator("#board-cast .chart").first();
   const box = await chart.boundingBox();
@@ -37,7 +37,7 @@ test("an edge drag over a chart switches boards and leaves the cursor alone", as
   await page.mouse.move(160, y, { steps: 8 });
   await page.mouse.up();
 
-  await expect(activeDot(page)).not.toHaveText("CAST");
+  await expect(activeDot(page)).not.toHaveText("FCAST");
   expect(await viewState(page)).toBe("board");      // switched boards, did not exit the deck
 
   // The chart declined the gesture, so its cursor is still parked at NOW rather
@@ -66,5 +66,5 @@ test("a mid-screen drag over a chart still scrubs and does not switch boards", a
   await page.mouse.up();
 
   expect(Math.abs(dragged - nowX)).toBeGreaterThan(5);   // it scrubbed
-  expect(await activeDot(page).textContent()).toBe("CAST");  // and stayed put
+  expect(await activeDot(page).textContent()).toBe("FCAST");  // and stayed put
 });
