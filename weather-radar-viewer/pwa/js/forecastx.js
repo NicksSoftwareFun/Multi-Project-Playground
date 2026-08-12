@@ -377,19 +377,18 @@ function paint() {
   // Board deck default is a two-column flex row; lay this board out as a
   // stacked column the same way #board-severe already does in boards.css,
   // without adding any new CSS.
-  boardEl.style.flexDirection = "column";
-  boardEl.style.gap = "18px";
-  boardEl.style.alignItems = "stretch";
-
   const c = cacheFor(loc.id);
   const kids = [el("div", { class: "place" }, loc.name + (loc.state ? ", " + loc.state : "") + " · FORECAST")];
 
   kids.push(meteogramSection(c));
-  const strip = nextTwoHoursSection(c);
-  if (strip) kids.push(strip);
   kids.push(sevenDaySection(c));
   kids.push(confidenceSection(loc, c));
   kids.push(modelAgreementSection(c));
+  // The 15-minute precipitation strip reads as a footnote to the forecast, not
+  // a headline: it sits under the model comparison rather than above the 48h
+  // meteogram, where it was the first thing on screen.
+  const strip = nextTwoHoursSection(c);
+  if (strip) kids.push(strip);
   kids.push(el("div", { class: "attrib" },
     "WEATHER DATA BY ", el("a", { href: "https://open-meteo.com/", target: "_blank", rel: "noopener" }, "OPEN-METEO.COM")));
 

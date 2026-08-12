@@ -46,8 +46,10 @@ export function init() {
     refreshWx();
   });
 
-  // tapping the conditions panel opens the location sheet (settings stays behind ⚙)
-  wxPanel.addEventListener("click", () => locations.openSheet());
+  // Tapping the conditions panel opens the full data boards — the panel is a
+  // summary of exactly what the NOW board shows, so it reads as "expand this".
+  // Locations live on the ⌂ button in the side rail.
+  wxPanel.addEventListener("click", () => boards.show("now"));
 
   state.on("view", ({ view }) => { if (view === "board") renderStats(); });
 

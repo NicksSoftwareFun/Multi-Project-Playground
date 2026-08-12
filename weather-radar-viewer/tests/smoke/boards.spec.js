@@ -27,10 +27,10 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator("#boardDots .dot").nth(1)).toBeAttached({ timeout: 15_000 });
 });
 
-test("▤ opens the deck with one dot per registered board", async ({ page }) => {
+test("the conditions panel opens the deck with one dot per registered board", async ({ page }) => {
   expect(await viewState(page)).toBe("radar");
 
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   await expect(page.locator("#screen")).toHaveAttribute("data-view", "board");
   await expect(page.locator("#boards")).toBeVisible();
 
@@ -49,7 +49,7 @@ test("▤ opens the deck with one dot per registered board", async ({ page }) =>
 });
 
 test("clicking a dot switches boards", async ({ page }) => {
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   const first = await activeBoardId(page);
   expect(first).toBeTruthy();
 
@@ -70,7 +70,7 @@ test("clicking a dot switches boards", async ({ page }) => {
 });
 
 test("ArrowRight / ArrowLeft step between boards", async ({ page }) => {
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   const n = await page.locator("#boardDots .dot").count();
   const start = await activeBoardId(page);
 
@@ -89,7 +89,7 @@ test("ArrowRight / ArrowLeft step between boards", async ({ page }) => {
 });
 
 test("Escape leaves the deck and returns to the radar view", async ({ page }) => {
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   await expect(page.locator("#screen")).toHaveAttribute("data-view", "board");
 
   await page.keyboard.press("Escape");

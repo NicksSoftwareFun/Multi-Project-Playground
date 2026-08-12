@@ -24,3 +24,7 @@ html, body {
   font-size: 9px !important;
 }
 .leaflet-control-attribution a { color: var(--sub-faint) !important; }
+/* The basemap credit belongs to the map. The satellite view and the data
+   boards cover #lmap but not its controls, so it has to be hidden explicitly
+   or it floats over every board's bottom-right corner. */
+.screen:not([data-view="radar"]) .leaflet-control-attribution { display: none; }

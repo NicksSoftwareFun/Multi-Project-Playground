@@ -39,15 +39,18 @@ export function init() {
   deckEl = document.getElementById("boards");
   dotsEl = document.getElementById("boardDots");
 
-  document.getElementById("boardsBtn").addEventListener("click", () => {
-    if (state.getView() === View.BOARD) state.goBack();
-    else show(currentId || (boards[0] && boards[0].id));
-  });
+  // The deck is entered by tapping the conditions panel (wx.js); the side rail
+   // now carries the locations button instead. Kept as an exported call so any
+   // other entry point — the alert chip, a future kiosk mode — still works.
+
+  // A horizontal drag inside a chart is a cursor scrub, not a board swipe, and
+  // a vertical drag inside one must not dismiss the deck either.
 
   // horizontal swipe between boards; vertical swipe down leaves the deck
   let sx = 0, sy = 0, tracking = false;
   deckEl.addEventListener("pointerdown", (e) => {
     if (e.target.closest("button") || e.target.closest("a")) return;
+    if (e.target.closest(".chart")) return;
     tracking = true; sx = e.clientX; sy = e.clientY;
   });
   deckEl.addEventListener("pointerup", (e) => {

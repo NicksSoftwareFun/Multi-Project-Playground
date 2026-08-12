@@ -23,7 +23,7 @@ async function setup(page) {
 }
 
 async function openAir(page) {
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   await expect(page.locator("#screen")).toHaveAttribute("data-view", "board");
   await page.locator("#boardDots .dot", { hasText: "AIR" }).click();
   await expect(page.locator(BOARD)).toHaveClass(/\bactive\b/);

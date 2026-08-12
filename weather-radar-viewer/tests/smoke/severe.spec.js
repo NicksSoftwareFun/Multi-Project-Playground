@@ -20,7 +20,7 @@ function viewState(page) {
 // Open the SEVERE board through the deck — the path that still works when
 // there are no alerts and therefore no chip to click.
 async function openSevereViaDeck(page) {
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   await expect(page.locator("#screen")).toHaveAttribute("data-view", "board");
   await page.locator("#boardDots .dot", { hasText: "SEVERE" }).click();
   await expect(page.locator(BOARD)).toHaveClass(/\bactive\b/);

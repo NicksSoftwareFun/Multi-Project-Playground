@@ -239,19 +239,34 @@ export function chart(container, spec) {
     holder.append(root);
   }
 
+  // The chart owns the gesture once a finger goes down on it: pointerdown
+  // captures the pointer (so a drag that leaves the hit rect, or a page
+  // scroll attempt, doesn't hand the gesture to the board's overflow-y:auto
+  // scroller) and touch-action:none (see charts.css) stops the browser from
+  // even trying to claim the touch for scrolling in the first place. Before
+  // this, a touch-drag got claimed for scrolling mid-gesture, which fired
+  // pointerleave/pointercancel on the hit rect and ran the old clear() —
+  // that's the reported "line snaps to the far left" bug (clear() parked the
+  // line at x=-10).
+  //
+  // Idle (no pointer interacting) now parks the line at NOW instead of
+  // hiding it, both on first render and after every re-render/resize, since
+  // render() re-runs attachCursor() from scratch each time and this function
+  // ends by parking. setCursor() is the single place that positions the line
+  // and fills the readout, so the pointer path and the idle path can never
+  // drift apart.
   function attachCursor(root, s, series, sx, xMin, xMax, plotW, plotH) {
     const line = svg("line", { class: "cursorline", y1: PAD.top, y2: PAD.top + plotH, x1: -10, x2: -10 });
     root.append(line);
     const hit = svg("rect", {
-      x: PAD.left, y: PAD.top, width: plotW, height: plotH, fill: "transparent", style: "cursor:crosshair"
+      class: "hitarea", x: PAD.left, y: PAD.top, width: plotW, height: plotH,
+      fill: "transparent", style: "cursor:crosshair"
     });
-    const clear = () => { line.setAttribute("x1", -10); line.setAttribute("x2", -10); readout.replaceChildren(); };
-    hit.addEventListener("pointermove", (e) => {
-      const box = root.getBoundingClientRect();
-      const px = ((e.clientX - box.left) / box.width) * (root.viewBox.baseVal.width || box.width);
-      const t = xMin + ((px - PAD.left) / Math.max(1, plotW)) * (xMax - xMin);
-      line.setAttribute("x1", sx(t));
-      line.setAttribute("x2", sx(t));
+
+    function setCursor(t) {
+      const cx = sx(t);
+      line.setAttribute("x1", cx);
+      line.setAttribute("x2", cx);
       const when = new Date(t);
       const parts = [document.createTextNode(
         String(when.getHours()).padStart(2, "0") + ":" + String(when.getMinutes()).padStart(2, "0") + "  "
@@ -266,9 +281,50 @@ export function chart(container, spec) {
         parts.push(span);
       }
       readout.replaceChildren(...parts);
+    }
+
+    const clear = () => { line.setAttribute("x1", -10); line.setAttribute("x2", -10); readout.replaceChildren(); };
+
+    // Same visibility rule as the dashed .nowline itself, so the idle cursor
+    // always lines up with it (or, when now is off-chart, both stay hidden).
+    const parkAtNow = () => {
+      if (s.now != null && s.now > xMin && s.now < xMax) setCursor(s.now);
+      else clear();
+    };
+
+    const timeAt = (clientX) => {
+      const box = root.getBoundingClientRect();
+      const px = ((clientX - box.left) / box.width) * (root.viewBox.baseVal.width || box.width);
+      return xMin + ((px - PAD.left) / Math.max(1, plotW)) * (xMax - xMin);
+    };
+
+    let activeId = null;
+    hit.addEventListener("pointerdown", (e) => {
+      activeId = e.pointerId;
+      hit.setPointerCapture(e.pointerId);
+      setCursor(timeAt(e.clientX));           // a tap reads out a value, not just a drag
+      e.preventDefault();
     });
-    hit.addEventListener("pointerleave", clear);
+    hit.addEventListener("pointermove", (e) => {
+      // Mouse hover (no button down, never captured) tracks continuously,
+      // same as before; a captured touch/pen drag keeps updating too.
+      setCursor(timeAt(e.clientX));
+    });
+    const release = (e) => {
+      if (activeId != null && e.pointerId !== activeId) return;
+      activeId = null;
+      parkAtNow();
+    };
+    hit.addEventListener("pointerup", release);
+    hit.addEventListener("pointercancel", release);
+    hit.addEventListener("lostpointercapture", release);
+    hit.addEventListener("pointerleave", (e) => {
+      if (activeId != null) return;   // boundary noise during a captured drag — ignore
+      parkAtNow();
+    });
     root.append(hit);
+
+    parkAtNow();   // initial state, and restored on every re-render/resize
   }
 
   function nearest(list, t) {

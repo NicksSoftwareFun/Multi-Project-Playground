@@ -37,6 +37,11 @@ function mirrorLegacy() {
 export function init() {
   locs = store.loadLocs();
   buildSheet();
+  const btn = document.getElementById("locsBtn");
+  if (btn) btn.addEventListener("click", () => {
+    if (state.overlayOpen("locsheet")) state.closeOverlay("locsheet");
+    else openSheet();
+  });
   if (active() && active().kind === "gps") scheduleGpsRefresh();
 }
 

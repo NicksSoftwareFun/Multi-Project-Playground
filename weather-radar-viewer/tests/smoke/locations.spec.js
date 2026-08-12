@@ -17,10 +17,10 @@ test("legacy skywatch_loc migrates to the v2 list", async ({ page }) => {
   expect(errors).toHaveLength(0);
 });
 
-test("wx panel opens the location sheet; ZIP add switches active", async ({ page }) => {
+test("the ⌂ button opens the location sheet; ZIP add switches active", async ({ page }) => {
   await boot(page);
   await page.waitForTimeout(600);
-  await page.click("#wxPanel");
+  await page.click("#locsBtn");
   await expect(page.locator("#locsheet")).toBeVisible();
   // one existing row from migration
   await expect(page.locator("#locsheet .locrow")).toHaveCount(1);
@@ -54,7 +54,7 @@ test("switching rows repaints instantly from snapshot; delete removes", async ({
   }});
   await page.waitForTimeout(600);
 
-  await page.click("#wxPanel");
+  await page.click("#locsBtn");
   const rows = page.locator("#locsheet .locrow");
   await expect(rows).toHaveCount(2);
   // snapshot temp chip is shown in the list
@@ -66,7 +66,7 @@ test("switching rows repaints instantly from snapshot; delete removes", async ({
   await expect(page.locator("#wxPlace")).toContainText("New York");
 
   // delete the now-inactive Ankeny row
-  await page.click("#wxPanel");
+  await page.click("#locsBtn");
   await page.locator("#locsheet .locrow", { hasText: "Ankeny" }).locator(".del").click();
   await expect(page.locator("#locsheet .locrow")).toHaveCount(1);
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem("skywatch_locs")));
@@ -79,7 +79,7 @@ test("GPS denial shows retry message and does not break the app", async ({ page,
   await context.grantPermissions([]);
   await boot(page);
   await page.waitForTimeout(600);
-  await page.click("#wxPanel");
+  await page.click("#locsBtn");
   await page.click("#gpsBtn");
   await expect(page.locator("#locMsg")).toHaveText(/LOCATION OFF/, { timeout: 15000 });
   // existing ZIP location still active and functional
@@ -92,7 +92,7 @@ test("GPS grant adds a current-location entry named via NWS", async ({ page, con
   await context.setGeolocation({ latitude: 41.6, longitude: -93.6 });
   await boot(page);
   await page.waitForTimeout(600);
-  await page.click("#wxPanel");
+  await page.click("#locsBtn");
   await page.click("#gpsBtn");
   await expect(page.locator("#locsheet")).toBeHidden({ timeout: 5000 });
   const v2 = await page.evaluate(() => JSON.parse(localStorage.getItem("skywatch_locs")));

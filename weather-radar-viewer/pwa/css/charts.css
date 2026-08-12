@@ -8,6 +8,10 @@
 .chart .grid line { stroke: rgba(140, 170, 195, 0.12); stroke-width: 1; }
 .chart .nowline { stroke: var(--sub-faint); stroke-width: 1; stroke-dasharray: 3 3; }
 .chart .cursorline { stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.7; }
+/* The chart claims the touch gesture for itself (crosshair drag) instead of
+   letting the browser start a page scroll mid-drag — see attachCursor()'s
+   comment in charts.js for why that matters. */
+.chart .hitarea { touch-action: none; }
 .chart .future { fill: var(--pred); opacity: 0.06; }
 .chart .readout {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;

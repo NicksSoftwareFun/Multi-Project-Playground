@@ -53,16 +53,23 @@ test("SAT button switches to satellite view and back", async ({ page }) => {
   await expect(page.locator("#satview")).toBeHidden();
 });
 
-test("the location sheet opens from the conditions panel and closes again", async ({ page }) => {
+test("the ⌂ button opens the location sheet and closes it again", async ({ page }) => {
   const sheet = page.locator("#locsheet");
   await expect(sheet).toBeHidden();
 
-  await page.locator("#wxPanel").click();
+  await page.locator("#locsBtn").click();
   await expect(sheet).toBeVisible();
   await expect(page.locator("#locZip")).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
+});
+
+test("tapping the conditions panel opens the data boards, not the location sheet", async ({ page }) => {
+  await page.locator("#wxPanel").click();
+  await expect.poll(() => viewState(page)).toBe("board");
+  await expect(page.locator("#locsheet")).toBeHidden();
+  await expect(page.locator("#statsview")).toBeVisible();
 });
 
 // The bug this guards: opening the layers drawer first used to strand you on a
@@ -71,7 +78,7 @@ test("Back leaves a board even when the layers drawer was opened first", async (
   await page.locator("#layersBtn").click();
   await expect(page.locator("#layersdrawer")).toBeVisible();
 
-  await page.locator("#boardsBtn").click();
+  await page.locator("#wxPanel").click();
   await expect.poll(() => viewState(page)).toBe("board");
   await expect(page.locator("#layersdrawer")).toBeHidden();   // drawer closed on entry
 

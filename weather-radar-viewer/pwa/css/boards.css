@@ -12,19 +12,34 @@
 #boards .board {
   position: absolute; inset: 0;
   display: none;
-  padding: calc(64px + env(safe-area-inset-top)) 70px 54px;
+  /* bottom padding clears the deck dots, which float over this scroll surface */
+  padding: calc(64px + env(safe-area-inset-top)) 70px 62px;
   gap: 80px; justify-content: center;
+  flex-wrap: wrap;
   overflow-y: auto;
 }
+/* Column boards scroll, and `justify-content: center` on a scroll container
+   makes everything above the centre line unreachable — the 48h meteogram was
+   stranded off the top of CAST. Start them at the top instead. */
+/* wrap is for the two-column boards (it breaks the credit line onto its own
+   row); on a column board it would spill sections into a second column */
+#boards #board-cast, #boards #board-severe { justify-content: flex-start; flex-wrap: nowrap; }
+/* CAST is a single stacked column of sections (was set inline from JS) */
+#boards #board-cast { flex-direction: column; gap: 18px; align-items: stretch; }
 #boards .board.active { display: flex; }
 
 /* deck position indicator */
 .boarddots {
   position: absolute; left: 0; right: 0;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  bottom: 0; padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
   display: flex; justify-content: center; gap: 8px;
   z-index: 2;
+  /* the deck scrolls under this strip — fade the ground so a chart line never
+     runs straight through the dots */
+  background: linear-gradient(rgba(10,16,24,0), var(--bg) 55%);
+  pointer-events: none;
 }
+.boarddots .dot { pointer-events: auto; }
 .boarddots .dot {
   border: 1px solid var(--btn-line);
   background: transparent; color: var(--sub-dim);
@@ -59,8 +74,12 @@
   font-size: 14px; color: var(--sub-faint); letter-spacing: 0.1em;
   text-align: center;
 }
+/* In normal flow at the very end of the board, never floating over a chart —
+   an absolutely positioned credit line sat on top of the confidence graph and
+   swallowed taps meant for it. width:100% breaks it onto its own row in the
+   two-column boards. */
 #boards .attrib {
-  position: absolute; bottom: calc(40px + env(safe-area-inset-bottom)); left: 0; right: 0;
+  width: 100%; order: 99; margin-top: 26px;
   text-align: center; font-size: 9px; letter-spacing: 0.08em; color: var(--sub-dim);
 }
 #boards .attrib a { color: var(--sub-faint); text-decoration: none; }
@@ -110,7 +129,10 @@
 .srcnote { font-size: 10px; color: var(--sub-dim); letter-spacing: 0.08em; }
 
 @media (max-width: 740px), (max-height: 480px) {
-  #boards .board { flex-direction: column; gap: 22px; padding: calc(60px + env(safe-area-inset-top)) 20px 48px; }
+  #boards .board {
+    flex-direction: column; gap: 22px; justify-content: flex-start; flex-wrap: nowrap;
+    padding: calc(60px + env(safe-area-inset-top)) 20px 56px;
+  }
   #boards .col { min-width: 0; }
   #boards .bigtemp { font-size: 54px; }
   #boards .bigcond { font-size: 14px; margin: 6px 0 14px; }
