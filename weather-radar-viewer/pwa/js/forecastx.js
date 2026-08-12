@@ -266,7 +266,9 @@ function meteogramSection(c) {
     y2: { unit: "%", min: 0, max: 100 },
     cursor: true,
     series: [
-      { type: "line", data: c.base.data.temp, token: "--accent", width: 1.75, label: "TEMP" },
+      // Same yellow as the ensemble median below it — the temperature trace is
+      // the same quantity in both charts and should not change color between them.
+      { type: "line", data: c.base.data.temp, token: "--pred-soft", width: 1.75, label: "TEMP" },
       { type: "bars", data: c.base.data.pop, token: "--info", axis: "y2", label: "POP" }
     ]
   }));
