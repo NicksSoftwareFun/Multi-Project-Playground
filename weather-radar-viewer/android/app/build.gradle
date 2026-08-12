@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Release signing is used when a keystore is present (CI decodes it from the
+// ANDROID_KEYSTORE_B64 secret). Without one, build `assembleDebug` instead —
+// an unsigned release APK cannot be installed.
+def keystoreFile = rootProject.file('keystore.jks')
+
+android {
+    namespace 'io.github.nickssoftwarefun.skywatch'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'io.github.nickssoftwarefun.skywatch'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    if (keystoreFile.exists()) {
+        signingConfigs {
+            release {
+                storeFile keystoreFile
+                storePassword System.getenv('KS_PASS')
+                keyAlias System.getenv('KS_ALIAS') ?: 'skywatch'
+                keyPassword System.getenv('KS_PASS')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

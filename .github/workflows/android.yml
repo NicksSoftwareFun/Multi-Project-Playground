@@ -1,0 +1,68 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/weather-radar-sources-l13g18]
+    paths:
+      - 'weather-radar-viewer/android/**'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+      KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KS_ALIAS: skywatch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Decode signing keystore (if configured)
+        if: env.KS_B64 != ''
+        working-directory: weather-radar-viewer/android
+        run: echo "$KS_B64" | base64 -d > keystore.jks
+
+      - name: Build APK
+        working-directory: weather-radar-viewer/android
+        run: |
+          set -eux
+          if [ -f keystore.jks ]; then
+            gradle assembleRelease --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk skywatch.apk
+          else
+            echo "No signing keystore secret set — building a debug-signed APK (installable by sideload)."
+            gradle assembleDebug --no-daemon --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk skywatch.apk
+          fi
+          ls -la skywatch.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skywatch-apk
+          path: weather-radar-viewer/android/skywatch.apk
+
+      - name: Publish to the android-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: weather-radar-viewer/android
+        run: |
+          set -eux
+          if ! gh release view android-latest >/dev/null 2>&1; then
+            gh release create android-latest \
+              --title "SKYWATCH Android APK" \
+              --notes "Sideload build of the SKYWATCH radar app. Download skywatch.apk on your phone and open it to install."
+          fi
+          gh release upload android-latest skywatch.apk --clobber
