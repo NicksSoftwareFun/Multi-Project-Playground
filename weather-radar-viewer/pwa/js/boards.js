@@ -40,26 +40,47 @@ export function init() {
   dotsEl = document.getElementById("boardDots");
 
   // The deck is entered by tapping the conditions panel (wx.js); the side rail
-   // now carries the locations button instead. Kept as an exported call so any
-   // other entry point — the alert chip, a future kiosk mode — still works.
+  // now carries the locations button instead. Kept as an exported call so any
+  // other entry point — the alert chip, a future kiosk mode — still works.
 
-  // A horizontal drag inside a chart is a cursor scrub, not a board swipe, and
-  // a vertical drag inside one must not dismiss the deck either.
+  // Gesture handling: horizontal swipe steps between boards, downward swipe
+  // leaves the deck. Two rules keep it from firing when the user meant
+  // something else, both learned from real misfires:
+  //
+  // 1. EVERY exit path must clear `tracking`. It used to be left set whenever
+  //    pointerdown landed on a control, and whenever a gesture ended somewhere
+  //    other than the deck (finger lifted off-element, pointer cancelled by a
+  //    scroll). A stale `tracking` kept stale start coordinates alive, so the
+  //    next tap on a dot — which sits at the BOTTOM of the screen — measured
+  //    itself against a start point far above, read as a long downward swipe,
+  //    and dropped the user back to the radar. That is the "sometimes tapping
+  //    the bottom buttons goes back" bug.
+  // 2. Downward swipe only dismisses from the top of the board. Otherwise the
+  //    ordinary gesture for scrolling a long board *is* the dismiss gesture.
+  let sx = 0, sy = 0, sTop = 0, pid = null, tracking = false;
+  const stop = () => { tracking = false; pid = null; };
+  const onControl = (t) => !!(t && t.closest && (t.closest("button") || t.closest("a") || t.closest(".chart")));
 
-  // horizontal swipe between boards; vertical swipe down leaves the deck
-  let sx = 0, sy = 0, tracking = false;
   deckEl.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("button") || e.target.closest("a")) return;
-    if (e.target.closest(".chart")) return;
-    tracking = true; sx = e.clientX; sy = e.clientY;
+    if (onControl(e.target)) { stop(); return; }
+    tracking = true;
+    pid = e.pointerId;
+    sx = e.clientX; sy = e.clientY;
+    const b = deckEl.querySelector(".board.active");
+    sTop = b ? b.scrollTop : 0;
   });
   deckEl.addEventListener("pointerup", (e) => {
-    if (!tracking) return;
-    tracking = false;
+    if (!tracking || e.pointerId !== pid) { stop(); return; }
+    stop();
+    if (onControl(e.target)) return;      // released on a control: a tap, never a swipe
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
-    else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) state.goBack();
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) { step(dx < 0 ? 1 : -1); return; }
+    if (dy > 80 && Math.abs(dy) > Math.abs(dx) && sTop === 0) state.goBack();
   });
+  deckEl.addEventListener("pointercancel", stop);
+  // Bubbles after the deck's own handler, so a gesture that ends anywhere else
+  // — off the element, over another layer — can never leave `tracking` set.
+  window.addEventListener("pointerup", stop);
 
   window.addEventListener("keydown", (e) => {
     if (state.getView() !== View.BOARD || state.overlayOpen()) return;
