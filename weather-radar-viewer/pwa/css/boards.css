@@ -1,51 +1,120 @@
-/* Board deck. M0 ships one board (NOW — the conditions & forecast board);
-   the deck shell and per-board layouts grow here in later milestones. */
+/* Board deck: full-screen data boards that swipe left/right.
+   #boards is the deck; each .board is a page; .active is the visible one. */
 
-#statsview {
+#boards {
   position: absolute; inset: 0; z-index: 620;
   background: var(--bg);
   display: none;
-  padding: calc(64px + env(safe-area-inset-top)) 70px 40px;
   font-family: var(--mono);
-  gap: 80px; justify-content: center;
 }
-.screen[data-view="board"] #statsview { display: flex; }
+.screen[data-view="board"] #boards { display: block; }
 
-#statsview .col { display: flex; flex-direction: column; min-width: 330px; }
-#statsview .place {
+#boards .board {
+  position: absolute; inset: 0;
+  display: none;
+  padding: calc(64px + env(safe-area-inset-top)) 70px 54px;
+  gap: 80px; justify-content: center;
+  overflow-y: auto;
+}
+#boards .board.active { display: flex; }
+
+/* deck position indicator */
+.boarddots {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex; justify-content: center; gap: 8px;
+  z-index: 2;
+}
+.boarddots .dot {
+  border: 1px solid var(--btn-line);
+  background: transparent; color: var(--sub-dim);
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+}
+.boarddots .dot.on { border-color: var(--accent); color: var(--accent); }
+
+/* ---- shared board typography ---- */
+#boards .col { display: flex; flex-direction: column; min-width: 330px; }
+#boards .place {
   font-size: 14px; letter-spacing: 0.14em; color: var(--sub-dim);
   text-transform: uppercase; margin-bottom: 10px;
 }
-#statsview .bigtemp { font-size: 84px; font-weight: 700; color: var(--ink-hi); line-height: 1; }
-#statsview .bigcond { font-size: 17px; color: var(--info); letter-spacing: 0.1em; margin: 10px 0 24px; }
-#statsview .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; }
-#statsview .grid .k { font-size: 13px; color: var(--sub); letter-spacing: 0.08em; }
-#statsview .grid .v { font-size: 15px; color: #DCE9F4; text-align: right; }
-#statsview .sect {
+#boards .bigtemp { font-size: 84px; font-weight: 700; color: var(--ink-hi); line-height: 1; }
+#boards .bigcond { font-size: 17px; color: var(--info); letter-spacing: 0.1em; margin: 10px 0 24px; }
+#boards .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; }
+#boards .grid .k { font-size: 13px; color: var(--sub); letter-spacing: 0.08em; }
+#boards .grid .v { font-size: 15px; color: #DCE9F4; text-align: right; }
+#boards .sect {
   font-size: 12px; letter-spacing: 0.18em; color: var(--pred-dim);
   margin: 0 0 12px; border-bottom: 1px solid rgba(216,180,74,0.35);
   padding-bottom: 6px;
 }
-#statsview .daily { font-size: 15px; color: #DCE9F4; margin-bottom: 18px; }
-#statsview .hours { display: grid; grid-template-columns: auto auto auto; gap: 8px 26px; }
-#statsview .hours .h { font-size: 14px; color: var(--sub); }
-#statsview .hours .t { font-size: 15px; color: #DCE9F4; text-align: right; }
-#statsview .hours .p { font-size: 14px; color: #6AA8D8; text-align: right; }
-#statsview .bigmsg {
+#boards .daily { font-size: 15px; color: #DCE9F4; margin-bottom: 18px; }
+#boards .hours { display: grid; grid-template-columns: auto auto auto; gap: 8px 26px; }
+#boards .hours .h { font-size: 14px; color: var(--sub); }
+#boards .hours .t { font-size: 15px; color: #DCE9F4; text-align: right; }
+#boards .hours .p { font-size: 14px; color: #6AA8D8; text-align: right; }
+#boards .bigmsg {
   align-self: center; margin: auto;
   font-size: 14px; color: var(--sub-faint); letter-spacing: 0.1em;
+  text-align: center;
 }
-#statsview .attrib {
-  position: absolute; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0;
+#boards .attrib {
+  position: absolute; bottom: calc(40px + env(safe-area-inset-bottom)); left: 0; right: 0;
   text-align: center; font-size: 9px; letter-spacing: 0.08em; color: var(--sub-dim);
 }
-#statsview .attrib a { color: var(--sub-faint); text-decoration: none; }
+#boards .attrib a { color: var(--sub-faint); text-decoration: none; }
+
+/* ---- SEVERE board ---- */
+#board-severe { flex-direction: column; gap: 18px; align-items: stretch; }
+#board-severe .hdr {
+  display: flex; align-items: baseline; gap: 14px;
+  font-size: 13px; letter-spacing: 0.16em; color: var(--sub-dim);
+}
+#board-severe .asof { margin-left: auto; font-size: 11px; color: var(--sub); }
+/* The board itself is the scroll surface — a nested scrolling list clipped
+   cards and stranded the SPC strip below a gap. */
+#board-severe .alerts { display: flex; flex-direction: column; gap: 10px; }
+.alertcard {
+  border: 1px solid var(--panel-line); border-left-width: 4px;
+  border-radius: 8px; background: var(--panel-bg);
+  padding: 12px 14px; cursor: pointer;
+}
+.alertcard.warning  { border-left-color: var(--sev-warn); }
+.alertcard.watch    { border-left-color: var(--sev-watch); }
+.alertcard.advisory { border-left-color: var(--sev-adv); }
+.alertcard.statement{ border-left-color: var(--sev-stmt); }
+.alertcard .ev { font-size: 15px; letter-spacing: 0.06em; color: var(--ink-hi); }
+.alertcard.warning .ev  { color: var(--sev-warn); }
+.alertcard.watch .ev    { color: var(--sev-watch); }
+.alertcard.advisory .ev { color: var(--sev-adv); }
+.alertcard .meta { font-size: 11px; color: var(--sub); margin-top: 4px; letter-spacing: 0.05em; }
+.alertcard .area { font-size: 11.5px; color: var(--sub-faint); margin-top: 6px; }
+.alertcard .body {
+  display: none; white-space: pre-wrap;
+  font-size: 12px; line-height: 1.55; color: var(--ink);
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--panel-line);
+}
+.alertcard.open .body { display: block; }
+
+/* SPC outlook strip */
+.spcstrip { display: flex; flex-direction: column; gap: 8px; }
+.spcday { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
+.spcday .d { color: var(--sub); letter-spacing: 0.1em; width: 52px; }
+.spcday .cat {
+  padding: 3px 10px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em;
+  color: #10161C; font-weight: 700;
+}
+.spcday .none { color: var(--sub-dim); font-size: 11.5px; letter-spacing: 0.06em; }
+
+.srcnote { font-size: 10px; color: var(--sub-dim); letter-spacing: 0.08em; }
 
 @media (max-width: 740px), (max-height: 480px) {
-  #statsview { flex-direction: column; gap: 22px; padding: calc(60px + env(safe-area-inset-top)) 26px 24px; overflow-y: auto; }
-  #statsview .col { min-width: 0; }
-  #statsview .bigtemp { font-size: 54px; }
-  #statsview .bigcond { font-size: 14px; margin: 6px 0 14px; }
-  #statsview .grid .k { font-size: 11px; }
-  #statsview .grid .v { font-size: 12px; }
+  #boards .board { flex-direction: column; gap: 22px; padding: calc(60px + env(safe-area-inset-top)) 20px 48px; }
+  #boards .col { min-width: 0; }
+  #boards .bigtemp { font-size: 54px; }
+  #boards .bigcond { font-size: 14px; margin: 6px 0 14px; }
+  #boards .grid .k { font-size: 11px; }
+  #boards .grid .v { font-size: 12px; }
+  .alertcard .ev { font-size: 13px; }
 }

@@ -9,11 +9,15 @@ import * as mapMod from "./map.js";
 import * as state from "./state.js";
 import { View, Board } from "./state.js";
 import * as timeline from "./timeline.js";
+import * as alerts from "./alerts.js";
 
+// The kiosk playlist. Conditional entries keep the loop lean when nothing is
+// happening — the SEVERE board only earns screen time during active weather.
 const SEQ = [
   { type: "radar", loops: 2 },
   { type: "sat", ms: 10000 },
   { type: "board", board: Board.NOW, ms: 20000 },
+  { type: "board", board: Board.SEVERE, ms: 15000, when: () => alerts.activeCount() > 0 },
 ];
 
 let autoOn = false;

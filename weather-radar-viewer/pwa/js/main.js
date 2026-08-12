@@ -8,6 +8,10 @@ import * as mapMod from "./map.js";
 import * as sat from "./sat.js";
 import * as wx from "./wx.js";
 import * as locations from "./locations.js";
+import * as layers from "./layers.js";
+import * as boards from "./boards.js";
+import * as alerts from "./alerts.js";
+import * as spc from "./spc.js";
 import * as timeline from "./timeline.js";
 import * as auto from "./auto.js";
 import * as settings from "./settings.js";
@@ -18,8 +22,12 @@ state.init(screenEl);
 net.initStatus(document.getElementById("status"));
 mapMod.init();
 sat.init();
+layers.init();      // loads layer prefs — before any module registers a layer
 locations.init();   // migrates storage, builds the sheet — before wx reads active()
-wx.init();          // reads locations.active(), feeds map.setActiveLatLon
+wx.init();          // reads locations.active(), registers the NOW board
+alerts.init();      // registers the alerts layer + SEVERE board, starts polling
+spc.init();         // registers outlook/MD/tropical layers (lazy: no fetch until on)
+boards.init();      // deck navigation, after boards are registered
 auto.init();
 timeline.init();
 settings.init();

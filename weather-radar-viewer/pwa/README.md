@@ -21,9 +21,25 @@ folder as the GitHub Pages site root. No manual steps.
   Screen**. Launches full-screen with the radar icon.
 
 Settings (ZIP code, Auto Mode) persist per device. On open, the radar
-centers on your ZIP at a 200 km view. Auto Mode makes a great wall/desk
-display: radar ×2 (regional then 175 km), satellite 10 s, conditions
-board 20 s, looped.
+centers on your active location at a 200 km view. Auto Mode makes a great
+wall/desk display: radar ×2 (regional then 175 km), satellite 10 s,
+conditions board 20 s, plus the severe board for 15 s whenever an alert
+is active, looped.
+
+## What's on screen
+
+- **Radar** — animated NEXRAD past 50 min and HRRR forecast to +2:45 on one
+  time-proportional timeline; forecast frames are framed in yellow.
+- **Alert chip** (top bar) — the highest-severity NWS alert for your location,
+  color-coded; tap it for the full text. It hides itself if the feed goes
+  stale rather than show a possibly-expired warning.
+- **≡ Layers** — alert polygons, SPC convective outlook, watches/mesoscale
+  discussions, tropical. Each row carries a health dot and reads `N/A` when
+  its source is unavailable.
+- **▤ Boards** — swipeable full-screen data boards: **NOW** (conditions and
+  forecast) and **SEVERE** (every active alert with full text, plus the SPC
+  Day 1–3 categorical risk for your location).
+- **Locations** — tap the conditions panel for unlimited saved ZIPs plus GPS.
 
 ## Android APK
 
@@ -57,5 +73,11 @@ Static, no build step — plain ES modules and CSS served as-is:
 
 IEM NEXRAD N0Q composite tiles (past), IEM HRRR REFD tiles (forecast),
 NOAA STAR GOES-East GeoColor (satellite), Open-Meteo with automatic
-NWS api.weather.gov fallback (conditions), Zippopotam.us (ZIP geocoding),
-CARTO dark basemap. Weather data by [Open-Meteo.com](https://open-meteo.com/).
+NWS api.weather.gov fallback (conditions), NWS active alerts + zone
+geometry (severe), NOAA ArcGIS map services for SPC outlooks, mesoscale
+discussions and tropical, Zippopotam.us (ZIP geocoding), CARTO dark
+basemap. Weather data by [Open-Meteo.com](https://open-meteo.com/).
+
+Endpoint reachability and CORS are re-verified weekly by
+`.github/workflows/endpoint-checks.yml`; layer ids are re-discovered at
+runtime because NOAA renumbers them.

@@ -1,9 +1,16 @@
 // Shared helpers for the SKYWATCH smoke suite.
 //
-// routeAll(page): intercepts every request. localhost passes through to the
-// static server; every known external feed is answered from fixtures; any
+// routeAll(page, opts): intercepts every request. localhost passes through to
+// the static server; every known external feed is answered from fixtures; any
 // other external domain is blocked. The suite therefore never touches the
 // live network and is fully deterministic.
+//
+//   opts.alerts — body served for api.weather.gov/alerts/active.
+//                 Defaults to ALERTS_ACTIVE; pass ALERTS_EMPTY (or any JSON
+//                 string) to exercise the no-alerts paths. This is the
+//                 supported per-test override; a test may also register its
+//                 own page.route() AFTER routeAll, since Playwright checks
+//                 the most recently added handler first (see xss.spec.js).
 //
 // boot(page, {localStorage}): seeds localStorage (default: a saved Ankeny, IA
 // location under skywatch_loc) via addInitScript, starts a pageerror
@@ -26,6 +33,14 @@ const NWS_HOURLY = fixture("nws-hourly.json").toString("utf8");
 const NWS_DAILY = fixture("nws-daily.json").toString("utf8");
 const ZIPPO = fixture("zippo.json").toString("utf8");
 const HOSTILE = JSON.parse(fixture("hostile-strings.json").toString("utf8"));
+
+// severe weather (M2)
+const ALERTS_ACTIVE = fixture("alerts-active.json").toString("utf8");
+const ALERTS_EMPTY = fixture("alerts-empty.json").toString("utf8");
+const ALERTS_ZONE = fixture("alerts-zone.json").toString("utf8");
+const SPC_LAYERS = fixture("spc-layers.json").toString("utf8");
+const SPC_OUTLOOK = fixture("spc-outlook.json").toString("utf8");
+const TROPICAL_SERVICES = fixture("arcgis-tropical-services.json").toString("utf8");
 
 // Leaflet, served from the PWA's vendor copy when present (post-refactor it
 // is loaded same-origin anyway; pre-refactor the page pulls it from unpkg and
@@ -57,7 +72,8 @@ function png(route) {
   });
 }
 
-async function routeAll(page) {
+async function routeAll(page, opts) {
+  const alertsBody = (opts && opts.alerts) || ALERTS_ACTIVE;
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
     const host = url.hostname;
@@ -75,12 +91,26 @@ async function routeAll(page) {
     // conditions + forecast
     if (host === "api.open-meteo.com") return json(route, OM_FORECAST);
     if (host === "api.weather.gov") {
+      // alerts + zones first: /zones/forecast/IAZ060 would otherwise be caught
+      // by the "forecast" branch below
+      if (url.pathname.startsWith("/alerts/active")) return json(route, alertsBody);
+      if (url.pathname.startsWith("/zones/")) return json(route, ALERTS_ZONE);
       if (url.pathname.includes("/points/")) return json(route, NWS_POINTS);
       if (url.pathname.includes("hourly")) return json(route, NWS_HOURLY);
       if (url.pathname.includes("forecast")) return json(route, NWS_DAILY);
       return json(route, "{}");
     }
     if (host === "api.zippopotam.us") return json(route, ZIPPO);
+
+    // SPC outlooks / mesoscale discussions / tropical (ArcGIS MapServers)
+    if (host === "mapservices.weather.noaa.gov") {
+      const p = url.pathname;
+      if (/\/MapServer\/layers$/.test(p)) return json(route, SPC_LAYERS);
+      if (/\/query$/.test(p)) return json(route, SPC_OUTLOOK);
+      // service directory used by spc.js's runtime tropical discovery
+      if (/^\/tropical\/rest\/services\/?$/.test(p)) return json(route, TROPICAL_SERVICES);
+      return json(route, "{}");
+    }
 
     // Leaflet CDN (pre-refactor markup) → local vendor copy
     if (host === "unpkg.com") {
@@ -118,4 +148,7 @@ async function boot(page, opts) {
   return { errors };
 }
 
-module.exports = { routeAll, boot, DEFAULT_LOC, HOSTILE, OM_FORECAST, ZIPPO };
+module.exports = {
+  routeAll, boot, DEFAULT_LOC, HOSTILE, OM_FORECAST, ZIPPO,
+  ALERTS_ACTIVE, ALERTS_EMPTY, ALERTS_ZONE, SPC_LAYERS, SPC_OUTLOOK, TROPICAL_SERVICES,
+};

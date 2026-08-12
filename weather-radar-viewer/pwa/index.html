@@ -38,13 +38,18 @@
       <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
     </div>
 
-    <div id="statsview"></div>
+    <div id="boards">
+      <div class="board" id="statsview" data-board="now"></div>
+      <div class="board" id="board-severe" data-board="severe"></div>
+      <div class="boarddots" id="boardDots"></div>
+    </div>
 
     <div id="predFrame"><span class="tab" id="predTab">PREDICTION</span></div>
 
     <div class="bar topbar chrome-all">
       <span class="brand">SKYWATCH</span>
       <span class="badge mrms" id="srcBadge">NEXRAD N0Q · IEM</span>
+      <button class="badge alertchip" id="alertChip" hidden></button>
       <span class="spacer"></span>
       <span class="frametime" id="frameTime">--:--</span>
       <span class="spacer"></span>
@@ -59,9 +64,16 @@
     <div class="zoomstack chrome-all">
       <button class="btn chrome-radar" id="zoomIn" aria-label="Zoom in">+</button>
       <button class="btn chrome-radar" id="zoomOut" aria-label="Zoom out">−</button>
+      <button class="btn chrome-radar" id="layersBtn" aria-label="Map layers" style="font-size:15px">≡</button>
       <button class="btn small chrome-map" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
+      <button class="btn chrome-all" id="boardsBtn" aria-label="Data boards" style="font-size:15px">▤</button>
       <button class="btn chrome-radar" id="homeBtn" aria-label="Reset view" style="font-size:15px">⌂</button>
       <button class="btn chrome-all" id="settingsBtn" aria-label="Settings" style="font-size:15px">⚙</button>
+    </div>
+
+    <div id="layersdrawer">
+      <div class="title">MAP LAYERS</div>
+      <div class="layerrows" id="layerRows"></div>
     </div>
 
     <div class="legend chrome-radar">

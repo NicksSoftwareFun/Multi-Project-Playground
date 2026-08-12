@@ -1,0 +1,30 @@
+{
+  "@context": ["https://geojson.org/geojson-ld/geojson-context.jsonld"],
+  "id": "https://api.weather.gov/zones/county/IAC153",
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-93.82, 41.49],
+      [-93.32, 41.49],
+      [-93.32, 41.87],
+      [-93.82, 41.87],
+      [-93.82, 41.49]
+    ]]
+  },
+  "properties": {
+    "@id": "https://api.weather.gov/zones/county/IAC153",
+    "@type": "wx:Zone",
+    "id": "IAC153",
+    "type": "county",
+    "name": "Polk",
+    "effectiveDate": "2024-02-15T18:00:00+00:00",
+    "expirationDate": "2200-01-01T00:00:00+00:00",
+    "state": "IA",
+    "cwa": ["DMX"],
+    "forecastOffices": ["https://api.weather.gov/offices/DMX"],
+    "timeZone": ["America/Chicago"],
+    "observationStations": [],
+    "radarStation": "KDMX"
+  }
+}
