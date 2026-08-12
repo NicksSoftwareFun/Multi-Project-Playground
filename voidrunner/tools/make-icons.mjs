@@ -125,7 +125,7 @@ function shade(u, v, scale) {
   return [clamp01(col[0]), clamp01(col[1]), clamp01(col[2]), 1];
 }
 
-function render(size, { scale = 1, radius = 0 } = {}) {
+function render(size, { scale = 1, radius = 0, fade = 0 } = {}) {
   const buf = Buffer.alloc(size * size * 4);
   const SS = 3;
   for (let py = 0; py < size; py++) {
@@ -137,6 +137,12 @@ function render(size, { scale = 1, radius = 0 } = {}) {
           const fy = (py + (sy + 0.5) / SS) / size * 2 - 1;
           const c = shade(fx, fy, scale);
           let alpha = c[3];
+          if (fade > 0) {
+            // Adaptive-icon foregrounds sit on their own layer, so let the art
+            // dissolve into the background colour instead of ending in a hard
+            // square edge the launcher would then mask.
+            alpha *= clamp01(1 - (Math.hypot(fx, fy) - fade) / (1 - fade));
+          }
           if (radius > 0) {
             // Rounded-square mask for the non-maskable icons.
             const q = Math.max(Math.abs(fx) - (1 - radius), 0);
@@ -169,4 +175,17 @@ const jobs = [
 for (const [name, size, opt] of jobs) {
   writeFileSync(join(OUT, name), render(size, opt));
   console.log('wrote', name, size + 'px');
+}
+
+// Android launcher icons. Legacy PNGs for API 23-25, plus an adaptive-icon
+// foreground layer (108dp canvas, 72dp safe zone) for API 26+.
+const RES = join(OUT, '..', 'android', 'res');
+const DENSITIES = [['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]];
+
+for (const [density, px] of DENSITIES) {
+  const dir = join(RES, `mipmap-${density}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'ic_launcher.png'), render(px, { radius: 0.22 }));
+  writeFileSync(join(dir, 'ic_launcher_fg.png'), render(Math.round(px * 2.25), { scale: 0.60, fade: 0.58 }));
+  console.log('wrote', `mipmap-${density}/ic_launcher.png`, px + 'px');
 }

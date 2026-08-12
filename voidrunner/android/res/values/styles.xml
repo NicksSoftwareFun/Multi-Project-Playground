@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Full-screen, no action bar, and a window background matching the game so
+       there is no white flash while the WebView spins up. -->
+  <style name="AppTheme" parent="android:Theme.Material.NoActionBar.Fullscreen">
+    <item name="android:windowBackground">@color/bg</item>
+    <item name="android:navigationBarColor">#FF04060D</item>
+    <item name="android:statusBarColor">#FF04060D</item>
+  </style>
+</resources>

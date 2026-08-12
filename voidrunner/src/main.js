@@ -11,6 +11,10 @@ import { fmtInt, fmtDist, clamp } from './util.js';
 const $ = (s) => document.querySelector(s);
 const SCREENS = ['menu', 'hangar', 'settings', 'help', 'pause', 'over', 'boot'];
 
+// The Android shell tags its WebView. Inside it the service worker is pointless
+// (the assets are already on the device) and a hardware Back button exists.
+const NATIVE = / VoidrunnerNative\//.test(navigator.userAgent);
+
 const canvas = $('#gl');
 let game, save, audio, input, hud;
 let current = 'boot';
@@ -89,6 +93,16 @@ function boot() {
   const unlock = () => { audio.unlock(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', unlock);
+
+  // Android hardware Back: pause a run, back out of a screen, then let the OS
+  // close the app. Returning false is what tells the shell to finish().
+  window.__vrBack = () => {
+    if (game.state === STATE.PLAY) { doPause(); return true; }
+    if (game.state === STATE.PAUSE) { show(null); game.resume(); return true; }
+    if (current === 'over') { toMenu(); return true; }
+    if (current && current !== 'menu' && current !== 'boot') { show('menu'); refreshMenu(); return true; }
+    return false;
+  };
 
   requestAnimationFrame(frame);
 }
@@ -307,7 +321,7 @@ function onDeath(run) {
 
 /* ------------------------------ service worker -------------------------- */
 
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is a bonus, not a requirement */ });
   });
