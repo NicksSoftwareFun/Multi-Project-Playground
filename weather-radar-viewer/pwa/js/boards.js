@@ -4,6 +4,7 @@
 import { el } from "./util.js";
 import * as state from "./state.js";
 import { View } from "./state.js";
+import { EDGE_SWIPE_PX } from "./config.js";
 
 const boards = [];        // [{ id, label, el, render, onEnter }]
 let deckEl, dotsEl;
@@ -57,13 +58,25 @@ export function init() {
   //    the bottom buttons goes back" bug.
   // 2. Downward swipe only dismisses from the top of the board. Otherwise the
   //    ordinary gesture for scrolling a long board *is* the dismiss gesture.
-  let sx = 0, sy = 0, sTop = 0, pid = null, tracking = false;
-  const stop = () => { tracking = false; pid = null; };
+  //
+  // 3. A drag starting at either screen edge belongs to the deck no matter what
+  //    it lands on. CAST is mostly charts, and charts own horizontal drags for
+  //    cursor scrubbing, so without an edge zone there is nowhere on that board
+  //    to swipe from. charts.js declines the same gestures (EDGE_SWIPE_PX is
+  //    shared) so the cursor does not lurch sideways mid-swipe.
+  let sx = 0, sy = 0, sTop = 0, pid = null, tracking = false, edge = false;
+  const stop = () => { tracking = false; pid = null; edge = false; };
   const onControl = (t) => !!(t && t.closest && (t.closest("button") || t.closest("a") || t.closest(".chart")));
+  const fromEdge = (x) => x <= EDGE_SWIPE_PX || x >= window.innerWidth - EDGE_SWIPE_PX;
 
   deckEl.addEventListener("pointerdown", (e) => {
-    if (onControl(e.target)) { stop(); return; }
+    // A real control still wins at the edge — the locations button lives up
+    // there, and a tap on it must not be swallowed by a gesture zone.
+    const control = onControl(e.target);
+    const atEdge = fromEdge(e.clientX);
+    if (control && !(atEdge && e.target.closest(".chart"))) { stop(); return; }
     tracking = true;
+    edge = atEdge;
     pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
     const b = deckEl.querySelector(".board.active");
@@ -71,11 +84,14 @@ export function init() {
   });
   deckEl.addEventListener("pointerup", (e) => {
     if (!tracking || e.pointerId !== pid) { stop(); return; }
+    const wasEdge = edge;
     stop();
-    if (onControl(e.target)) return;      // released on a control: a tap, never a swipe
+    if (!wasEdge && onControl(e.target)) return;   // released on a control: a tap, never a swipe
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) { step(dx < 0 ? 1 : -1); return; }
-    if (dy > 80 && Math.abs(dy) > Math.abs(dx) && sTop === 0) state.goBack();
+    // An edge swipe is deliberate, so it needs less travel than a mid-screen one.
+    const need = wasEdge ? 40 : 60;
+    if (Math.abs(dx) > need && Math.abs(dx) > Math.abs(dy)) { step(dx < 0 ? 1 : -1); return; }
+    if (!wasEdge && dy > 80 && Math.abs(dy) > Math.abs(dx) && sTop === 0) state.goBack();
   });
   deckEl.addEventListener("pointercancel", stop);
   // Bubbles after the deck's own handler, so a gesture that ends anywhere else

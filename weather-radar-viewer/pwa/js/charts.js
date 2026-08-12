@@ -22,7 +22,10 @@
 // A null/undefined value breaks the path — gaps in the data stay visible as
 // gaps instead of being interpolated over.
 
+import { EDGE_SWIPE_PX } from "./config.js";
+
 const NS = "http://www.w3.org/2000/svg";
+
 const PAD = { top: 10, right: 12, bottom: 18, left: 38 };
 
 function svg(tag, attrs) {
@@ -301,19 +304,30 @@ export function chart(container, spec) {
       return xMin + ((px - PAD.left) / Math.max(1, plotW)) * (xMax - xMin);
     };
 
+    // A drag that starts at a screen edge is the board deck's swipe, not a scrub.
+    // Declining it here (rather than letting both run) keeps the cursor from
+    // lurching sideways while the user is swiping to the next board.
+    const fromEdge = (x) =>
+      x <= EDGE_SWIPE_PX || x >= (window.innerWidth || 0) - EDGE_SWIPE_PX;
+
     let activeId = null;
+    let yielded = false;          // true while an edge gesture is in progress
     hit.addEventListener("pointerdown", (e) => {
+      if (fromEdge(e.clientX)) { yielded = true; return; }
+      yielded = false;
       activeId = e.pointerId;
       hit.setPointerCapture(e.pointerId);
       setCursor(timeAt(e.clientX));           // a tap reads out a value, not just a drag
       e.preventDefault();
     });
     hit.addEventListener("pointermove", (e) => {
+      if (yielded) return;                    // the deck owns this gesture
       // Mouse hover (no button down, never captured) tracks continuously,
       // same as before; a captured touch/pen drag keeps updating too.
       setCursor(timeAt(e.clientX));
     });
     const release = (e) => {
+      if (yielded) { yielded = false; return; }
       if (activeId != null && e.pointerId !== activeId) return;
       activeId = null;
       parkAtNow();

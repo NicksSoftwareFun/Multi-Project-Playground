@@ -106,6 +106,13 @@ export const SPC_CAT_COLORS = {
 };
 
 // --- astronomy (M5) ---
+// A horizontal drag starting this close to a screen edge belongs to the board
+// deck, not to whatever it lands on. It is how the deck stays swipeable across
+// CAST, where charts legitimately own horizontal drags for cursor scrubbing.
+// Read by BOTH boards.js (claims the gesture) and charts.js (declines it) —
+// they must never disagree about the size of this zone.
+export const EDGE_SWIPE_PX = 28;
+
 export const SKY_TICK_MS = 30 * 1000;         // countdown refresh while the board is on screen
 export const SKY_SAMPLE_MIN = 5;               // altitude-track sampling interval: 289 points/body over 24h, ~1ms for both
 export const SKY_TZ_WARN_H = 3;                // device-vs-longitude gap that triggers the timezone note; 3 rather than 2 so wide legitimate zones (e.g. Indiana on EDT) don't false-positive
