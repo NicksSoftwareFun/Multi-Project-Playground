@@ -395,9 +395,23 @@ function wwaQueryUrl(id, b) {
     "&geometry=" + geom + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects";
 }
 
+// Leaflet lets you keep dragging past the antimeridian, so getBounds() can hand
+// back longitudes several globes out (w=1541). ArcGIS answers that with nothing
+// and the layer would quietly fall back; clamp into a sane envelope instead.
 function mapBBox(m) {
   const b = m.getBounds();
-  return { w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth() };
+  let w = b.getWest(), e = b.getEast();
+  if (e - w >= 360) { w = -180; e = 180; }
+  else {
+    const wrap = (x) => ((x + 180) % 360 + 360) % 360 - 180;
+    w = wrap(w); e = wrap(e);
+    if (w > e) { w = -180; e = 180; }        // straddles the seam — just ask for the world
+  }
+  return {
+    w, e,
+    s: Math.max(-90, b.getSouth()),
+    n: Math.min(90, b.getNorth())
+  };
 }
 function padBBox(b) {
   const dw = (b.e - b.w) * BBOX_PAD, dh = (b.n - b.s) * BBOX_PAD;
