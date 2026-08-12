@@ -520,7 +520,10 @@ function toggle(id, draw) {
 export function init() {
   try {
     layers.register({ id: "spc", label: "SPC OUTLOOK", defaultOn: false, onToggle: toggle("spc", drawOutlook) });
-    layers.register({ id: "spcmd", label: "WATCHES / MDs", defaultOn: false, onToggle: toggle("spcmd", drawMd) });
+    // Labelled for what it actually draws: the service behind it is SPC's
+    // mesoscale-discussion layer. Watch boxes are NWS active alerts and reach
+    // the map through the "alerts" layer, not this one.
+    layers.register({ id: "spcmd", label: "MESOSCALE DISCUSSIONS", defaultOn: false, onToggle: toggle("spcmd", drawMd) });
     layers.register({ id: "tropical", label: "TROPICAL", defaultOn: false, onToggle: toggle("tropical", drawTropical) });
 
     // alerts.js owns the SEVERE board and drops an empty #spcStrip into it

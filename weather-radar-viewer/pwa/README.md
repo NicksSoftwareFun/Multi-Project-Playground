@@ -38,9 +38,12 @@ locations sheet recenters it there.
   answers "does this affect me".
 - Place labels are drawn above the radar, so a wall of 60 dBZ can never
   hide which county you are looking at.
-- **≡ Layers** — alert polygons, SPC convective outlook, watches/mesoscale
+- **≡ Layers** — alert polygons, SPC convective outlook, mesoscale
   discussions, tropical. Each row carries a health dot and reads `N/A` when
-  its source is unavailable.
+  its source is unavailable. The three severe layers are three time horizons:
+  outlook (days out) → mesoscale discussion (hours out, before anything is
+  warned) → alert polygon (in effect now). Watch boxes are NWS active alerts,
+  so they arrive on the alert-polygon layer.
 - **▤ Boards** — swipeable full-screen data boards: **NOW** (conditions and
   forecast), **CAST** (48 h meteogram, 15-minute precipitation, 7-day strip,
   ensemble confidence bands, model agreement), **SEVERE** (every active alert
@@ -83,7 +86,7 @@ IEM NEXRAD N0Q composite tiles (past), IEM HRRR REFD tiles (forecast),
 NOAA STAR GOES-East GeoColor (satellite), Open-Meteo with automatic
 NWS api.weather.gov fallback (conditions), NWS active alerts + zone
 geometry (severe), NOAA ArcGIS map services for SPC outlooks, mesoscale
-discussions, watch/warning/advisory polygons and tropical, Open-Meteo
+mesoscale discussions, watch/warning/advisory polygons and tropical, Open-Meteo
 air quality (US AQI) and ensembles, Zippopotam.us (ZIP geocoding), CARTO
 dark basemap (geography and labels as separate layers). Weather data by [Open-Meteo.com](https://open-meteo.com/).
 
