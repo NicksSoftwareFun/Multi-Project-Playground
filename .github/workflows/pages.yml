@@ -25,9 +25,21 @@ jobs:
       - name: Install test dependencies
         working-directory: weather-radar-viewer/tests
         run: npm ci || npm install
+      # --with-deps runs apt-get update, which fails whenever a third-party apt
+      # mirror is mid-sync (seen: dl.google.com serving a Packages.gz whose size
+      # disagrees with its own index). That has nothing to do with this app, so
+      # retry, then fall back to the browser-only install — ubuntu-latest already
+      # ships the shared libraries Chromium needs.
       - name: Install Playwright Chromium
         working-directory: weather-radar-viewer/tests
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "playwright install attempt $i failed; retrying in $((i * 10))s"
+            sleep $((i * 10))
+          done
+          echo "falling back to a browser-only install (no apt)"
+          npx playwright install chromium
       # sw.js SHELL completeness is asserted by smoke/sw.spec.js as part of npm test
       - name: Run smoke suite
         working-directory: weather-radar-viewer/tests
