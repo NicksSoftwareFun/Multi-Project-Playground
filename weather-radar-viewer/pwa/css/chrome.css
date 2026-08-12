@@ -22,6 +22,20 @@
 .badge.mrms { color: var(--ok); border-color: #2E6E68; background: rgba(23,61,58,0.55); }
 .badge.fcst { color: var(--pred-soft); border-color: #9E7E24; background: rgba(74,58,12,0.55); }
 .badge.sat  { color: var(--info); border-color: #3A6C9E; background: rgba(22,44,70,0.55); }
+/* severe-weather chip: the whole notification story for a no-push app */
+.badge.alertchip {
+  cursor: pointer; font-weight: 700;
+  color: var(--sev-warn); border-color: var(--sev-warn);
+  background: rgba(90, 18, 18, 0.55);
+  animation: chippulse 2.4s ease-in-out infinite;
+}
+.badge.alertchip[hidden] { display: none; }
+.badge.alertchip.watch    { color: var(--sev-watch); border-color: var(--sev-watch); background: rgba(92,54,10,0.55); animation: none; }
+.badge.alertchip.advisory { color: var(--sev-adv); border-color: var(--sev-adv); background: rgba(74,58,12,0.55); animation: none; }
+.badge.alertchip.statement{ color: var(--sev-stmt); border-color: var(--sev-stmt); background: rgba(22,44,70,0.55); animation: none; }
+@keyframes chippulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .badge.alertchip { animation: none; } }
+
 .topbar .spacer { flex: 1; }
 .frametime { font-family: var(--mono); font-size: 13px; color: var(--ink-mid); }
 .frametime.fcst { color: var(--pred-soft); }
@@ -142,11 +156,14 @@
 .status .on { color: var(--ok); }
 .status .off { color: var(--err); }
 
-/* current conditions block (bottom right, opposite the legend) */
+/* Current conditions block (bottom right, opposite the legend). It clears the
+   button rail on the right: on short screens the two used to overlap and the
+   panel swallowed taps meant for the buttons. */
 .wx {
   position: absolute; z-index: 700;
-  right: calc(12px + env(safe-area-inset-right));
+  right: calc(64px + env(safe-area-inset-right));
   bottom: calc(66px + env(safe-area-inset-bottom));
+  max-width: calc(100% - 90px);
   background: var(--panel-bg);
   border: 1px solid var(--panel-line); border-radius: 8px;
   padding: 10px 13px; min-width: 196px;
@@ -180,4 +197,6 @@
   .wx .rows .k { font-size: 9px; }
   .wx .rows .v { font-size: 10px; }
   .btn { height: 36px; min-width: 36px; font-size: 16px; }
+  .zoomstack { gap: 6px; }
+  .wx { right: calc(52px + env(safe-area-inset-right)); max-width: calc(100% - 72px); }
 }

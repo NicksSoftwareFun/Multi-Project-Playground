@@ -113,19 +113,20 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            goImmersive();
+            applySystemUi();
         }
     }
 
-    /** Hide the status and navigation bars; they slide back in on a swipe. */
-    private void goImmersive() {
+    /**
+     * The status bar stays hidden (the activity theme is fullscreen) but the
+     * navigation bar stays put: this is a touch console, and hiding Back/Home
+     * behind a swipe makes it feel trapped. The WebView lays out above the
+     * nav bar rather than under it, so on-screen controls stay reachable.
+     */
+    private void applySystemUi() {
         web.setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN);
     }
 
     @Override

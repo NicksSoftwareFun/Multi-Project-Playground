@@ -1,0 +1,7 @@
+{
+  "@context": ["https://geojson.org/geojson-ld/geojson-context.jsonld"],
+  "type": "FeatureCollection",
+  "title": "Current watches, warnings, and advisories for 41.73 N, 93.6 W",
+  "updated": "2099-05-14T22:14:00+00:00",
+  "features": []
+}

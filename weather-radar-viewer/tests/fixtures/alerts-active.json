@@ -1,0 +1,128 @@
+{
+  "@context": ["https://geojson.org/geojson-ld/geojson-context.jsonld"],
+  "type": "FeatureCollection",
+  "title": "Current watches, warnings, and advisories for 41.73 N, 93.6 W",
+  "updated": "2099-05-14T22:14:00+00:00",
+  "features": [
+    {
+      "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.tor.dmx.0001",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-93.78, 41.61],
+          [-93.42, 41.61],
+          [-93.42, 41.86],
+          [-93.78, 41.86],
+          [-93.78, 41.61]
+        ]]
+      },
+      "properties": {
+        "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.tor.dmx.0001",
+        "@type": "wx:Alert",
+        "id": "urn:oid:2.49.0.1.840.0.tor.dmx.0001",
+        "areaDesc": "Polk, IA; Dallas, IA",
+        "geocode": { "SAME": ["019153", "019049"], "UGC": ["IAC153", "IAC049"] },
+        "affectedZones": [
+          "https://api.weather.gov/zones/county/IAC153",
+          "https://api.weather.gov/zones/county/IAC049"
+        ],
+        "references": [],
+        "sent": "2099-05-14T17:12:00-05:00",
+        "effective": "2099-05-14T17:12:00-05:00",
+        "onset": "2099-05-14T17:12:00-05:00",
+        "expires": "2099-05-14T17:45:00-05:00",
+        "ends": "2099-05-14T17:45:00-05:00",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Extreme",
+        "certainty": "Observed",
+        "urgency": "Immediate",
+        "event": "Tornado Warning",
+        "sender": "w-nws.webmaster@noaa.gov",
+        "senderName": "NWS Des Moines IA",
+        "headline": "Tornado Warning issued May 14 at 5:12PM CDT until May 14 at 5:45PM CDT by NWS Des Moines IA",
+        "description": "At 512 PM CDT, a severe thunderstorm capable of producing a tornado was located near Grimes, moving northeast at 40 mph.\n\nHAZARD: Tornado.\n\nSOURCE: Radar indicated rotation.\n\nIMPACT: Flying debris will be dangerous to those caught without shelter.",
+        "instruction": "TAKE COVER NOW! Move to a basement or an interior room on the lowest floor of a sturdy building.",
+        "response": "Shelter",
+        "parameters": { "NWSheadline": ["TORNADO WARNING"], "VTEC": ["/O.NEW.KDMX.TO.W.0031.990514T2212Z-990514T2245Z/"] }
+      }
+    },
+    {
+      "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.svr.dmx.0002",
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.svr.dmx.0002",
+        "@type": "wx:Alert",
+        "id": "urn:oid:2.49.0.1.840.0.svr.dmx.0002",
+        "areaDesc": "Polk, IA; Story, IA; Jasper, IA",
+        "geocode": { "SAME": ["019153"], "UGC": ["IAC153"] },
+        "affectedZones": ["https://api.weather.gov/zones/county/IAC153"],
+        "references": [],
+        "sent": "2099-05-14T15:40:00-05:00",
+        "effective": "2099-05-14T15:40:00-05:00",
+        "onset": "2099-05-14T15:40:00-05:00",
+        "expires": "2099-05-14T21:00:00-05:00",
+        "ends": "2099-05-14T21:00:00-05:00",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Severe",
+        "certainty": "Possible",
+        "urgency": "Future",
+        "event": "Severe Thunderstorm Watch",
+        "sender": "w-nws.webmaster@noaa.gov",
+        "senderName": "NWS Storm Prediction Center Norman OK",
+        "headline": "Severe Thunderstorm Watch issued May 14 at 3:40PM CDT until May 14 at 9:00PM CDT by NWS Storm Prediction Center",
+        "description": "SEVERE THUNDERSTORM WATCH 214 IS IN EFFECT UNTIL 900 PM CDT FOR THE FOLLOWING LOCATIONS IN IOWA: DALLAS, JASPER, POLK, STORY.\n\nHAIL TO 2 INCHES IN DIAMETER AND WIND GUSTS TO 70 MPH ARE POSSIBLE.",
+        "instruction": "Remain alert for approaching severe thunderstorms and be prepared to take shelter.",
+        "response": "Prepare",
+        "parameters": { "NWSheadline": ["SEVERE THUNDERSTORM WATCH 214"] }
+      }
+    },
+    {
+      "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.heat.dmx.0003",
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-94.20, 41.30],
+          [-93.10, 41.30],
+          [-93.10, 42.10],
+          [-94.20, 42.10],
+          [-94.20, 41.30]
+        ]]
+      },
+      "properties": {
+        "@id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.heat.dmx.0003",
+        "@type": "wx:Alert",
+        "id": "urn:oid:2.49.0.1.840.0.heat.dmx.0003",
+        "areaDesc": "Polk, IA",
+        "geocode": { "SAME": ["019153"], "UGC": ["IAZ060"] },
+        "affectedZones": ["https://api.weather.gov/zones/forecast/IAZ060"],
+        "references": [],
+        "sent": "2099-05-14T10:02:00-05:00",
+        "effective": "2099-05-14T10:02:00-05:00",
+        "onset": "2099-05-14T13:00:00-05:00",
+        "expires": "2099-05-14T20:00:00-05:00",
+        "ends": "2099-05-14T20:00:00-05:00",
+        "status": "Actual",
+        "messageType": "Alert",
+        "category": "Met",
+        "severity": "Moderate",
+        "certainty": "Likely",
+        "urgency": "Expected",
+        "event": "Heat Advisory",
+        "sender": "w-nws.webmaster@noaa.gov",
+        "senderName": "NWS Des Moines IA",
+        "headline": "Heat Advisory issued May 14 at 10:02AM CDT until May 14 at 8:00PM CDT by NWS Des Moines IA",
+        "description": "HEAT INDEX VALUES UP TO 105 EXPECTED THIS AFTERNOON AND EVENING.\n\nHot temperatures and high humidity may cause heat illnesses to occur.",
+        "instruction": "Drink plenty of fluids, stay in an air-conditioned room, and check up on relatives and neighbors.",
+        "response": "Execute",
+        "parameters": { "NWSheadline": ["HEAT ADVISORY REMAINS IN EFFECT UNTIL 8 PM CDT THIS EVENING"] }
+      }
+    }
+  ]
+}

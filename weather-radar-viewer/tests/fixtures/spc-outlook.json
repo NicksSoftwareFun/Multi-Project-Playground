@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "name": "SPC_wx_outlks Day 1 Categorical Outlook",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "properties": {
+        "OBJECTID": 1,
+        "dn": 4,
+        "valid": "209905141200",
+        "expire": "209905151200",
+        "issue": "209905140600",
+        "label": "SLGT",
+        "label2": "Slight Risk",
+        "stroke": "#DDAA00",
+        "fill": "#FFE066",
+        "idp_source": "spc_wx_outlks"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-97.0, 39.0],
+          [-90.0, 39.0],
+          [-90.0, 44.0],
+          [-97.0, 44.0],
+          [-97.0, 39.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "properties": {
+        "OBJECTID": 2,
+        "dn": 3,
+        "valid": "209905141200",
+        "expire": "209905151200",
+        "issue": "209905140600",
+        "label": "MRGL",
+        "label2": "Marginal Risk",
+        "stroke": "#3C7A3C",
+        "fill": "#66A366",
+        "idp_source": "spc_wx_outlks"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-82.0, 30.0],
+          [-78.0, 30.0],
+          [-78.0, 34.0],
+          [-82.0, 34.0],
+          [-82.0, 30.0]
+        ]]
+      }
+    }
+  ]
+}

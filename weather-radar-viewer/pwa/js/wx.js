@@ -10,6 +10,7 @@ import * as store from "./store.js";
 import * as mapMod from "./map.js";
 import * as state from "./state.js";
 import * as locations from "./locations.js";
+import * as boards from "./boards.js";
 
 let loc = null;          // the active location (mirror of locations.active())
 let lastWx = null;
@@ -31,6 +32,8 @@ export function init() {
 
   loc = locations.active();
   mapMod.setActiveLatLon(loc ? [loc.lat, loc.lon] : null);
+
+  boards.register({ id: "now", label: "NOW", el: statsEl, render: renderStats });
 
   // location switch: paint the last-good snapshot instantly, then refresh live
   locations.onChange((newLoc) => {
