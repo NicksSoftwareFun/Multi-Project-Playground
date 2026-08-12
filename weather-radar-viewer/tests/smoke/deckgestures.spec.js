@@ -30,6 +30,7 @@ test.beforeEach(async ({ page }) => {
 test("a drag that ends on a dot is a tap, not a downward swipe", async ({ page }) => {
   await openDeck(page);
   const dot = page.locator("#boardDots .dot").nth(2);
+  await expect(dot).toBeVisible();
   const box = await dot.boundingBox();
 
   // press well above the dots, release on one — the exact shape that used to
@@ -56,6 +57,7 @@ test("scrolling a long board downward does not dismiss the deck", async ({ page 
 
   // Drag downward from a 7-day row — plain text, NOT a chart, so the chart
   // guard cannot be what saves us. This is exactly a scroll gesture.
+  await expect(board.locator(".castday").first()).toBeVisible();
   const row = await board.locator(".castday").first().boundingBox();
   await page.mouse.move(row.x + row.width / 2, row.y);
   await page.mouse.down();

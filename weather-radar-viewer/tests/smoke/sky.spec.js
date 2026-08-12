@@ -150,6 +150,7 @@ test("the sun/moon altitude chart renders 3 paths and the crosshair readout name
   expect(await svgEl.locator("path").count()).toBeGreaterThanOrEqual(3);   // sun, moon, horizon
 
   const hit = svgEl.locator(".hitarea");
+  await expect(hit).toBeVisible();
   const box = await hit.boundingBox();
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
   await page.mouse.down();

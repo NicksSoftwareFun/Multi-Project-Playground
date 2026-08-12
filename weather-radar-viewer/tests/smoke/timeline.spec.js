@@ -32,6 +32,7 @@ function nowPct(page) {
 }
 
 async function pointerDownAt(page, fraction) {
+  await expect(page.locator("#trackbox")).toBeVisible();
   const box = await page.locator("#trackbox").boundingBox();
   await page.mouse.move(box.x + box.width * fraction, box.y + box.height / 2);
   await page.mouse.down();

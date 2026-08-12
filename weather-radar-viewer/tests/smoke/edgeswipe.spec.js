@@ -28,6 +28,7 @@ test("an edge drag over a chart switches boards and leaves the cursor alone", as
   expect(await activeDot(page).textContent()).toBe("FCAST");
 
   const chart = page.locator("#board-cast .chart").first();
+  await expect(chart).toBeVisible();
   const box = await chart.boundingBox();
   const y = box.y + box.height / 2;                 // vertically inside a chart
 
@@ -55,6 +56,7 @@ test("an edge drag over a chart switches boards and leaves the cursor alone", as
 test("a mid-screen drag over a chart still scrubs and does not switch boards", async ({ page }) => {
   await openCast(page);
   const chart = page.locator("#board-cast .chart").first();
+  await expect(chart).toBeVisible();
   const box = await chart.boundingBox();
   const y = box.y + box.height / 2;
   const nowX = Number(await chart.locator(".nowline").getAttribute("x1"));
