@@ -1,0 +1,45 @@
+/* SKYWATCH design tokens — single dark console theme.
+   Every color and the data typeface live here; components reference vars only. */
+:root {
+  /* ground + ink */
+  --bg: #0A1018;
+  --ink: #DCE3EA;
+  --ink-hi: #EAF2F8;
+  --ink-mid: #BFD3E2;
+  --sub: #7E93A5;
+  --sub-dim: #6E8496;
+  --sub-faint: #8FA5B7;
+
+  /* accent + semantics */
+  --accent: #53C7F0;
+  --pred: #F5C542;        /* prediction frame/tab */
+  --pred-soft: #F5D06A;   /* forecast badge/text */
+  --pred-dim: #D8B44A;    /* forecast labels */
+  --ok: #6ADBD0;
+  --err: #E07A5F;
+  --info: #8FC7F5;
+
+  /* severity (alerts, M2+) */
+  --sev-warn: #FF5B5B;
+  --sev-watch: #FFA53D;
+  --sev-adv: #F5D06A;
+  --sev-stmt: #8FC7F5;
+
+  /* surfaces */
+  --panel-bg: rgba(8, 14, 22, 0.85);
+  --panel-bg-heavy: rgba(10, 18, 28, 0.92);
+  --panel-line: rgba(140, 170, 195, 0.25);
+  --btn-bg: rgba(16, 26, 38, 0.82);
+  --btn-bg-hover: rgba(30, 46, 64, 0.9);
+  --btn-line: rgba(140, 170, 195, 0.35);
+  --track-past: rgba(120, 170, 200, 0.5);
+  --track-future: rgba(245, 197, 66, 0.45);
+
+  /* type */
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* timeline geometry — overwritten from JS at boot so it can never desync
+     from the PAST/FUT frame constants */
+  --now-pct: 23.3%;
+}

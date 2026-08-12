@@ -15,8 +15,10 @@ android {
         applicationId 'io.github.nickssoftwarefun.skywatch'
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        // CI injects -Pvc=<run number> -PvName=1.<run number>; local builds
+        // fall back to 1 / 1.0-dev
+        versionCode (project.hasProperty('vc') ? project.property('vc').toInteger() : 1)
+        versionName (project.hasProperty('vName') ? project.property('vName') : '1.0-dev')
     }
 
     if (keystoreFile.exists()) {

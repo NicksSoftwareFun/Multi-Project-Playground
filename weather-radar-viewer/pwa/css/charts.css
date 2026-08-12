@@ -1,0 +1,7 @@
+/* Chart styling for the SVG chart util (js/charts.js, arrives in M3).
+   Established now so the stylesheet set is stable for the service-worker SHELL. */
+.chart { width: 100%; }
+.chart text { font-family: var(--mono); font-size: 9px; fill: var(--sub); }
+.chart .grid line { stroke: rgba(140, 170, 195, 0.12); }
+.chart .nowline { stroke: var(--sub-faint); stroke-dasharray: 3 3; }
+.chart .future { fill: var(--pred); opacity: 0.06; }

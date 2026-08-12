@@ -1,0 +1,71 @@
+/* Views and overlays: satellite, settings, fader, and the data-view visibility rules.
+   #screen carries data-view="radar"|"sat"|"board" (+ data-board when in board view).
+   Scope classes tag chrome elements once; three rules replace per-mode hide lists. */
+
+/* visibility convention */
+.screen:not([data-view="radar"]) .chrome-radar { display: none; }
+.screen:not([data-view="radar"]):not([data-view="sat"]) .chrome-map { display: none; }
+/* .chrome-all elements are never hidden by view changes */
+
+/* ---- full-screen satellite view (raw GOES image) ---- */
+#satview {
+  position: absolute; inset: 0; z-index: 600;
+  background: #000; overflow: hidden; display: none;
+}
+.screen[data-view="sat"] #satview { display: block; }
+/* GOES CONUS is 5:3, most screens are wider — fill width, tiny vertical crop */
+#satview img { position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 100%; }
+.satmsg {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-family: var(--mono); font-size: 12px;
+  color: var(--sub-faint); display: none;
+}
+#satview.err .satmsg { display: block; }
+#satview.err img { display: none; }
+
+/* ---- fade layer for view transitions / auto mode ---- */
+#fader {
+  position: absolute; inset: 0; z-index: 940;
+  background: #000; opacity: 0; pointer-events: none;
+  transition: opacity 0.45s;
+}
+#fader.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { #fader { transition: none; } }
+
+/* ---- settings overlay (data-overlay stack, sits above everything) ---- */
+#settings {
+  position: absolute; inset: 0; z-index: 950;
+  background: rgba(6,10,16,0.96);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+}
+.screen.settings #settings { display: flex; }
+#settings .title {
+  font-family: var(--mono);
+  font-size: 13px; letter-spacing: 0.22em; color: var(--sub-faint);
+}
+#settings label {
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: 0.12em; color: var(--sub);
+}
+#settings input[type="text"], #settings input:not([type]) {
+  background: rgba(16,26,38,0.9); color: var(--ink-hi);
+  border: 1px solid rgba(140,170,195,0.4); border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 22px; letter-spacing: 0.2em; text-align: center;
+  width: 150px; padding: 10px 6px; outline: none;
+}
+#settings input:focus { border-color: var(--accent); }
+#settings .msg {
+  font-family: var(--mono);
+  font-size: 11px; color: var(--sub-faint); min-height: 16px;
+}
+#settings .msg.err { color: var(--err); }
+#settings .btnrow { display: flex; gap: 12px; }
+#settings .chk {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: 0.08em; color: #AEB9C4;
+  cursor: pointer; max-width: 460px;
+}
+#settings .chk input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }

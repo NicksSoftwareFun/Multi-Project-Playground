@@ -2,7 +2,7 @@
    instantly (and offline shows the UI with feed-error states). Weather data,
    radar tiles, and satellite imagery are always fetched from the network —
    stale radar is worse than no radar. */
-const VERSION = "skywatch-v1";
+const VERSION = "skywatch-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,26 +10,40 @@ const SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./icon-512-maskable.png",
-  "./apple-touch-icon.png"
-];
-const CDN = [
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  "./apple-touch-icon.png",
+  "./css/tokens.css",
+  "./css/base.css",
+  "./css/chrome.css",
+  "./css/views.css",
+  "./css/boards.css",
+  "./css/charts.css",
+  "./js/config.js",
+  "./js/util.js",
+  "./js/state.js",
+  "./js/net.js",
+  "./js/store.js",
+  "./js/map.js",
+  "./js/timeline.js",
+  "./js/sat.js",
+  "./js/wx.js",
+  "./js/auto.js",
+  "./js/settings.js",
+  "./js/main.js",
+  "./vendor/leaflet/leaflet.js",
+  "./vendor/leaflet/leaflet.css",
+  "./vendor/leaflet/images/layers.png",
+  "./vendor/leaflet/images/layers-2x.png",
+  "./vendor/leaflet/images/marker-icon.png",
+  "./vendor/leaflet/images/marker-icon-2x.png",
+  "./vendor/leaflet/images/marker-shadow.png",
+  "./vendor/suncalc.js"
 ];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
-    caches.open(VERSION).then(function (c) {
-      // CDN entries are cached opaque (no-cors); fine for script/style tags
-      return Promise.all([
-        c.addAll(SHELL),
-        Promise.all(CDN.map(function (u) {
-          return fetch(u, { mode: "no-cors" })
-            .then(function (r) { return c.put(u, r); })
-            .catch(function () { /* cached on a later fetch instead */ });
-        }))
-      ]);
-    }).then(function () { return self.skipWaiting(); })
+    caches.open(VERSION)
+      .then(function (c) { return c.addAll(SHELL); })
+      .then(function () { return self.skipWaiting(); })
   );
 });
 
@@ -44,23 +58,7 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
   const url = new URL(e.request.url);
-  const isShell = url.origin === self.location.origin;
-  const isCdn = url.hostname === "unpkg.com";
-  if (!isShell && !isCdn) return;   // live data: straight to the network
-
-  if (isCdn) {
-    // cache-first: the pinned Leaflet version never changes
-    e.respondWith(
-      caches.match(e.request).then(function (hit) {
-        return hit || fetch(e.request).then(function (r) {
-          const copy = r.clone();
-          caches.open(VERSION).then(function (c) { c.put(e.request, copy); });
-          return r;
-        });
-      })
-    );
-    return;
-  }
+  if (url.origin !== self.location.origin) return;   // live data: straight to the network
 
   // shell: network-first so updates land, cache fallback for offline launch
   e.respondWith(

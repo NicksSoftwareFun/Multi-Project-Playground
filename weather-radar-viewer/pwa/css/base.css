@@ -1,0 +1,26 @@
+/* Base: reset, app shell, safe areas */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* the "screen" fills the real screen */
+.device { position: fixed; inset: 0; }
+.screen {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  overflow: hidden; background: var(--bg);
+  user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#lmap { position: absolute; inset: 0; background: var(--bg); }
+.leaflet-container { background: var(--bg); font-family: inherit; }
+.leaflet-control-attribution {
+  background: rgba(8, 14, 22, 0.7) !important; color: var(--sub-dim) !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a { color: var(--sub-faint) !important; }

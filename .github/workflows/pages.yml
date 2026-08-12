@@ -15,7 +15,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install test dependencies
+        working-directory: weather-radar-viewer/tests
+        run: npm ci || npm install
+      - name: Install Playwright Chromium
+        working-directory: weather-radar-viewer/tests
+        run: npx playwright install --with-deps chromium
+      # sw.js SHELL completeness is asserted by smoke/sw.spec.js as part of npm test
+      - name: Run smoke suite
+        working-directory: weather-radar-viewer/tests
+        run: npm test
+      - name: Forbid unmarked innerHTML in pwa/js
+        working-directory: weather-radar-viewer/tests
+        run: |
+          # every innerHTML use in pwa/js must carry the /* safe-static */ marker;
+          # tolerate the js dir not existing yet (pre-refactor)
+          if [ -d ../pwa/js ]; then
+            if grep -rn "\.innerHTML" ../pwa/js/ | grep -v "safe-static"; then
+              echo "::error::innerHTML without a /* safe-static */ marker found in pwa/js"
+              exit 1
+            fi
+            echo "innerHTML style check passed"
+          else
+            echo "pwa/js does not exist yet — skipping innerHTML style check"
+          fi
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

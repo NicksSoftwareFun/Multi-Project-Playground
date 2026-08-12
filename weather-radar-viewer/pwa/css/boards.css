@@ -1,0 +1,51 @@
+/* Board deck. M0 ships one board (NOW — the conditions & forecast board);
+   the deck shell and per-board layouts grow here in later milestones. */
+
+#statsview {
+  position: absolute; inset: 0; z-index: 620;
+  background: var(--bg);
+  display: none;
+  padding: calc(64px + env(safe-area-inset-top)) 70px 40px;
+  font-family: var(--mono);
+  gap: 80px; justify-content: center;
+}
+.screen[data-view="board"] #statsview { display: flex; }
+
+#statsview .col { display: flex; flex-direction: column; min-width: 330px; }
+#statsview .place {
+  font-size: 14px; letter-spacing: 0.14em; color: var(--sub-dim);
+  text-transform: uppercase; margin-bottom: 10px;
+}
+#statsview .bigtemp { font-size: 84px; font-weight: 700; color: var(--ink-hi); line-height: 1; }
+#statsview .bigcond { font-size: 17px; color: var(--info); letter-spacing: 0.1em; margin: 10px 0 24px; }
+#statsview .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 28px; }
+#statsview .grid .k { font-size: 13px; color: var(--sub); letter-spacing: 0.08em; }
+#statsview .grid .v { font-size: 15px; color: #DCE9F4; text-align: right; }
+#statsview .sect {
+  font-size: 12px; letter-spacing: 0.18em; color: var(--pred-dim);
+  margin: 0 0 12px; border-bottom: 1px solid rgba(216,180,74,0.35);
+  padding-bottom: 6px;
+}
+#statsview .daily { font-size: 15px; color: #DCE9F4; margin-bottom: 18px; }
+#statsview .hours { display: grid; grid-template-columns: auto auto auto; gap: 8px 26px; }
+#statsview .hours .h { font-size: 14px; color: var(--sub); }
+#statsview .hours .t { font-size: 15px; color: #DCE9F4; text-align: right; }
+#statsview .hours .p { font-size: 14px; color: #6AA8D8; text-align: right; }
+#statsview .bigmsg {
+  align-self: center; margin: auto;
+  font-size: 14px; color: var(--sub-faint); letter-spacing: 0.1em;
+}
+#statsview .attrib {
+  position: absolute; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0;
+  text-align: center; font-size: 9px; letter-spacing: 0.08em; color: var(--sub-dim);
+}
+#statsview .attrib a { color: var(--sub-faint); text-decoration: none; }
+
+@media (max-width: 740px), (max-height: 480px) {
+  #statsview { flex-direction: column; gap: 22px; padding: calc(60px + env(safe-area-inset-top)) 26px 24px; overflow-y: auto; }
+  #statsview .col { min-width: 0; }
+  #statsview .bigtemp { font-size: 54px; }
+  #statsview .bigcond { font-size: 14px; margin: 6px 0 14px; }
+  #statsview .grid .k { font-size: 11px; }
+  #statsview .grid .v { font-size: 12px; }
+}

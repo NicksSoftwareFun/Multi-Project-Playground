@@ -1,0 +1,13 @@
+{
+  "name": "weather-radar-viewer-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Smoke tests (Playwright, fully stubbed) and live endpoint checks for the SKYWATCH PWA",
+  "scripts": {
+    "test": "playwright test",
+    "endpoints": "node integration/endpoint-checks.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2"
+  }
+}

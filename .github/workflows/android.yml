@@ -40,11 +40,11 @@ jobs:
         run: |
           set -eux
           if [ -f keystore.jks ]; then
-            gradle assembleRelease --no-daemon --stacktrace
+            gradle assembleRelease --no-daemon --stacktrace -Pvc=${{ github.run_number }} -PvName=1.${{ github.run_number }}
             cp app/build/outputs/apk/release/app-release.apk skywatch.apk
           else
             echo "No signing keystore secret set — building a debug-signed APK (installable by sideload)."
-            gradle assembleDebug --no-daemon --stacktrace
+            gradle assembleDebug --no-daemon --stacktrace -Pvc=${{ github.run_number }} -PvName=1.${{ github.run_number }}
             cp app/build/outputs/apk/debug/app-debug.apk skywatch.apk
           fi
           ls -la skywatch.apk

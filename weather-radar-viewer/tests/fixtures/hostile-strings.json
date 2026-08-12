@@ -1,0 +1,6 @@
+{
+  "imgOnerror": "<img src=x onerror=\"window.__xss_img=1\">",
+  "scriptBreak": "</script><script>window.__xss_script=1</script>",
+  "quoteBreak": "\" onmouseover=\"window.__xss_attr=1\" data-x=\"",
+  "placeName": "<img src=x onerror=\"window.__xss_place=1\">Evil City"
+}

@@ -1,0 +1,28 @@
+{
+  "@context": ["https://geojson.org/geojson-ld/geojson-context.jsonld"],
+  "id": "https://api.weather.gov/points/41.73,-93.6",
+  "type": "Feature",
+  "geometry": { "type": "Point", "coordinates": [-93.6, 41.73] },
+  "properties": {
+    "@id": "https://api.weather.gov/points/41.73,-93.6",
+    "@type": "wx:Point",
+    "cwa": "DMX",
+    "forecastOffice": "https://api.weather.gov/offices/DMX",
+    "gridId": "DMX",
+    "gridX": 73,
+    "gridY": 49,
+    "forecast": "https://api.weather.gov/gridpoints/DMX/73,49/forecast",
+    "forecastHourly": "https://api.weather.gov/gridpoints/DMX/73,49/forecast/hourly",
+    "forecastGridData": "https://api.weather.gov/gridpoints/DMX/73,49",
+    "observationStations": "https://api.weather.gov/gridpoints/DMX/73,49/stations",
+    "relativeLocation": {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.6031, 41.7288] },
+      "properties": { "city": "Ankeny", "state": "IA" }
+    },
+    "forecastZone": "https://api.weather.gov/zones/forecast/IAZ060",
+    "county": "https://api.weather.gov/zones/county/IAC153",
+    "timeZone": "America/Chicago",
+    "radarStation": "KDMX"
+  }
+}
