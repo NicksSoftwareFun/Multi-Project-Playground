@@ -30,6 +30,13 @@ Settings (ZIP code, Auto Mode) persist per device. Auto Mode makes a
 great wall/desk display: radar ×2 (regional then 175 km), satellite 10 s,
 conditions board 20 s, looped.
 
+## Android APK
+
+Android users can install straight from Chrome (the install prompt creates a
+real launcher app), but a sideloadable APK is also built from
+`../android/` — see that folder's README, or grab the latest at
+https://github.com/NicksSoftwareFun/Multi-Project-Playground/releases/download/android-latest/skywatch.apk
+
 ## Files
 
 - `index.html` — the app (responsive; fills any screen, safe-area aware)
