@@ -105,6 +105,12 @@ export const SPC_CAT_COLORS = {
   MDT: "#E06666", HIGH: "#EE99EE"
 };
 
+// --- astronomy (M5) ---
+export const SKY_TICK_MS = 30 * 1000;         // countdown refresh while the board is on screen
+export const SKY_SAMPLE_MIN = 5;               // altitude-track sampling interval: 289 points/body over 24h, ~1ms for both
+export const SKY_TZ_WARN_H = 3;                // device-vs-longitude gap that triggers the timezone note; 3 rather than 2 so wide legitimate zones (e.g. Indiana on EDT) don't false-positive
+export const SKY_PHASE_UNCERTAINTY_H = 5;      // rendered in the phase-accuracy caveat, held here so the constant and the sentence cannot drift apart
+
 export const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
 export const DEFAULT_VIEW_KM = 200;   // boot + home framing around the active location
 export const AUTO_CLOSE_KM = 175;     // auto-mode second radar pass

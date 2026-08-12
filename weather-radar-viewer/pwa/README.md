@@ -52,7 +52,10 @@ locations sheet recenters it there.
   forecast), **CAST** (48 h meteogram, 15-minute precipitation, 7-day strip,
   ensemble confidence bands, model agreement), **SEVERE** (every active alert
   with full text, plus the SPC categorical risk for the next three days,
-  labelled by date) and **AIR** (US AQI, pollutants, 48 h trend, smoke note).
+  labelled by date), **AIR** (US AQI, pollutants, 48 h trend, smoke note) and
+  **SKY** (day length and its day-over-day change, the three twilights,
+  golden hour, solar noon, moon phase and rise/set — computed entirely
+  on-device, the one board that works with no network at all).
 - **Locations** — tap the conditions panel for unlimited saved ZIPs plus GPS.
 
 ## Android APK
@@ -77,7 +80,7 @@ Static, no build step — plain ES modules and CSS served as-is:
   `timeline` (scrubber, play loop, frame chrome) · `sat` (GOES viewer) ·
   `wx` (conditions: Open-Meteo → NWS fallback) · `locations` · `layers` ·
   `boards` · `alerts` · `spc` · `charts` (hand-rolled SVG chart engine) ·
-  `forecastx` (CAST) · `airq` (AIR) · `main` (boot)
+  `forecastx` (CAST) · `airq` (AIR) · `astro` (SKY) · `main` (boot)
 - `vendor/` — Leaflet 1.9.4 and SunCalc, self-hosted (no CDN dependency)
 - `sw.js` — service worker: caches the app shell for instant launch;
   weather data is always fetched live (stale radar is worse than no radar)

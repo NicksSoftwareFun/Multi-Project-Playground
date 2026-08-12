@@ -46,6 +46,13 @@ export function parseValidTime(vt) {
   return { start, hours: hours || 1 };
 }
 
+// SunCalc's getTimes() signals "this event doesn't happen here today" with an
+// Invalid Date object (NaN time), never null/undefined/a missing key — the
+// sharpest trap in the vendored astronomy engine (see astro.js). Lives here
+// rather than in astro.js because M6's ISO-duration/gridpoint parsing wants
+// the same guard.
+export function isValidDate(d) { return d instanceof Date && !isNaN(d.getTime()); }
+
 // Magnus dewpoint (°C in, °C out) — soundings (M7)
 export function dewpointC(tempC, rhPct) {
   if (tempC == null || rhPct == null || rhPct <= 0) return null;

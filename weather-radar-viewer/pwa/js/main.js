@@ -14,6 +14,7 @@ import * as alerts from "./alerts.js";
 import * as spc from "./spc.js";
 import * as forecastx from "./forecastx.js";
 import * as airq from "./airq.js";
+import * as astro from "./astro.js";
 import * as timeline from "./timeline.js";
 
 const screenEl = document.getElementById("screen");
@@ -24,11 +25,12 @@ mapMod.init();
 sat.init();
 layers.init();      // loads layer prefs — before any module registers a layer
 locations.init();   // migrates storage, builds the sheet — before wx reads active()
-// Board registration order is deck order: NOW ⇄ CAST ⇄ SEVERE ⇄ AIR
+// Board registration order is deck order: NOW ⇄ CAST ⇄ SEVERE ⇄ AIR ⇄ SKY
 wx.init();          // reads locations.active(), registers the NOW board
 forecastx.init();   // CAST board (lazy: fetches on first open)
 alerts.init();      // registers the alerts layer + SEVERE board, starts polling
 airq.init();        // AIR board (lazy)
+astro.init();   // SKY board (offline: computed on-device from vendor/suncalc.js)
 spc.init();         // registers outlook/MD/tropical layers (lazy: no fetch until on)
 boards.init();      // deck navigation, after boards are registered
 timeline.init();
