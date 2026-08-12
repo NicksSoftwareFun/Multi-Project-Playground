@@ -109,3 +109,59 @@
 #locsheet .addrow input:focus { border-color: var(--accent); }
 #locsheet .msg { font-size: 10.5px; color: var(--sub-faint); min-height: 14px; }
 #locsheet .msg.err { color: var(--err); }
+
+/* ---- alert detail sheet (data-overlay): tap a map polygon ----
+   Phone-first bottom sheet. The BODY (#alertsheetBody) is the only scroll
+   surface — cards inside it never get their own scroller. */
+#alertsheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 930;
+  background: rgba(8, 14, 22, 0.97);
+  border-top: 1px solid var(--panel-line);
+  border-radius: 14px 14px 0 0;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  font-family: var(--mono);
+  display: none;
+  flex-direction: column; gap: 10px;
+  max-height: 78%;
+}
+.screen.alertsheet #alertsheet { display: flex; }
+#alertsheet .title {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 12px; letter-spacing: 0.2em; color: var(--sub-faint);
+  flex: none;
+}
+#alertsheetClose {
+  border: 1px solid var(--btn-line); border-radius: 6px;
+  background: var(--btn-bg); color: var(--sub-faint);
+  width: 26px; height: 26px; font-size: 13px; line-height: 1;
+  cursor: pointer; flex: none;
+}
+#alertsheetClose:hover { background: var(--btn-bg-hover); color: var(--ink); }
+#alertsheetBody {
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+#alertsheetBody .bigmsg {
+  font-size: 13px; color: var(--sub-faint); letter-spacing: 0.08em;
+  text-align: center; padding: 26px 0;
+}
+/* The board's .alertcard is a click-to-expand summary; here every card is
+   already the full alert, so the body is always shown and never a button. */
+#alertsheet .alertcard { cursor: default; }
+#alertsheet .alertcard .body { display: block; }
+
+/* Comfortably readable on a landscape tablet (1024x600 and up) instead of an
+   edge-to-edge phone sheet: dock it as a fixed-width panel near the corner,
+   matching the phone breakpoint boards.css already uses elsewhere. */
+@media (min-width: 741px) and (min-height: 481px) {
+  #alertsheet {
+    /* clear of the button rail, same right offset the layers drawer uses, so
+       zoom and the boards button stay reachable while the sheet is open */
+    left: auto; right: calc(64px + env(safe-area-inset-right));
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    top: calc(64px + env(safe-area-inset-top));
+    width: 380px; max-height: none;
+    border-radius: 12px; border: 1px solid var(--panel-line);
+    padding: 14px 16px 16px;
+  }
+}

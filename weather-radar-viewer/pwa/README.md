@@ -33,9 +33,13 @@ locations sheet recenters it there.
   feed goes stale rather than show a possibly-expired warning.
 - **Alert polygons** — every watch, warning and advisory intersecting the
   current map view, from NOAA's watch/warn/advisory service, refetched as
-  you pan. The chip and the SEVERE board stay scoped to your saved
-  locations: the map answers "what is happening out there", the chip
-  answers "does this affect me".
+  you pan. Tap one for the full NWS text in a scrollable sheet (the tap
+  re-queries alerts for that exact point, so you get the real product text,
+  not just the outline). Heat/cold products and plain advisories are off by
+  default — a single heat wave issues them county by county and buries the
+  radar; each drawer row shows how many are in view either way. The chip and
+  the SEVERE board stay scoped to your saved locations: the map answers
+  "what is happening out there", the chip answers "does this affect me".
 - Place labels are drawn above the radar, so a wall of 60 dBZ can never
   hide which county you are looking at.
 - **≡ Layers** — alert polygons, SPC convective outlook, mesoscale

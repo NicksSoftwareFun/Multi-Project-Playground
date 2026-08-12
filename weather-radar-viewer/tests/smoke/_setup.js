@@ -41,6 +41,11 @@ const ALERTS_ZONE = fixture("alerts-zone.json").toString("utf8");
 const SPC_LAYERS = fixture("spc-layers.json").toString("utf8");
 const SPC_OUTLOOK = fixture("spc-outlook.json").toString("utf8");
 const TROPICAL_SERVICES = fixture("arcgis-tropical-services.json").toString("utf8");
+// MAP alerts (viewport polygons drawn by alerts.js's syncLayer(), a different
+// service — /eventdriven/ — from the /vector/ SPC outlook MapServer above,
+// even though both live on mapservices.weather.noaa.gov).
+const WWA_LAYERS = fixture("wwa-layers.json").toString("utf8");
+const WWA_QUERY = fixture("wwa-query.json").toString("utf8");
 
 // forecast depth + air quality (M3/M4)
 //
@@ -146,9 +151,17 @@ async function routeAll(page, opts) {
     }
     if (host === "api.zippopotam.us") return json(route, ZIPPO);
 
-    // SPC outlooks / mesoscale discussions / tropical (ArcGIS MapServers)
+    // SPC outlooks / mesoscale discussions / tropical (ArcGIS MapServers) +
+    // the WWA watch/warning/advisory MapServer (alerts.js MAP alerts).
     if (host === "mapservices.weather.noaa.gov") {
       const p = url.pathname;
+      // WWA (/eventdriven/) is checked first — its layer-catalog and query
+      // URLs match the same generic patterns as the SPC (/vector/) routes below.
+      if (p.includes("/eventdriven/")) {
+        if (/\/MapServer\/layers$/.test(p)) return json(route, WWA_LAYERS);
+        if (/\/query$/.test(p)) return json(route, WWA_QUERY);
+        return json(route, "{}");
+      }
       if (/\/MapServer\/layers$/.test(p)) return json(route, SPC_LAYERS);
       if (/\/query$/.test(p)) return json(route, SPC_OUTLOOK);
       // service directory used by spc.js's runtime tropical discovery
@@ -195,5 +208,6 @@ async function boot(page, opts) {
 module.exports = {
   routeAll, boot, DEFAULT_LOC, HOSTILE, OM_FORECAST, ZIPPO,
   ALERTS_ACTIVE, ALERTS_EMPTY, ALERTS_ZONE, SPC_LAYERS, SPC_OUTLOOK, TROPICAL_SERVICES,
+  WWA_LAYERS, WWA_QUERY,
   OM_CAST, OM_MODELS, OM_ENSEMBLE, OM_AIR, CORS,
 };

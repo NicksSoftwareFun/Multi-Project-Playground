@@ -459,6 +459,42 @@ function normalizeMapFeature(f, layerId) {
   };
 }
 
+// Heat/cold products are the ones that blanket a viewport by the hundreds
+// during a heat wave (the complaint that started this feature) — a dedicated
+// toggle lets a user drop those without also losing every other advisory.
+// "Heat Advisory" is heat-family AND cls "advisory", so it is hidden by
+// either toggle being off; that overlap is intended, not a bug.
+const HEAT_COLD_RE = /heat|wind chill|extreme cold|cold weather|freeze|frost/i;
+function isHeatCold(event) { return HEAT_COLD_RE.test(String(event || "")); }
+
+// The single predicate that decides whether a map alert (viewport feature or
+// point-query fallback) actually gets a polygon on screen. Reused by
+// reportMapHealth() below so the drawer's counts and the drawn set can never
+// drift apart.
+function mapDrawable(a) {
+  if (!layers.isOn("alerts")) return false;
+  if (isHeatCold(a.event) && !layers.isOn("alertsheat")) return false;
+  if ((a.cls === "advisory" || a.cls === "statement") && !layers.isOn("alertsadv")) return false;
+  return true;
+}
+
+// Toggling HEAT/COLD or ADVISORIES never re-fetches — the counts always
+// describe the raw viewport cache, filtered or not, so "how many of these
+// are heat advisories?" has an answer even while that row is off.
+function reportMapHealth() {
+  const heat = mapCache.alerts.filter((a) => isHeatCold(a.event)).length;
+  const adv = mapCache.alerts.filter((a) => a.cls === "advisory" || a.cls === "statement").length;
+  layers.setHealth("alertsheat", true, heat ? heat + " in view" : "none in view");
+  layers.setHealth("alertsadv", true, adv ? adv + " in view" : "none in view");
+  // A failed/never-succeeded viewport query is already reported as "my
+  // alerts only" from fetchMapAlerts()'s catch — leave that note alone.
+  if (mapCache.ok !== true) return;
+  const total = mapCache.alerts.length;
+  const shown = mapCache.alerts.filter(mapDrawable).length;
+  layers.setHealth("alerts", true,
+    shown === total ? total + " in view" : shown + " of " + total + " in view");
+}
+
 function mapCadenceMs() { return anyActive() ? ALERT_POLL_ACTIVE_MS : ALERT_POLL_QUIET_MS; }
 
 function needsMapFetch(m) {
@@ -494,7 +530,7 @@ async function fetchMapAlerts() {
       }
     }
     mapCache = { bbox: padded, fetchedAt: Date.now(), alerts: [...seen.values()], ok: true };
-    layers.setHealth("alerts", true, mapCache.alerts.length + " in view");
+    reportMapHealth();
   } catch {
     mapCache = { bbox: mapCache.bbox, fetchedAt: mapCache.fetchedAt, alerts: mapCache.alerts, ok: false };
     layers.setHealth("alerts", true, "my alerts only");
@@ -509,26 +545,16 @@ function onMapMoveEnd() {
   moveTimer = setTimeout(() => { moveTimer = null; fetchMapAlerts(); }, MOVE_DEBOUNCE_MS);
 }
 
-// A map alert has no NWS id to match against — cross-reference by event name
-// + area text instead, so a click on the viewport layer can still open the
-// matching SEVERE card when the clicked alert is also one of MY alerts.
-function matchMine(a) {
-  const ev = String(a.event || "").toLowerCase().trim();
-  if (!ev) return null;
-  const ar = String(a.areaDesc || "").toLowerCase();
-  return unionAlerts().find((x) => {
-    if (String(x.event || "").toLowerCase().trim() !== ev) return false;
-    if (!ar || !x.areaDesc) return true;      // no area text to cross-check — event match is enough
-    const xa = x.areaDesc.toLowerCase();
-    return xa.includes(ar) || ar.includes(xa);
-  }) || null;
-}
-
 function syncLayer() {
   const m = mapMod.getMap();
   if (!m || !window.L) return;          // Leaflet unavailable: chip and board carry on alone
   if (group) { m.removeLayer(group); group = null; }
   if (!layers.isOn("alerts")) return;
+
+  // Recompute the drawer counts every time this runs, not just after a fetch
+  // — toggling HEAT/COLD or ADVISORIES changes the shown/total split without
+  // any network activity.
+  reportMapHealth();
 
   // Trust the viewport layer once it has ever answered successfully — a
   // genuine "nothing in view" from ArcGIS must not be papered over with the
@@ -536,7 +562,7 @@ function syncLayer() {
   // succeeded, so the map is never emptier than it was before this feature
   // existed.
   const useMap = mapCache.ok === true;
-  const drawable = (useMap ? mapCache.alerts : unionAlerts()).filter((a) => a.geometry);
+  const drawable = (useMap ? mapCache.alerts : unionAlerts()).filter((a) => a.geometry && mapDrawable(a));
   if (!drawable.length) return;
   ensurePane(m);
 
@@ -552,10 +578,13 @@ function syncLayer() {
         style: { color: sevColor(a.cls), weight: 2, fillColor: sevColor(a.cls), fillOpacity: 0.12 }
       });
     } catch { continue; }              // malformed geometry: skip this one, keep the rest
-    lyr.on("click", () => {
-      const mine = useMap ? matchMine(a) : a;
-      if (mine) openIds.add(mine.id);
-      boards.show("severe");
+    // ArcGIS features carry no CAP text — a tap re-queries NWS directly for
+    // exactly the point tapped, which is the only way to get a description
+    // and instruction for what's actually under the finger. Stop the click
+    // from also reaching the map (which would otherwise pan/zoom under it).
+    lyr.on("click", (e) => {
+      L.DomEvent.stopPropagation(e);
+      openAlertSheet(e.latlng.lat, e.latlng.lng);
     });
     group.addLayer(lyr);
     if (a.cls === "warning") lyr.bringToFront();
@@ -565,6 +594,57 @@ function syncLayer() {
   // publish(). resolveZones() is a no-op once every pending watch has been
   // tried, so this costs nothing on the common path.
   resolveZones();
+}
+
+// ---- alert detail sheet (tap a polygon) ------------------------------------
+//
+// The ArcGIS viewport features never carry CAP text, so a tap re-queries NWS
+// directly for the point that was tapped instead of trying to enrich the
+// polygon's own (id-only) properties. A later tap must always win over a
+// slower earlier response — same stale-response guard as spc.js's stripSeq.
+
+let sheetBodyEl = null;
+let sheetSeq = 0;
+
+function bySeverity(list) {
+  return list.slice().sort((a, b) => SEV[a.cls].rank - SEV[b.cls].rank);
+}
+
+function sheetMsg(text) {
+  return el("div", { class: "bigmsg" }, text);
+}
+
+function sheetCard(a) {
+  const bodyText = [a.description, a.instruction].filter(Boolean).join("\n\n") || "NO DETAILS PROVIDED";
+  return el("div", { class: "alertcard " + a.cls },
+    el("div", { class: "ev" }, a.event.toUpperCase()),
+    el("div", { class: "meta" }, "UNTIL " + (a.expires ? fmt(new Date(a.expires)) : "--:--")),
+    a.senderName ? el("div", { class: "meta" }, a.senderName.toUpperCase()) : null,
+    el("div", { class: "area" }, a.areaDesc || "--"),
+    el("div", { class: "body" }, bodyText)
+  );
+}
+
+async function openAlertSheet(lat, lon) {
+  const seq = ++sheetSeq;
+  state.openOverlay("alertsheet");
+  if (sheetBodyEl) sheetBodyEl.replaceChildren(sheetMsg("LOADING…"));
+
+  let list;
+  try {
+    const j = await fetchT(NWS_ALERTS + "?point=" + lat.toFixed(4) + "," + lon.toFixed(4)).then(okJson);
+    list = (j.features || []).map(normalize).filter(Boolean).filter(live);
+  } catch (err) {
+    if (seq !== sheetSeq || !sheetBodyEl) return;   // superseded by a later tap
+    sheetBodyEl.replaceChildren(sheetMsg("ALERT TEXT UNAVAILABLE — " + ((err && err.message) || "NETWORK")));
+    return;
+  }
+  if (seq !== sheetSeq || !sheetBodyEl) return;      // superseded by a later tap
+  if (!list.length) {
+    sheetBodyEl.replaceChildren(sheetMsg("NO ACTIVE ALERTS AT THIS POINT"));
+    return;
+  }
+  sheetBodyEl.replaceChildren(...bySeverity(list).map(sheetCard));
 }
 
 // ---- zone geometry (watches ship without one) ------------------------------
@@ -684,12 +764,19 @@ function alertsToggle(on) {
 export function init() {
   chipEl = document.getElementById("alertChip");
   boardEl = document.getElementById("board-severe");
+  sheetBodyEl = document.getElementById("alertsheetBody");
 
   if (chipEl) chipEl.addEventListener("click", () => boards.show("severe"));
   if (boardEl) {
     boards.register({ id: "severe", label: "SEVERE", el: boardEl, render: renderBoard });
   }
+  const sheetCloseBtn = document.getElementById("alertsheetClose");
+  if (sheetCloseBtn) sheetCloseBtn.addEventListener("click", () => state.closeOverlay("alertsheet"));
+
   layers.register({ id: "alerts", label: "ALERT POLYGONS", defaultOn: true, onToggle: alertsToggle });
+  // Both toggles only change what syncLayer() draws/reports — never a fetch.
+  layers.register({ id: "alertsheat", label: "HEAT / COLD ALERTS", defaultOn: false, onToggle: () => syncLayer() });
+  layers.register({ id: "alertsadv", label: "ADVISORIES", defaultOn: false, onToggle: () => syncLayer() });
 
   // Viewport-driven MAP alerts refetch on pan/zoom, debounced so a drag
   // gesture doesn't fire a request per frame.
