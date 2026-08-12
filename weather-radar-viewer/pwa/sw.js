@@ -2,7 +2,7 @@
    instantly (and offline shows the UI with feed-error states). Weather data,
    radar tiles, and satellite imagery are always fetched from the network —
    stale radar is worse than no radar. */
-const VERSION = "skywatch-v2";
+const VERSION = "skywatch-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -26,6 +26,7 @@ const SHELL = [
   "./js/timeline.js",
   "./js/sat.js",
   "./js/wx.js",
+  "./js/locations.js",
   "./js/auto.js",
   "./js/settings.js",
   "./js/main.js",

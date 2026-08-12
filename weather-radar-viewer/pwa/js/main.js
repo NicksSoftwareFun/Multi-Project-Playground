@@ -7,6 +7,7 @@ import * as net from "./net.js";
 import * as mapMod from "./map.js";
 import * as sat from "./sat.js";
 import * as wx from "./wx.js";
+import * as locations from "./locations.js";
 import * as timeline from "./timeline.js";
 import * as auto from "./auto.js";
 import * as settings from "./settings.js";
@@ -17,7 +18,8 @@ state.init(screenEl);
 net.initStatus(document.getElementById("status"));
 mapMod.init();
 sat.init();
-wx.init();          // loads the saved location, feeds map.setActiveLatLon
+locations.init();   // migrates storage, builds the sheet — before wx reads active()
+wx.init();          // reads locations.active(), feeds map.setActiveLatLon
 auto.init();
 timeline.init();
 settings.init();

@@ -1,18 +1,48 @@
 // Persistence: localStorage schema + a minimal IndexedDB promise wrapper.
-// M0 keeps the legacy single-location key; the v2 multi-location schema and
-// its migration land in M1 (locations.js).
 
-const K_LOC = "skywatch_loc";
+const K_LOC_V1 = "skywatch_loc";     // legacy single location — kept this release for rollback
+const K_LOCS = "skywatch_locs";      // v2 multi-location
 const K_AUTO = "skywatch_auto";
+const SNAP_PREFIX = "skywatch_snap_";
 
-export function loadLoc() {
-  try { return JSON.parse(localStorage.getItem(K_LOC) || "null"); }
+function readJson(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); }
   catch { return null; }
 }
-export function saveLoc(loc) { localStorage.setItem(K_LOC, JSON.stringify(loc)); }
+
+// v2 shape: { v:2, activeId, list:[{id:"gps"|"z<zip>", kind, zip?, lat, lon, name, state}] }
+export function loadLocs() {
+  let v2 = readJson(K_LOCS);
+  if (v2 && v2.v === 2 && Array.isArray(v2.list)) return v2;
+  // migration: wrap the legacy single location (legacy key left in place)
+  const legacy = readJson(K_LOC_V1);
+  if (legacy && legacy.zip) {
+    v2 = {
+      v: 2,
+      activeId: "z" + legacy.zip,
+      list: [{ id: "z" + legacy.zip, kind: "zip", zip: legacy.zip,
+               lat: legacy.lat, lon: legacy.lon, name: legacy.name, state: legacy.state }]
+    };
+    saveLocs(v2);
+    return v2;
+  }
+  return { v: 2, activeId: null, list: [] };
+}
+export function saveLocs(locs) { localStorage.setItem(K_LOCS, JSON.stringify(locs)); }
+
+// legacy accessors (still used to mirror the active ZIP for rollback safety)
+export function saveLoc(loc) { localStorage.setItem(K_LOC_V1, JSON.stringify(loc)); }
 
 export function loadAuto() { return localStorage.getItem(K_AUTO) === "1"; }
 export function saveAuto(on) { localStorage.setItem(K_AUTO, on ? "1" : "0"); }
+
+// last-good normalized wx record per location — instant paint on switch/offline
+export function loadSnap(locId) { return readJson(SNAP_PREFIX + locId); }
+export function saveSnap(locId, record) {
+  try { localStorage.setItem(SNAP_PREFIX + locId, JSON.stringify(record)); }
+  catch { /* quota — snapshots are optional */ }
+}
+export function dropSnap(locId) { localStorage.removeItem(SNAP_PREFIX + locId); }
 
 // ---- IndexedDB (normals forever-cache, alert zone geometries, bulk payloads) ----
 const DB_NAME = "skywatch";

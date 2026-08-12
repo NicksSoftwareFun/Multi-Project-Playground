@@ -9,21 +9,15 @@ import { fetchT, okJson, setHealth } from "./net.js";
 import * as store from "./store.js";
 import * as mapMod from "./map.js";
 import * as state from "./state.js";
+import * as locations from "./locations.js";
 
-let loc = null;
+let loc = null;          // the active location (mirror of locations.active())
 let lastWx = null;
 
 let wxPanel, wxPlace, wxHint, wxBig, wxTemp, wxCond, wxRows, statsEl;
 
 export function getLoc() { return loc; }
 export function getLastWx() { return lastWx; }
-
-export function setLoc(newLoc) {
-  loc = newLoc;
-  store.saveLoc(loc);
-  mapMod.setActiveLatLon(loc ? [loc.lat, loc.lon] : null);
-  refreshWx();
-}
 
 export function init() {
   wxPanel = document.getElementById("wxPanel");
@@ -35,10 +29,30 @@ export function init() {
   wxRows = document.getElementById("wxRows");
   statsEl = document.getElementById("statsview");
 
-  loc = store.loadLoc();
+  loc = locations.active();
   mapMod.setActiveLatLon(loc ? [loc.lat, loc.lon] : null);
 
+  // location switch: paint the last-good snapshot instantly, then refresh live
+  locations.onChange((newLoc) => {
+    loc = newLoc;
+    mapMod.setActiveLatLon(loc ? [loc.lat, loc.lon] : null);
+    mapMod.goDefaultView();
+    lastWx = loc ? store.loadSnap(loc.id) : null;
+    if (lastWx) renderPanel(lastWx);
+    if (state.getView() === "board") renderStats();
+    refreshWx();
+  });
+
+  // tapping the conditions panel opens the location sheet (settings stays behind ⚙)
+  wxPanel.addEventListener("click", () => locations.openSheet());
+
   state.on("view", ({ view }) => { if (view === "board") renderStats(); });
+
+  // instant paint from snapshot on boot too
+  if (loc) {
+    lastWx = store.loadSnap(loc.id);
+    if (lastWx) renderPanel(lastWx);
+  }
 
   refreshWx();
   setInterval(refreshWx, WX_REFRESH_MS);
@@ -143,40 +157,53 @@ function showHint(text) {
   wxRows.style.display = "none";
 }
 
+function placeLine(withSrc) {
+  const zipPart = loc.zip ? " · " + loc.zip : "";
+  return loc.name + (loc.state ? ", " + loc.state : "") + zipPart + (withSrc ? " · " + withSrc : "");
+}
+
+function renderPanel(n) {
+  wxPlace.textContent = placeLine(n.src);
+  wxTemp.textContent = degF(n.temp);
+  wxCond.textContent = n.cond;
+  wxRows.replaceChildren(
+    ...row("FEELS", degF(n.feels)),
+    ...row("HUMIDITY", pct(n.rh)),
+    ...row("DEW PT", degF(n.dew)),
+    ...row("WIND", n.windTxt),
+    ...row("GUSTS", n.gust || "--"),
+    ...row("PRESSURE", n.pres || "--"),
+    ...row("PRECIP", n.precip || "--")
+  );
+  wxHint.style.display = "none";
+  wxBig.style.display = "flex";
+  wxRows.style.display = "grid";
+}
+
 export function refreshWx() {
   if (!loc) {
     wxPlace.textContent = "LOCAL CONDITIONS";
-    showHint("TAP TO SET ZIP CODE");
+    showHint("TAP TO SET LOCATION");
     return;
   }
+  const forLoc = loc.id;
   omFetch()
     .catch((omErr) => nwsFetch().catch((nwsErr) => {
       throw new Error("OM: " + omErr.message + " / NWS: " + nwsErr.message);
     }))
     .then((n) => {
+      if (!loc || loc.id !== forLoc) return;   // user switched mid-flight
       lastWx = n;
+      store.saveSnap(loc.id, n);
       setHealth("wx", "WX    ", true, n.src.toLowerCase());
-      wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src;
-      wxTemp.textContent = degF(n.temp);
-      wxCond.textContent = n.cond;
-      wxRows.replaceChildren(
-        ...row("FEELS", degF(n.feels)),
-        ...row("HUMIDITY", pct(n.rh)),
-        ...row("DEW PT", degF(n.dew)),
-        ...row("WIND", n.windTxt),
-        ...row("GUSTS", n.gust || "--"),
-        ...row("PRESSURE", n.pres || "--"),
-        ...row("PRECIP", n.precip || "--")
-      );
-      wxHint.style.display = "none";
-      wxBig.style.display = "flex";
-      wxRows.style.display = "grid";
+      renderPanel(n);
       if (state.getView() === "board") renderStats();
     })
     .catch((err) => {
+      if (!loc || loc.id !== forLoc) return;
       lastWx = null;
       setHealth("wx", "WX    ", false, "down");
-      wxPlace.textContent = loc.name + ", " + loc.state + " · " + loc.zip;
+      wxPlace.textContent = placeLine();
       showHint("WEATHER UNAVAILABLE — " + (err && err.message ? err.message : "NETWORK"));
       if (state.getView() === "board") renderStats();
     });
@@ -184,7 +211,7 @@ export function refreshWx() {
 
 export function renderStats() {
   if (!loc) {
-    statsEl.replaceChildren(el("div", { class: "bigmsg" }, "SET A ZIP CODE IN SETTINGS"));
+    statsEl.replaceChildren(el("div", { class: "bigmsg" }, "SET A LOCATION — TAP THE CONDITIONS PANEL"));
     return;
   }
   if (!lastWx) {
@@ -193,7 +220,7 @@ export function renderStats() {
   }
   const n = lastWx;
   const left = el("div", { class: "col" },
-    el("div", { class: "place" }, loc.name + ", " + loc.state + " · " + loc.zip + " · " + n.src),
+    el("div", { class: "place" }, placeLine(n.src)),
     el("div", { class: "bigtemp" }, degF(n.temp)),
     el("div", { class: "bigcond" }, n.cond),
     el("div", { class: "grid" },
