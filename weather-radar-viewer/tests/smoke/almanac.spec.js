@@ -33,9 +33,10 @@ test("ranks today against the archive and says what the archive is", async ({ pa
   await expect(board(page)).toContainText(/\d+(ST|ND|RD|TH) WARMEST OF \d+/);
 
   // and must never let ERA5 pass for a station record
-  const notes = (await board(page).locator(".srcnote").allTextContents()).join(" ");
-  expect(notes).toContain("ERA5");
-  expect(notes).toMatch(/NOT AN OFFICIAL/i);
+  await expect(board(page).locator(".srcnote").filter({ hasText: /NOT AN OFFICIAL/i }))
+    .toHaveCount(1, { timeout: 20_000 });
+  await expect(board(page).locator(".srcnote").filter({ hasText: "ERA5" }).first())
+    .toBeVisible();
 });
 
 test("a dead archive says so plainly instead of rendering a number", async ({ page }) => {
@@ -61,16 +62,14 @@ test("the station-record caveat survives the failure path", async ({ page }) => 
   await boot(page);
   await openAlmanac(page);
 
-  // Wait for the board to SETTLE, not for one particular failure element: the
-  // claim under test is that the caveat is present whatever state it lands in.
-  // Asserting the element instead of the claim is what made this flake once.
-  await expect
-    .poll(async () => (await board(page).locator(".bigmsg, .bigtemp, .srcnote").count()) > 0,
-          { timeout: 20_000 })
-    .toBe(true);
-
-  const notes = (await board(page).locator(".srcnote").allTextContents()).join(" ");
-  expect(notes).toMatch(/NOT AN OFFICIAL/i);
+  // A RETRYING assertion on the caveat itself. Two earlier versions of this
+  // test read the notes once after waiting for something else to appear, and
+  // both flaked: the wait could be satisfied by a transient loading state that
+  // has a .bigmsg but no .srcnote yet, so the read came back empty. Waiting for
+  // the exact thing under test removes the race by construction — it can only
+  // fail if the caveat never arrives, which is the claim.
+  await expect(board(page).locator(".srcnote").filter({ hasText: /NOT AN OFFICIAL/i }))
+    .toHaveCount(1, { timeout: 20_000 });
 });
 
 test("a partial backfill is labelled as partial", async ({ page }) => {
