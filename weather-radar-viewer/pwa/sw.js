@@ -35,6 +35,7 @@ const SHELL = [
   "./js/forecastx.js",
   "./js/airq.js",
   "./js/astro.js",
+  "./js/almanac.js",
   "./js/main.js",
   "./vendor/leaflet/leaflet.js",
   "./vendor/leaflet/leaflet.css",

@@ -118,6 +118,26 @@ export const SKY_SAMPLE_MIN = 5;               // altitude-track sampling interv
 export const SKY_TZ_WARN_H = 3;                // device-vs-longitude gap that triggers the timezone note; 3 rather than 2 so wide legitimate zones (e.g. Indiana on EDT) don't false-positive
 export const SKY_PHASE_UNCERTAINTY_H = 5;      // rendered in the phase-accuracy caveat, held here so the constant and the sentence cannot drift apart
 
+// --- almanac (M5, climatology half) ---
+export const OM_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
+export const ALMANAC_CACHE_VER = 1;
+// Confirmed live: archive-api.open-meteo.com/v1/archive accepts start_date
+// 1940-01-01 exactly and rejects 1939-01-01 ("out of allowed range").
+export const ALMANAC_EPOCH_YEAR = 1940;
+export const ALMANAC_CHUNK_YEARS = 10;
+export const ALMANAC_CHUNKS_PER_VISIT = 3;
+export const ALMANAC_CHUNK_GAP_MS = 1500;
+export const ALMANAC_CHUNK_FETCH_MS = 30000;   // fetchT's 8s default cannot carry a decade of daily data
+export const ALMANAC_TAIL_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // only the decade containing the current year is ever refetched
+export const ALMANAC_TODAY_TTL_MS = 30 * 60 * 1000;
+export const ALMANAC_GRID_DEG = 0.25;   // ERA5 native grid
+export const ALMANAC_NORMAL_HALF_WINDOW = 7;
+export const ALMANAC_NORMAL_PERIOD = [1991, 2020];   // WMO current standard normals period
+export const ALMANAC_MIN_YEARS_PCT = 30;
+export const ALMANAC_MIN_YEARS_BAND = 10;
+export const ALMANAC_MIN_YEARS_CHART = 5;
+export const ALMANAC_NEAR_BAND = 0.10;   // 0.40-0.60 exceedance reads NEAR NORMAL
+
 export const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
 export const DEFAULT_VIEW_KM = 200;   // boot + home framing around the active location
 export const AUTO_CLOSE_KM = 175;     // auto-mode second radar pass

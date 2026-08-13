@@ -23,9 +23,9 @@
    stranded off the top of CAST. Start them at the top instead. */
 /* wrap is for the two-column boards (it breaks the credit line onto its own
    row); on a column board it would spill sections into a second column */
-#boards #board-cast, #boards #board-severe, #boards #board-sky { justify-content: flex-start; flex-wrap: nowrap; }
+#boards #board-cast, #boards #board-severe, #boards #board-sky, #boards #board-almanac { justify-content: flex-start; flex-wrap: nowrap; }
 /* CAST is a single stacked column of sections (was set inline from JS) */
-#boards #board-cast, #boards #board-sky { flex-direction: column; gap: 18px; align-items: stretch; }
+#boards #board-cast, #boards #board-sky, #boards #board-almanac { flex-direction: column; gap: 18px; align-items: stretch; }
 #boards .board.active { display: flex; }
 
 /* deck position indicator */
@@ -138,6 +138,20 @@
 #board-sky .moondisc .lit { fill: var(--ink-mid); }
 #board-sky .skyphase { font-size: 17px; color: var(--info); letter-spacing: 0.1em; }
 #board-sky .skyillum { font-size: 28px; color: var(--ink-hi); }
+
+/* ---- ALMANAC board ---- */
+/* JS only ever toggles the class name — the color values live here, never in JS */
+#board-almanac .bigcond.hot { color: var(--sev-watch); }
+#board-almanac .bigcond.cold { color: var(--accent); }
+#board-almanac .bigcond.near { color: var(--info); }
+#board-almanac .bigcond.record { color: var(--sev-warn); }
+#board-almanac .bigcond.none { color: var(--sub-dim); }
+.srcbadge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--sub-dim);
+  border: 1px solid var(--panel-line); border-radius: 3px; padding: 1px 5px;
+  margin-left: 8px; white-space: nowrap;
+}
+#board-almanac .rebuildable { cursor: pointer; }
 
 @media (max-width: 740px), (max-height: 480px) {
   #boards .board {

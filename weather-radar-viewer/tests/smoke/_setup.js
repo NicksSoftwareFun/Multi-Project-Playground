@@ -15,6 +15,11 @@
 // boot(page, {localStorage}): seeds localStorage (default: a saved Ankeny, IA
 // location under skywatch_loc) via addInitScript, starts a pageerror
 // collector, and navigates to "/". Returns { errors }.
+//
+// Stubbed feeds: api.open-meteo.com, ensemble-api.open-meteo.com,
+// air-quality-api.open-meteo.com, archive-api.open-meteo.com (era5Chunk(),
+// M5 ALMANAC), api.weather.gov, api.zippopotam.us, mapservices.weather.noaa.gov,
+// mesonet.agron.iastate.edu, *.basemaps.cartocdn.com, cdn.star.nesdis.noaa.gov.
 "use strict";
 const fs = require("fs");
 const path = require("path");
@@ -82,6 +87,40 @@ const OM_MODELS = anchoredFixture("om-models.json");
 const OM_ENSEMBLE = anchoredFixture("om-ensemble.json");
 const OM_AIR = anchoredFixture("om-air.json");
 
+// ERA5 archive (M5 ALMANAC). A static fixture can't work here — the board
+// asks for whatever calendar day the suite runs on — so this synthesizes the
+// response from the request's own start_date/end_date, the same reasoning as
+// anchoredFixture() above. seeded() is a deterministic integer hash in
+// {-1,0,1} so a spec can reproduce the exact warmest/coldest year and rank
+// independently, without reaching into this module's internals.
+function seeded(year, doy) {
+  const h = Math.abs(Math.sin(year * 374761393 + doy * 668265263) * 43758.5453) % 1;
+  return Math.floor(h * 3) - 1;   // -1, 0, or 1
+}
+function era5Chunk(url) {
+  const s = url.searchParams.get("start_date");
+  const e = url.searchParams.get("end_date");
+  const startMs = Date.parse(s + "T00:00:00Z");
+  const endMs = Date.parse(e + "T00:00:00Z");
+  const time = [], tmax = [], tmin = [];
+  for (let t = startMs; t <= endMs; t += 86400000) {
+    const dt = new Date(t);
+    const y = dt.getUTCFullYear();
+    const doy = Math.round((t - Date.UTC(y, 0, 1)) / 86400000) + 1;
+    const seed = seeded(y, doy);
+    const hi = 62 + 26 * Math.sin((2 * Math.PI * (doy - 105)) / 365) + (y - 1940) * 0.02 + 6 * seed;
+    const lo = hi - 20 - 3 * seed;
+    time.push(dt.toISOString().slice(0, 10));
+    tmax.push(Math.round(hi * 10) / 10);
+    tmin.push(Math.round(lo * 10) / 10);
+  }
+  return JSON.stringify({
+    latitude: 41.75, longitude: -93.5, timezone: "America/Chicago", utc_offset_seconds: -21600,
+    daily_units: { temperature_2m_max: "°F", temperature_2m_min: "°F" },
+    daily: { time, temperature_2m_max: tmax, temperature_2m_min: tmin },
+  });
+}
+
 // Leaflet, served from the PWA's vendor copy when present (post-refactor it
 // is loaded same-origin anyway; pre-refactor the page pulls it from unpkg and
 // we answer with the same files). Falls back to a stub that leaves window.L
@@ -139,6 +178,7 @@ async function routeAll(page, opts) {
     }
     if (host === "ensemble-api.open-meteo.com") return json(route, OM_ENSEMBLE());
     if (host === "air-quality-api.open-meteo.com") return json(route, OM_AIR());
+    if (host === "archive-api.open-meteo.com") return json(route, era5Chunk(url));
     if (host === "api.weather.gov") {
       // alerts + zones first: /zones/forecast/IAZ060 would otherwise be caught
       // by the "forecast" branch below
@@ -210,4 +250,5 @@ module.exports = {
   ALERTS_ACTIVE, ALERTS_EMPTY, ALERTS_ZONE, SPC_LAYERS, SPC_OUTLOOK, TROPICAL_SERVICES,
   WWA_LAYERS, WWA_QUERY,
   OM_CAST, OM_MODELS, OM_ENSEMBLE, OM_AIR, CORS,
+  era5Chunk,
 };

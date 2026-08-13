@@ -55,7 +55,9 @@ locations sheet recenters it there.
   labelled by date), **AIR** (US AQI, pollutants, 48 h trend, smoke note) and
   **SKY** (day length and its day-over-day change, the three twilights,
   golden hour, solar noon, moon phase and rise/set — computed entirely
-  on-device, the one board that works with no network at all).
+  on-device, the one board that works with no network at all) and
+  **ALMANAC** (today ranked against this grid cell's ERA5 record since
+  1940 — percentile, 30-year normal, and the day's warmest/coldest years).
 - **Locations** — tap the conditions panel for unlimited saved ZIPs plus GPS.
 
 ## Android APK
@@ -80,7 +82,8 @@ Static, no build step — plain ES modules and CSS served as-is:
   `timeline` (scrubber, play loop, frame chrome) · `sat` (GOES viewer) ·
   `wx` (conditions: Open-Meteo → NWS fallback) · `locations` · `layers` ·
   `boards` · `alerts` · `spc` · `charts` (hand-rolled SVG chart engine) ·
-  `forecastx` (FCAST) · `airq` (AIR) · `astro` (SKY) · `main` (boot)
+  `forecastx` (FCAST) · `airq` (AIR) · `astro` (SKY) · `almanac` (ALMANAC) ·
+  `main` (boot)
 - `vendor/` — Leaflet 1.9.4 and SunCalc, self-hosted (no CDN dependency)
 - `sw.js` — service worker: caches the app shell for instant launch;
   weather data is always fetched live (stale radar is worse than no radar)
@@ -94,8 +97,11 @@ NOAA STAR GOES-East GeoColor (satellite), Open-Meteo with automatic
 NWS api.weather.gov fallback (conditions), NWS active alerts + zone
 geometry (severe), NOAA ArcGIS map services for SPC outlooks, mesoscale
 mesoscale discussions, watch/warning/advisory polygons and tropical, Open-Meteo
-air quality (US AQI) and ensembles, Zippopotam.us (ZIP geocoding), CARTO
-dark basemap (geography and labels as separate layers). Weather data by [Open-Meteo.com](https://open-meteo.com/).
+air quality (US AQI) and ensembles, Open-Meteo ERA5 archive
+(archive-api.open-meteo.com) for daily climate history — cached in IndexedDB
+per 0.25° grid cell, Zippopotam.us (ZIP geocoding), CARTO dark basemap
+(geography and labels as separate layers). Weather data by
+[Open-Meteo.com](https://open-meteo.com/).
 
 Endpoint reachability and CORS are re-verified weekly by
 `.github/workflows/endpoint-checks.yml`; layer ids are re-discovered at

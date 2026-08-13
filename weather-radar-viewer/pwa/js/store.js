@@ -83,3 +83,14 @@ export async function idbPut(storeName, key, value) {
     });
   } catch { /* non-fatal */ }
 }
+
+export async function idbDel(storeName, key) {
+  try {
+    const d = await db();
+    await new Promise((resolve, reject) => {
+      const tx = d.transaction(storeName, "readwrite").objectStore(storeName).delete(key);
+      tx.onsuccess = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch { /* non-fatal */ }
+}
