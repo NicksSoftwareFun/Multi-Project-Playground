@@ -5,6 +5,7 @@
 .chart svg { display: block; width: 100%; overflow: visible; }
 .chart text { font-family: var(--mono); font-size: 9px; fill: var(--sub-dim); }
 .chart text.major { fill: var(--sub); }
+.chart tspan.datesub { fill: var(--sub-dim); font-size: 8.5px; }
 .chart .grid line { stroke: rgba(140, 170, 195, 0.12); stroke-width: 1; }
 .chart .nowline { stroke: var(--sub-faint); stroke-width: 1; stroke-dasharray: 3 3; }
 .chart .cursorline { stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.7; }

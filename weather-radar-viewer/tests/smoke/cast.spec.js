@@ -120,3 +120,42 @@ test("no pageerrors while opening and rendering CAST", async ({ page }) => {
   await expect(page.locator(BOARD + " .chiplegend .lchip").first()).toBeAttached({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
+
+// The 7-day used to be one run-on sentence per day; it is now a table whose
+// columns line up, and every day carries its numeric date under the weekday.
+test("the 7-day is a column table with dates under the weekdays", async ({ page }) => {
+  await routeAll(page);
+  await boot(page);
+  await page.locator("#wxPanel").click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
+
+  const rows = page.locator("#board-cast .castdays .castday");
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+  expect(await rows.count()).toBeGreaterThanOrEqual(5);
+
+  const first = rows.first();
+  await expect(first.locator(".when .dow")).toHaveText(/^(SUN|MON|TUE|WED|THU|FRI|SAT)$/);
+  await expect(first.locator(".when .date")).toHaveText(/^\d{1,2}\/\d{1,2}$/);
+  await expect(first.locator(".hi")).toHaveText(/^-?\d+°$/);
+  await expect(first.locator(".lo")).toHaveText(/^-?\d+°$/);
+});
+
+// Day boundaries on a time axis carry the date beneath the weekday, so a
+// reader never has to count forward from today to place a feature.
+test("day ticks on the meteogram print the date under the weekday", async ({ page }) => {
+  await routeAll(page);
+  await boot(page);
+  await page.locator("#wxPanel").click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
+
+  const svg = page.locator("#board-cast .chart .plot svg").first();
+  await expect(svg).toBeVisible({ timeout: 15_000 });
+
+  const subs = await svg.locator("tspan.datesub").allTextContents();
+  expect(subs.length).toBeGreaterThan(0);
+  for (const t of subs) expect(t).toMatch(/^\d{1,2}\/\d{1,2}$/);
+
+  // and the weekday still sits above it, in the same text node
+  const pairs = await svg.locator("text:has(tspan.datesub)").allTextContents();
+  expect(pairs[0]).toMatch(/^(SUN|MON|TUE|WED|THU|FRI|SAT)\d{1,2}\/\d{1,2}$/);
+});

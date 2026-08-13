@@ -49,7 +49,7 @@ locations sheet recenters it there.
   channel whose tiles never arrive says which one failed rather than showing a
   blank map. Layer names are probed with one canary tile before the template is
   trusted, and a legacy alias name announces itself if it ever wins.
-- **≡ Layers** — alert polygons, heat/cold alerts, advisories, river gauges,
+- **≡ Layers** — alert polygons, heat/cold alerts, advisories,
   SPC convective outlook, mesoscale discussions, tropical, NOHRSC modelled snow
   depth, and WPC Day-1 winter guidance. Each row carries a health dot and reads
   `N/A` when its source is unavailable. The three severe layers are three time
@@ -65,7 +65,7 @@ locations sheet recenters it there.
   precipitation, 7-day strip, ensemble confidence bands, model agreement, plus
   a winter-hazards strip and an atmospheric-profile section), **SEVERE** (every
   active alert with full text, the SPC categorical risk for the next three days
-  labelled by date, and nearby river gauges), **AIR** (US AQI, pollutants, 48 h
+  labelled by date), **AIR** (US AQI, pollutants, 48 h
   trend, smoke note, plus an inversion/mixing section), **SKY** (day length and
   its day-over-day change, the three twilights, golden hour, solar noon, moon
   phase and rise/set — computed entirely on-device, the one board that works
@@ -85,13 +85,6 @@ locations sheet recenters it there.
   change, and a refusal to print one at all across an inversion near 0 °C. The
   warm-nose case never asserts sleet versus freezing rain — six levels cannot
   resolve that, and it says so.
-- **River gauges** (SEVERE, and a map layer) — nearby USGS gauges with current
-  stage, flow where reported, and NWS flood categories drawn as a zone bar.
-  Every row states that stage is relative to that gauge's own datum and is not
-  comparable between gauges, and names which NWS gauge the thresholds came from
-  and how far away it is. A reading too old to trust is dated and withheld from
-  the flood comparison rather than colored; a gauge that cannot be assessed is
-  drawn hollow and dashed so it cannot be read as "assessed and fine".
 - **⌂ Locations** — unlimited saved ZIPs plus GPS. The button sits in the side
   rail on the radar view and on every board.
 
@@ -129,8 +122,6 @@ Static, no build step — plain ES modules and CSS served as-is:
   and WPC Day-1 winter-guidance map layers) ·
   `profile` (freezing level, precipitation-type reasoning, cloud layers,
   mixing depth — sections inside FCAST and AIR, no board of their own) ·
-  `rivers` (USGS gauges + NWPS flood categories: a section inside SEVERE plus
-  a map layer of gauge pins) ·
   `main` (boot)
 - `vendor/` — Leaflet 1.9.4 and SunCalc, self-hosted (no CDN dependency)
 - `sw.js` — service worker: caches the app shell for instant launch;
@@ -166,12 +157,6 @@ probabilistic winter guidance (Day-1 snow and ice accumulation), whose Day-1
 layer is likewise resolved by name — the same catalog carries unrelated ice
 charts and a Winter Storm Severity Index, and none of those may be drawn under
 a winter-guidance label.
-
-**Rivers** — USGS gauges, discovered through the OGC monitoring-locations API
-and read through the classic instantaneous-values service by explicit site id,
-joined to NOAA/NWS National Water Prediction Service gauges for flood
-categories. Categories defined by discharge rather than stage are named and
-never compared against a stage reading.
 
 **Geocoding and basemap** — Zippopotam.us (ZIP → lat/lon), CARTO dark basemap
 (geography and labels as separate layers, so labels draw above the radar).

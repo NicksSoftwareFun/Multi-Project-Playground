@@ -224,35 +224,6 @@ export const STANDARD_ATM_FT_BY_HPA = {
   1000: 364, 925: 2500, 850: 4781, 700: 9882, 500: 18289, 300: 30065
 };
 
-// --- water: river gauges + flood stages (M7) ---
-// Two-step by necessity. The classic waterservices bbox form is UNUSABLE for
-// discovery — probed live, it did not answer at all (~45 s abort) for 0.2° and
-// 0.5° boxes, and only replied to a ~110 km box with 150 KB / 55 sites. The
-// modern OGC API answers the small box the classic one could not, so discovery
-// runs there and only the READING is fetched from waterservices, by explicit
-// site id (that form is confirmed fast). Never fall back to the bbox form: it
-// would hang the board rather than degrade it.
-export const USGS_OGC_SITES =
-  "https://api.waterdata.usgs.gov/ogcapi/v0/collections/monitoring-locations/items";
-export const USGS_IV = "https://waterservices.usgs.gov/nwis/iv/";
-export const NWPS_GAUGES = "https://api.water.noaa.gov/nwps/v1/gauges";
-export const RIVER_TTL_MS = 15 * 60 * 1000;             // live stage/flow reading
-export const GAUGE_CATALOG_TTL_MS = 24 * 60 * 60 * 1000; // gauges do not move; thresholds barely change
-export const RIVER_BBOX_DEG = 0.25;      // half-width of the discovery box, ~17 mi N-S
-export const RIVER_DISCOVER_LIMIT = 20;  // 50 features cost 127 KB live; a nearby list wants far fewer
-export const RIVER_MAX_GAUGES = 4;       // nearest N stream sites actually rendered
-// USGS<->NWPS proximity join, in MILES rather than degrees: a degree box is ~30%
-// tighter east-west than north-south at these latitudes, which is not a
-// tolerance anyone chose. The join is also one-to-one — a lid claimed by the
-// nearer site is not available to the next one.
-export const GAUGE_MATCH_MI = 0.7;
-// A reading older than this is not "now". USGS answers with the newest value it
-// has, which for a gauge whose radio is down can be many hours stale.
-export const GAUGE_STALE_MS = 2 * RIVER_TTL_MS;
-// NWPS writes -9999 into a flood category's `flow` to mean "not applicable".
-// Read as a number it is a discharge threshold every gauge is above, which
-// would mis-classify all of them, so anything at or below this is ABSENT.
-export const NWPS_ABSENT_SENTINEL = -9998;
 
 export const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
 export const DEFAULT_VIEW_KM = 200;   // boot + home framing around the active location

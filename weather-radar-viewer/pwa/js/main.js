@@ -18,7 +18,6 @@ import * as airq from "./airq.js";
 import * as astro from "./astro.js";
 import * as almanac from "./almanac.js";
 import * as profile from "./profile.js";
-import * as rivers from "./rivers.js";
 import * as timeline from "./timeline.js";
 
 const screenEl = document.getElementById("screen");
@@ -37,7 +36,6 @@ airq.init();        // AIR board (lazy)
 astro.init();   // SKY board (offline: computed on-device from vendor/suncalc.js)
 almanac.init();      // ALMANAC board (lazy)
 profile.init();     // PROFILE section on FCAST + INVERSION/MIXING on AIR (lazy)
-rivers.init();      // river gauges on SEVERE + optional map pins (lazy)
 spc.init();         // registers outlook/MD/tropical layers (lazy: no fetch until on)
 winter.init();      // snow-depth + WPC winter layers, and the FCAST winter strip
 boards.init();      // deck navigation, after boards are registered

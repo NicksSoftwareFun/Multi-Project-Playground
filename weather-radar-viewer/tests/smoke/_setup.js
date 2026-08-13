@@ -294,7 +294,7 @@ function wpcWinterRoute(route, url) {
 }
 
 // ---------------------------------------------------------------------------
-// M7 fixtures: Open-Meteo pressure levels, USGS gauges, NWPS flood categories.
+// M7 fixtures: Open-Meteo pressure levels.
 // Same rule as the M6 block above — these REFUSE what the real services refuse.
 
 // Open-Meteo's real accepted pressure levels. Asking for one that is not on
@@ -461,145 +461,6 @@ function omProfileRoute(route, url, kind) {
   return json(route, JSON.stringify(body));
 }
 
-// --- water -----------------------------------------------------------------
-
-const USGS_OGC_SITES = fixture("usgs-ogc-sites.json").toString("utf8");
-const USGS_OGC_SITES_EMPTY = fixture("usgs-ogc-sites-empty.json").toString("utf8");
-const NWPS_GAUGES_BBOX = fixture("nwps-gauges-bbox.json").toString("utf8");
-const NWPS_GAUGE_SAYI4 = fixture("nwps-gauge-sayi4.json").toString("utf8");
-const NWPS_GAUGE_ANKI4 = fixture("nwps-gauge-anki4.json").toString("utf8");
-const NWPS_GAUGE_DESI4 = fixture("nwps-gauge-desi4.json").toString("utf8");
-const NWPS_GAUGE_FLOW_ONLY = fixture("nwps-gauge-flow-only.json").toString("utf8");
-const NWPS_DETAILS = { SAYI4: NWPS_GAUGE_SAYI4, ANKI4: NWPS_GAUGE_ANKI4, DESI4: NWPS_GAUGE_DESI4 };
-
-// Live readings for the three fixture stream sites. stage in feet (00065),
-// discharge in cfs (00060); a site absent from this table is unknown to the
-// service, which 404s rather than answering with an empty series.
-const USGS_READINGS = {
-  "05485500": { name: "Des Moines River near Saylorville, IA", stage: 11.2, flow: 4820 },
-  "05484800": { name: "Fourmile Creek at Ankeny, IA", stage: 5.4, flow: null },
-  "05481950": { name: "Beaver Creek near Grimes, IA", stage: 3.1, flow: 210 },
-};
-
-function ogcError(route, status, description) {
-  return route.fulfill({
-    status, contentType: "application/json", headers: CORS,
-    body: JSON.stringify({ code: String(status), description }),
-  });
-}
-
-// The modern OGC API is the only discovery endpoint that answers a small box.
-// It rejects a malformed bbox, an out-of-range limit, and — as the OGC API -
-// Features spec requires — any query parameter it does not know.
-const OGC_ALLOWED = new Set(["bbox", "limit", "f", "offset", "skipGeometry", "properties"]);
-function usgsOgcRoute(route, url, empty) {
-  const q = url.searchParams;
-  for (const k of q.keys()) {
-    if (!OGC_ALLOWED.has(k)) return ogcError(route, 400, "Unknown query parameter: " + k);
-  }
-  const raw = q.get("bbox");
-  if (!raw) return ogcError(route, 400, "bbox is required for a nearby-sites query");
-  const parts = raw.split(",");
-  if (parts.length !== 4 || !parts.every((v) => v !== "" && Number.isFinite(Number(v)))) {
-    return ogcError(route, 400, "bbox must be 4 numbers (minx,miny,maxx,maxy): " + raw);
-  }
-  const [w, s, e, n] = parts.map(Number);
-  if (!(e > w) || !(n > s)) return ogcError(route, 400, "degenerate bbox: " + raw);
-  if (Math.abs(w) > 180 || Math.abs(e) > 180 || Math.abs(s) > 90 || Math.abs(n) > 90) {
-    return ogcError(route, 400, "bbox out of range: " + raw);
-  }
-  const limit = q.get("limit");
-  if (limit != null && (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 10000)) {
-    return ogcError(route, 400, "limit must be between 1 and 10000: " + limit);
-  }
-  const f = q.get("f");
-  if (f != null && f !== "json" && f !== "geojson") {
-    return ogcError(route, 400, "unsupported format: " + f);
-  }
-  return json(route, empty ? USGS_OGC_SITES_EMPTY : USGS_OGC_SITES);
-}
-
-function usgsText(route, status, body) {
-  return route.fulfill({ status, contentType: "text/plain", headers: CORS, body });
-}
-
-// Classic waterservices, READINGS ONLY. The bbox form is the one that probed
-// as unusable — it did not answer at all for a small box — so the stub refuses
-// it outright: if rivers.js ever reaches for bbox discovery here again, the
-// suite fails instead of shipping a board that hangs for 45 seconds.
-function usgsIvRoute(route, url) {
-  const q = url.searchParams;
-  if (q.get("bBox") || q.get("bbox")) {
-    return usgsText(route, 504, "The operation was aborted due to timeout");
-  }
-  if (q.get("format") !== "json") return usgsText(route, 400, "Unsupported format: " + q.get("format"));
-  const sites = (q.get("sites") || "").split(",").filter(Boolean);
-  if (!sites.length) return usgsText(route, 400, "No sites requested: provide sites= or a bBox=");
-  if (!q.get("parameterCd")) return usgsText(route, 400, "parameterCd is required");
-  const known = sites.filter((s) => USGS_READINGS[s]);
-  if (!known.length) {
-    return usgsText(route, 404, "No sites found matching all criteria: " + sites.join(","));
-  }
-  const wanted = new Set((q.get("parameterCd") || "").split(","));
-  // A reading with no timestamp is a reading of unknown age, so the stub dates
-  // it to the current quarter hour the way the real service does.
-  // IV dateTimes look like "2026-08-13T02:15:00.000-05:00" — an offset, never a
-  // Z. toISOString() already carries the milliseconds, so only the zone is
-  // swapped; appending a second ".000" produced a string nothing can parse,
-  // which silently hid the observation time from everything downstream.
-  const stamp = new Date(Math.floor(Date.now() / 900000) * 900000).toISOString().replace("Z", "-00:00");
-  const timeSeries = [];
-  const push = (site, code, name, unit, value) => {
-    timeSeries.push({
-      sourceInfo: { siteName: USGS_READINGS[site].name, siteCode: [{ value: site, agencyCode: "USGS" }] },
-      variable: { variableCode: [{ value: code }], variableName: name, unit: { unitCode: unit } },
-      values: [{ value: [{ value: String(value), qualifiers: ["P"], dateTime: stamp }] }],
-    });
-  };
-  for (const site of known) {
-    const r = USGS_READINGS[site];
-    if (wanted.has("00065") && r.stage != null) push(site, "00065", "Gage height, ft", "ft", r.stage);
-    if (wanted.has("00060") && r.flow != null) push(site, "00060", "Discharge, cubic feet per second", "ft3/s", r.flow);
-  }
-  return json(route, JSON.stringify({ value: { timeSeries } }));
-}
-
-function nwpsRoute(route, url) {
-  const p = url.pathname;
-  const detail = /^\/nwps\/v1\/gauges\/([A-Za-z0-9]+)$/.exec(p);
-  if (detail) {
-    const body = NWPS_DETAILS[detail[1].toUpperCase()];
-    if (!body) {
-      return route.fulfill({
-        status: 404, contentType: "application/json", headers: CORS,
-        body: JSON.stringify({ code: 404, message: "gauge " + detail[1] + " not found" }),
-      });
-    }
-    return json(route, body);
-  }
-  if (/^\/nwps\/v1\/gauges\/?$/.test(p)) {
-    const q = url.searchParams;
-    const box = ["bbox.xmin", "bbox.ymin", "bbox.xmax", "bbox.ymax"].map((k) => q.get(k));
-    if (box.some((v) => v == null || v === "" || !Number.isFinite(Number(v)))) {
-      return route.fulfill({
-        status: 400, contentType: "application/json", headers: CORS,
-        body: JSON.stringify({ code: 400, message: "bbox.xmin, bbox.ymin, bbox.xmax and bbox.ymax are all required" }),
-      });
-    }
-    if (q.get("srid") !== "EPSG_4326") {
-      return route.fulfill({
-        status: 400, contentType: "application/json", headers: CORS,
-        body: JSON.stringify({ code: 400, message: "srid must be EPSG_4326, got " + q.get("srid") }),
-      });
-    }
-    return json(route, NWPS_GAUGES_BBOX);
-  }
-  return route.fulfill({
-    status: 404, contentType: "application/json", headers: CORS,
-    body: JSON.stringify({ code: 404, message: "unknown path " + p }),
-  });
-}
-
 function nwsNotFound(route, detail) {
   return route.fulfill({
     status: 404,
@@ -615,10 +476,8 @@ function nwsNotFound(route, detail) {
 async function routeAll(page, opts) {
   const alertsBody = (opts && opts.alerts) || ALERTS_ACTIVE;
   const gridpointsBody = (opts && opts.gridpoints) || NWS_GRIDPOINTS;
-  // M7. opts.profile names a PROFILE_KINDS entry ("base" by default); opts.rivers
-  // === "empty" makes gauge discovery return zero features.
+  // M7. opts.profile names a PROFILE_KINDS entry ("base" by default).
   const profileKind = (opts && opts.profile) || "base";
-  const riversEmpty = !!(opts && opts.rivers === "empty");
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
     const host = url.hostname;
@@ -686,9 +545,6 @@ async function routeAll(page, opts) {
     // M7 water. Discovery and readings are deliberately different hosts: the
     // OGC API answers the small bounding box, the classic service answers by
     // explicit site id and refuses the bbox form entirely.
-    if (host === "api.waterdata.usgs.gov") return usgsOgcRoute(route, url, riversEmpty);
-    if (host === "waterservices.usgs.gov") return usgsIvRoute(route, url);
-    if (host === "api.water.noaa.gov") return nwpsRoute(route, url);
 
     // SPC outlooks / mesoscale discussions / tropical (ArcGIS MapServers) +
     // the WWA watch/warning/advisory MapServer (alerts.js MAP alerts).
@@ -777,7 +633,5 @@ module.exports = {
   WPC_WINTER_SERVICES, WPC_WINTER_PRECIP_FOLDER, WPC_WINTER_DECOY_FOLDER,
   WPC_WINTER_LAYERS, WPC_WINTER_QUERY,
   // M7 profile + water
-  PROFILE_KINDS, USGS_OGC_SITES, USGS_OGC_SITES_EMPTY, USGS_READINGS,
-  NWPS_GAUGES_BBOX, NWPS_GAUGE_SAYI4, NWPS_GAUGE_ANKI4, NWPS_GAUGE_DESI4,
-  NWPS_GAUGE_FLOW_ONLY,
+  PROFILE_KINDS,
 };

@@ -82,6 +82,14 @@ function dayAbbr(unixSec, offsetSec) {
   return d.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }).toUpperCase();
 }
 
+// "8/13" for the row beneath the weekday. UTC accessors on purpose: the epoch
+// has already had the location's offset folded in above, so reading it in the
+// device's zone would shift the date for anyone in a different one.
+function dayDate(unixSec, offsetSec) {
+  const d = new Date((unixSec + (offsetSec || 0)) * 1000);
+  return (d.getUTCMonth() + 1) + "/" + d.getUTCDate();
+}
+
 // Trim an hourly series to roughly now..+48h. x values stay true unix ms —
 // the chart engine positions everything (including `now`) off that epoch.
 // Grace equals the grid spacing (1h) — same margin wx.js's own hourly slice
@@ -122,6 +130,7 @@ function parseBase(j) {
     for (let i = 0; i < d.time.length; i++) {
       days.push({
         label: dayAbbr(d.time[i], offset),
+        date: dayDate(d.time[i], offset),
         hi: d.temperature_2m_max ? d.temperature_2m_max[i] : null,
         lo: d.temperature_2m_min ? d.temperature_2m_min[i] : null,
         pop: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
@@ -299,13 +308,37 @@ function sevenDaySection(c) {
   if (c.base.err) { box.append(sectionMsg("FORECAST UNAVAILABLE — " + c.base.err)); return box; }
   const days = c.base.data.days;
   if (!days.length) { box.append(sectionMsg("NO DATA")); return box; }
-  const list = el("div");
+  // A table, not a sentence per day. Each value sits in its own column so the
+  // week reads down a column — the numbers are the point, and a run-on line of
+  // "HI 72 / LO 52 · POP 15% · MOSTLY CLEAR" made them impossible to scan.
+  // The high/low bar shows each day's range against the week's own span, so a
+  // cold front is visible before you have read a single number.
+  const his = days.map((d) => d.hi).filter((v) => v != null);
+  const los = days.map((d) => d.lo).filter((v) => v != null);
+  const wkHi = his.length ? Math.max(...his) : null;
+  const wkLo = los.length ? Math.min(...los) : null;
+  const span = wkHi != null && wkLo != null && wkHi > wkLo ? wkHi - wkLo : null;
+
+  const list = el("div", { class: "castdays" });
   for (const d of days) {
     const hi = d.hi == null ? "--" : Math.round(d.hi) + "°";
     const lo = d.lo == null ? "--" : Math.round(d.lo) + "°";
-    list.append(el("div", { class: "castday", style: "display:flex;justify-content:space-between;gap:12px;padding:3px 0" },
-      el("span", { class: "k" }, d.label),
-      el("span", { class: "v" }, "HI " + hi + " / LO " + lo + " · POP " + pct(d.pop) + (d.cond ? " · " + d.cond : ""))
+    const bar = el("div", { class: "rangebar" });
+    if (span != null && d.hi != null && d.lo != null) {
+      const fill = el("div", { class: "fill" });
+      fill.style.left = ((d.lo - wkLo) / span * 100) + "%";
+      fill.style.width = Math.max(2, (d.hi - d.lo) / span * 100) + "%";
+      bar.append(fill);
+    }
+    list.append(el("div", { class: "castday" },
+      el("div", { class: "when" },
+        el("span", { class: "dow" }, d.label),
+        el("span", { class: "date" }, d.date || "")),
+      el("div", { class: "lo" }, lo),
+      bar,
+      el("div", { class: "hi" }, hi),
+      el("div", { class: "pop" }, d.pop == null ? "--" : pct(d.pop)),
+      el("div", { class: "cond" }, d.cond || "")
     ));
   }
   box.append(list);

@@ -1,7 +1,0 @@
-{
-  "gauges": [
-    { "lid": "SAYI4", "name": "Des Moines River near Saylorville", "latitude": 41.7205, "longitude": -93.68, "state": { "abbreviation": "IA" } },
-    { "lid": "ANKI4", "name": "Fourmile Creek at Ankeny", "latitude": 41.74, "longitude": -93.584, "state": { "abbreviation": "IA" } },
-    { "lid": "DESI4", "name": "Des Moines River at Des Moines", "latitude": 41.586, "longitude": -93.625, "state": { "abbreviation": "IA" } }
-  ]
-}

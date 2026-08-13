@@ -174,10 +174,11 @@ test("no moonrise on the local calendar day renders '--' with the orbital-mechan
   expect(r.moon.rise).toBeNull();
   expect(r.moon.set).not.toBeNull();
 
-  // Rendered half: no clock mocking (see the file-header note on page.clock),
-  // so this relies on today's real date still landing near 2026-08-12 —
-  // verified true for this suite's run date, same trade-off as the
-  // astronomical-twilight render check above.
+  // Rendered half. The original version pinned a date on which the real moon
+  // happened to have no rise, and broke the day the calendar moved past it —
+  // a test that decays. Instead assert the INVARIANT that holds every day: the
+  // rendered MOONRISE cell agrees with what computeSky() says for today, and
+  // the explanatory note appears exactly when the value is missing.
   await page.addInitScript((seed) => {
     for (const k of Object.keys(seed)) localStorage.setItem(k, seed[k]);
   }, seedLoc(41.73, 0, "00001"));
@@ -185,13 +186,25 @@ test("no moonrise on the local calendar day renders '--' with the orbital-mechan
   await expect(page.locator("#boardDots .dot").nth(1)).toBeAttached({ timeout: 15_000 });
   await openSky(page);
 
-  const moonriseValue = await page.evaluate(() => {
+  const { rendered, hasRise } = await page.evaluate(async () => {
     const board = document.querySelector("#board-sky");
     const k = Array.from(board.querySelectorAll(".grid .k")).find((el) => /MOONRISE/i.test(el.textContent));
-    return k && k.nextElementSibling ? k.nextElementSibling.textContent.trim() : null;
+    const mod = await import("/js/astro.js");
+    const sky = mod.computeSky(new Date(), 41.73, 0);
+    return {
+      rendered: k && k.nextElementSibling ? k.nextElementSibling.textContent.trim() : null,
+      hasRise: !!(sky && sky.moon && sky.moon.rise),
+    };
   });
-  expect(moonriseValue).toBe("--");
-  await expect(page.locator(BOARD + " .srcnote").filter({ hasText: /NO MOONRISE/i })).toHaveCount(1);
+
+  const note = page.locator(BOARD + " .srcnote").filter({ hasText: /NO MOONRISE/i });
+  if (hasRise) {
+    expect(rendered).toMatch(/^\d{2}:\d{2}$/);
+    await expect(note).toHaveCount(0);
+  } else {
+    expect(rendered).toBe("--");
+    await expect(note).toHaveCount(1);
+  }
 });
 
 test("no NaN, Invalid Date, or undefined anywhere on the board across a range of latitudes", async ({ page }) => {

@@ -26,7 +26,8 @@ import { EDGE_SWIPE_PX } from "./config.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
-const PAD = { top: 10, right: 12, bottom: 18, left: 38 };
+// bottom fits a two-line day tick (weekday over date)
+const PAD = { top: 10, right: 12, bottom: 26, left: 38 };
 
 function svg(tag, attrs) {
   const n = document.createElementNS(NS, tag);
@@ -95,6 +96,9 @@ function timeTicks(min, max, width) {
       label: midnight
         ? dt.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()
         : String(dt.getHours()).padStart(2, "0"),
+      // A weekday alone leaves the reader counting forward from today to work
+      // out which date a feature falls on; the numeric date goes underneath it.
+      sub: midnight ? (dt.getMonth() + 1) + "/" + dt.getDate() : null,
       major: midnight
     });
   }
@@ -191,8 +195,19 @@ export function chart(container, spec) {
       const x = sx(tk.t);
       if (x < PAD.left - 1 || x > PAD.left + plotW + 1) continue;
       grid.append(svg("line", { x1: x, y1: PAD.top, x2: x, y2: PAD.top + plotH }));
+      // Two lines for a day boundary (weekday over date), one for an hour.
+      // tspan rather than a second <text>: one node keeps the x anchor and the
+      // .major styling in a single place.
       const lbl = svg("text", { x, y: height - 5, "text-anchor": "middle", class: tk.major ? "major" : "" });
-      lbl.textContent = tk.label;
+      if (tk.sub) {
+        const top = svg("tspan", { x, dy: "-0.55em" });
+        top.textContent = tk.label;
+        const bot = svg("tspan", { class: "datesub", x, dy: "1.05em" });
+        bot.textContent = tk.sub;
+        lbl.append(top, bot);
+      } else {
+        lbl.textContent = tk.label;
+      }
       root.append(lbl);
     }
     root.insertBefore(grid, root.firstChild);

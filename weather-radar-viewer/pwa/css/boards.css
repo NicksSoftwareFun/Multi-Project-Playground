@@ -163,35 +163,6 @@
 }
 .profstrip .grid { margin-bottom: 2px; }
 
-/* ---- river gauges (SEVERE board, M7) ---- */
-#riverStrip:empty { display: none; margin: 0; }
-.riverstrip { display: flex; flex-direction: column; gap: 4px; }
-.gaugerow { padding: 10px 0; border-bottom: 1px solid var(--panel-line); }
-.gaugerow .name { font-size: 13px; color: var(--ink-mid); letter-spacing: 0.04em; }
-.gaugerow .stage { font-size: 20px; color: var(--ink-hi); font-weight: 700; }
-.gaugerow .rel { font-size: 11.5px; color: var(--sub-faint); letter-spacing: 0.04em; }
-.gaugerow .grid { margin: 6px 0 4px; }
-/* Flood-category zones reuse the existing severity tokens — no parallel flood
-   palette is invented, and no color value is ever set from JS. */
-.gaugebar {
-  position: relative; height: 6px; border-radius: 3px;
-  background: var(--panel-line); margin: 6px 0 4px;
-}
-.gaugebar .zone { position: absolute; top: 0; bottom: 0; opacity: 0.75; }
-.gaugebar .zone.below { background: var(--ok); }
-.gaugebar .zone.action { background: var(--sev-stmt); }
-.gaugebar .zone.minor { background: var(--sev-adv); }
-.gaugebar .zone.moderate { background: var(--sev-watch); }
-.gaugebar .zone.major { background: var(--sev-warn); }
-.gaugebar .now {
-  position: absolute; top: -3px; width: 2px; height: 12px;
-  background: var(--ink-hi); border-radius: 1px;
-}
-.gaugerow .rel.action { color: var(--sev-stmt); }
-.gaugerow .rel.minor { color: var(--sev-adv); }
-.gaugerow .rel.moderate { color: var(--sev-watch); }
-.gaugerow .rel.major { color: var(--sev-warn); }
-
 /* ---- SKY board ---- */
 /* 84px (the shared .bigtemp size) is sized for "72°" and overflows "13H 59M 41S" */
 #boards #board-sky .bigtemp { font-size: 46px; letter-spacing: 0.02em; }
@@ -232,4 +203,44 @@
   .profstrip .profline { font-size: 11.5px; }
   #boards #board-sky .bigtemp { font-size: 32px; }
   #board-sky .moondisc { width: 48px; height: 48px; }
+}
+
+/* ---- 7-day table (FCAST) ----
+   Columns, not sentences. Each value lands in the same place on every row so
+   the week reads DOWN a column; the range bar gives the shape of the week
+   before any number is read. */
+.castdays { display: flex; flex-direction: column; }
+.castday {
+  display: grid;
+  grid-template-columns: 62px 40px minmax(60px, 1fr) 44px 46px minmax(0, 1.4fr);
+  align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--panel-line);
+}
+.castday:last-child { border-bottom: none; }
+.castday .when { display: flex; flex-direction: column; line-height: 1.15; }
+.castday .when .dow { font-size: 12.5px; color: var(--ink); letter-spacing: 0.08em; }
+.castday .when .date { font-size: 9.5px; color: var(--sub-dim); letter-spacing: 0.04em; }
+.castday .lo { font-size: 13px; color: var(--info); text-align: right; }
+.castday .hi { font-size: 14px; color: var(--ink-hi); font-weight: 700; }
+.castday .pop { font-size: 11.5px; color: var(--sub); text-align: right; }
+.castday .cond {
+  font-size: 11px; color: var(--sub-dim); letter-spacing: 0.04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* each day's low-to-high span, positioned inside the week's own range */
+.castday .rangebar {
+  position: relative; height: 4px; border-radius: 2px;
+  background: var(--panel-line);
+}
+.castday .rangebar .fill {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--info), var(--pred-soft));
+}
+
+@media (max-width: 740px), (max-height: 480px) {
+  /* the condition text is the first thing to go when space is tight — the
+     numbers are what the table is for */
+  .castday { grid-template-columns: 54px 34px minmax(40px, 1fr) 38px 40px; gap: 8px; }
+  .castday .cond { display: none; }
 }
