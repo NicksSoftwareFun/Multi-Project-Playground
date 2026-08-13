@@ -25,6 +25,10 @@
   --sev-adv: #F5D06A;
   --sev-stmt: #8FC7F5;
 
+  /* winter hazards (M6) */
+  --snow: #CFE6FF;        /* snowfall totals + WPC winter guidance fill */
+  --ice-accum: #8FE0D8;   /* ice accumulation */
+
   /* surfaces */
   --panel-bg: rgba(8, 14, 22, 0.85);
   --panel-bg-heavy: rgba(10, 18, 28, 0.92);

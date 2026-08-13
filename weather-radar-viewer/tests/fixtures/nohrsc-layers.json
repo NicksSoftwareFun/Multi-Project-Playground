@@ -1,0 +1,62 @@
+{
+  "layers": [
+    {
+      "id": 0,
+      "name": "Snow Depth",
+      "type": "Group Layer",
+      "geometryType": "",
+      "parentLayerId": -1,
+      "subLayerIds": [1, 2, 3]
+    },
+    {
+      "id": 1,
+      "name": "Boundary",
+      "type": "Feature Layer",
+      "parentLayerId": 0,
+      "subLayerIds": null
+    },
+    {
+      "id": 2,
+      "name": "Footprint",
+      "type": "Feature Layer",
+      "parentLayerId": 0,
+      "subLayerIds": null
+    },
+    {
+      "id": 3,
+      "name": "Image",
+      "type": "Raster Layer",
+      "parentLayerId": 0,
+      "subLayerIds": null
+    },
+    {
+      "id": 4,
+      "name": "Snow Water Equivalent",
+      "type": "Group Layer",
+      "geometryType": "",
+      "parentLayerId": -1,
+      "subLayerIds": [5, 6, 7]
+    },
+    {
+      "id": 5,
+      "name": "Boundary",
+      "type": "Feature Layer",
+      "parentLayerId": 4,
+      "subLayerIds": null
+    },
+    {
+      "id": 6,
+      "name": "Footprint",
+      "type": "Feature Layer",
+      "parentLayerId": 4,
+      "subLayerIds": null
+    },
+    {
+      "id": 7,
+      "name": "Image",
+      "type": "Raster Layer",
+      "parentLayerId": 4,
+      "subLayerIds": null
+    }
+  ]
+}

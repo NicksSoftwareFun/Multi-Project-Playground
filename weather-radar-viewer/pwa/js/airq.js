@@ -9,6 +9,7 @@ import { fetchT, okJson, setHealth } from "./net.js";
 import { chart } from "./charts.js";
 import * as locations from "./locations.js";
 import * as boards from "./boards.js";
+import * as state from "./state.js";
 
 let boardEl = null;
 let loc = null;               // mirror of locations.active()
@@ -261,6 +262,9 @@ function renderBoard(data, activeLoc) {
   }
   const pn = pollenNote();
   if (pn) rightKids.push(pn);
+  // profile.js fills this on the "airboard" event emitted below — the mixing
+  // depth and surface inversion that explain the smoke/haze inference above.
+  rightKids.push(el("div", { id: "inversionStrip" }));
   const right = el("div", { class: "col" }, ...rightKids);
 
   const attrib = el("div", { class: "attrib" },
@@ -282,6 +286,10 @@ function renderBoard(data, activeLoc) {
     series: [{ type: "line", data: data.hourlyAqi, token: "--accent", width: 1.5, label: "AQI" }],
     cursor: true
   });
+
+  // Every render builds a fresh #inversionStrip node, so its owner has to be
+  // told to refill it. Emitted last, when the node is actually in the document.
+  state.emit("airboard", { el: boardEl });
 }
 
 function render() {

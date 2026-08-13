@@ -9,7 +9,8 @@
   Static no-build PWA: plain ES modules + CSS served as-is; the Android APK
   is a WebView on this hosted origin, so web deploys reach it instantly.
   Live feeds: IEM NEXRAD N0Q tiles (past) + IEM HRRR REFD tiles (forecast),
-  NOAA STAR GOES-East GeoColor, Open-Meteo with NWS fallback (conditions).
+  IEM cached GOES-East tiles (CH13 IR/CH02 VIS) + NOAA STAR GeoColor,
+  Open-Meteo with NWS fallback (conditions).
 -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0A1018">
@@ -35,7 +36,11 @@
 
     <div id="satview">
       <img id="satimg" alt="GOES-East GeoColor satellite image">
-      <div class="satmsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
+      <!-- Default text, not a placeholder: if the module never runs, an .err
+           state still reads as a sentence rather than an empty box. -->
+      <div class="satmsg" id="satMsg">GOES-EAST IMAGE UNAVAILABLE — CHECK CONNECTION</div>
+      <div class="satnote chrome-sat" id="satNote"></div>
+      <div id="satChannels" class="chrome-sat"></div>
     </div>
 
     <div id="boards">

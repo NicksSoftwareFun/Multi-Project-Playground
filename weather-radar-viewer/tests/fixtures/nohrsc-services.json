@@ -1,0 +1,20 @@
+{
+  "currentVersion": 11.2,
+  "folders": [
+    "air_quality",
+    "climate",
+    "hazards",
+    "NDFD",
+    "obs",
+    "outlooks",
+    "precip",
+    "snow",
+    "Utilities"
+  ],
+  "services": [
+    {
+      "name": "radar_base_reflectivity",
+      "type": "MapServer"
+    }
+  ]
+}

@@ -42,23 +42,58 @@ locations sheet recenters it there.
   "what is happening out there", the chip answers "does this affect me".
 - Place labels are drawn above the radar, so a wall of 60 dBZ can never
   hide which county you are looking at.
-- **≡ Layers** — alert polygons, SPC convective outlook, mesoscale
-  discussions, tropical. Each row carries a health dot and reads `N/A` when
-  its source is unavailable. The three severe layers are three time horizons:
-  outlook (days out) → mesoscale discussion (hours out, before anything is
-  warned) → alert polygon (in effect now). Watch boxes are NWS active alerts,
-  so they arrive on the alert-polygon layer.
-- **▤ Boards** — swipeable full-screen data boards: **NOW** (conditions and
-  forecast), **FCAST** (48 h meteogram, 15-minute precipitation, 7-day strip,
-  ensemble confidence bands, model agreement), **SEVERE** (every active alert
-  with full text, plus the SPC categorical risk for the next three days,
-  labelled by date), **AIR** (US AQI, pollutants, 48 h trend, smoke note) and
-  **SKY** (day length and its day-over-day change, the three twilights,
-  golden hour, solar noon, moon phase and rise/set — computed entirely
-  on-device, the one board that works with no network at all) and
-  **ALMANAC** (today ranked against this grid cell's ERA5 record since
-  1940 — percentile, 30-year normal, and the day's warmest/coldest years).
-- **Locations** — tap the conditions panel for unlimited saved ZIPs plus GPS.
+- **Satellite** — GOES-East, with a channel strip: **GEOCOLOR** (a fixed
+  full-sector image that does not pan or zoom) plus **CH13 IR** and
+  **CH02 VIS**, which are map tile layers that do pan and zoom. The channel
+  choice persists. CH02 says so when it is likely dark at your location, and a
+  channel whose tiles never arrive says which one failed rather than showing a
+  blank map. Layer names are probed with one canary tile before the template is
+  trusted, and a legacy alias name announces itself if it ever wins.
+- **≡ Layers** — alert polygons, heat/cold alerts, advisories, river gauges,
+  SPC convective outlook, mesoscale discussions, tropical, NOHRSC modelled snow
+  depth, and WPC Day-1 winter guidance. Each row carries a health dot and reads
+  `N/A` when its source is unavailable. The three severe layers are three time
+  horizons: outlook (days out) → mesoscale discussion (hours out, before
+  anything is warned) → alert polygon (in effect now). Watch boxes are NWS
+  active alerts, so they arrive on the alert-polygon layer. The snow-depth
+  raster is re-exported for the exact viewport on every pan and says "out of
+  coverage" outside CONUS rather than drawing nothing silently.
+- **Boards** — tap the conditions panel to enter the swipeable full-screen data
+  deck; ← / → , a horizontal swipe, or the dots move between boards, and a
+  downward swipe from the top of a board — or Escape / Back — leaves. Six boards:
+  **NOW** (conditions and forecast), **FCAST** (48 h meteogram, 15-minute
+  precipitation, 7-day strip, ensemble confidence bands, model agreement, plus
+  a winter-hazards strip and an atmospheric-profile section), **SEVERE** (every
+  active alert with full text, the SPC categorical risk for the next three days
+  labelled by date, and nearby river gauges), **AIR** (US AQI, pollutants, 48 h
+  trend, smoke note, plus an inversion/mixing section), **SKY** (day length and
+  its day-over-day change, the three twilights, golden hour, solar noon, moon
+  phase and rise/set — computed entirely on-device, the one board that works
+  with no network at all) and **ALMANAC** (today ranked against this grid
+  cell's ERA5 record since 1940 — percentile, 30-year normal, and the day's
+  warmest/coldest years).
+- **Winter hazards** (FCAST) — forecast snow and ice accumulation from the NWS
+  gridpoint, totalled and broken out by period, with the source grid and any
+  unit conversion stated on screen. A confirmed all-zero forecast renders
+  nothing at all; a field that could not be *read* says so instead, so August
+  and a broken feed never look alike.
+- **Profile** (FCAST) and **Inversion / mixing** (AIR) — freezing level,
+  precipitation-type reasoning, cloud layers and mixing depth, derived on-device
+  from six Open-Meteo pressure levels. These are model output for the current
+  hour, not an observed sounding, and every number carries what limits it: the
+  interpolation gap, the sensitivity of the freezing level to a small lapse-rate
+  change, and a refusal to print one at all across an inversion near 0 °C. The
+  warm-nose case never asserts sleet versus freezing rain — six levels cannot
+  resolve that, and it says so.
+- **River gauges** (SEVERE, and a map layer) — nearby USGS gauges with current
+  stage, flow where reported, and NWS flood categories drawn as a zone bar.
+  Every row states that stage is relative to that gauge's own datum and is not
+  comparable between gauges, and names which NWS gauge the thresholds came from
+  and how far away it is. A reading too old to trust is dated and withheld from
+  the flood comparison rather than colored; a gauge that cannot be assessed is
+  drawn hollow and dashed so it cannot be read as "assessed and fine".
+- **⌂ Locations** — unlimited saved ZIPs plus GPS. The button sits in the side
+  rail on the radar view and on every board.
 
 ## Android APK
 
@@ -75,14 +110,27 @@ Static, no build step — plain ES modules and CSS served as-is:
   attributes on `#screen`
 - `css/` — `tokens.css` (design tokens: all colors + the data typeface),
   `base` / `chrome` / `views` / `boards` / `charts`
-- `js/` — `config` (endpoints + frame model) · `util` (helpers, safe-DOM
-  `el()`/`esc()`) · `state` (view enum, pub/sub, Escape/Back history
-  sentinel) · `net` (`fetchT` timeout fetch, source health) · `store`
-  (localStorage + IndexedDB) · `map` (Leaflet + radar frame engine) ·
-  `timeline` (scrubber, play loop, frame chrome) · `sat` (GOES viewer) ·
-  `wx` (conditions: Open-Meteo → NWS fallback) · `locations` · `layers` ·
-  `boards` · `alerts` · `spc` · `charts` (hand-rolled SVG chart engine) ·
+- `js/` — 23 modules:
+  `config` (endpoints, frame model, palettes, tuned thresholds) ·
+  `util` (helpers, safe-DOM `el()`/`esc()`, `isValidDate`) ·
+  `state` (view enum, pub/sub, Escape/Back history sentinel) ·
+  `net` (`fetchT` timeout fetch, source health) ·
+  `store` (localStorage + IndexedDB) ·
+  `map` (Leaflet + radar frame engine) ·
+  `timeline` (scrubber, play loop, frame chrome) ·
+  `sat` (GOES viewer + the channel strip: GeoColor image, CH13/CH02 tiles) ·
+  `wx` (conditions: Open-Meteo → NWS fallback; the panel that enters the deck) ·
+  `locations` · `layers` (drawer, per-layer health dots, persistence) ·
+  `boards` (the six-board deck, dots, keyboard and swipe navigation) ·
+  `alerts` · `spc` ·
+  `charts` (hand-rolled SVG chart engine) ·
   `forecastx` (FCAST) · `airq` (AIR) · `astro` (SKY) · `almanac` (ALMANAC) ·
+  `winter` (NWS-gridpoint snow/ice strip in FCAST, plus the NOHRSC snow-depth
+  and WPC Day-1 winter-guidance map layers) ·
+  `profile` (freezing level, precipitation-type reasoning, cloud layers,
+  mixing depth — sections inside FCAST and AIR, no board of their own) ·
+  `rivers` (USGS gauges + NWPS flood categories: a section inside SEVERE plus
+  a map layer of gauge pins) ·
   `main` (boot)
 - `vendor/` — Leaflet 1.9.4 and SunCalc, self-hosted (no CDN dependency)
 - `sw.js` — service worker: caches the app shell for instant launch;
@@ -92,16 +140,43 @@ Static, no build step — plain ES modules and CSS served as-is:
 
 ## Data sources (all free, no keys)
 
-IEM NEXRAD N0Q composite tiles (past), IEM HRRR REFD tiles (forecast),
-NOAA STAR GOES-East GeoColor (satellite), Open-Meteo with automatic
-NWS api.weather.gov fallback (conditions), NWS active alerts + zone
-geometry (severe), NOAA ArcGIS map services for SPC outlooks, mesoscale
-mesoscale discussions, watch/warning/advisory polygons and tropical, Open-Meteo
-air quality (US AQI) and ensembles, Open-Meteo ERA5 archive
-(archive-api.open-meteo.com) for daily climate history — cached in IndexedDB
-per 0.25° grid cell, Zippopotam.us (ZIP geocoding), CARTO dark basemap
-(geography and labels as separate layers). Weather data by
-[Open-Meteo.com](https://open-meteo.com/).
+**Radar and satellite** — IEM NEXRAD N0Q composite tiles (past) and IEM HRRR
+REFD tiles (forecast); NOAA STAR GOES-19 GeoColor for the fixed satellite image,
+and IEM's GOES-East CH13 and CH02 tile layers for the two pannable channels
+(the exact layer names are probed at runtime, with the legacy 4 km IR / 1 km
+visible composites as named fallbacks).
+
+**Conditions and forecast** — Open-Meteo with automatic NWS `api.weather.gov`
+fallback; Open-Meteo ensembles for the confidence bands and model agreement;
+Open-Meteo air quality for the US AQI; the Open-Meteo ERA5 archive
+(`archive-api.open-meteo.com`) for daily climate history, cached in IndexedDB
+per 0.25° grid cell; and Open-Meteo pressure levels (1000/925/850/700/500/300
+hPa) for the derived freezing level, precipitation-type reasoning, cloud layers
+and mixing depth. Everything under "profile" is model output for the current
+hour, not an observed sounding, and the board says so.
+
+**Severe and hazards** — NWS active alerts plus zone geometry; NOAA ArcGIS map
+services for SPC convective outlooks, mesoscale discussions, watch/warning/
+advisory polygons and tropical products; the NWS gridpoint `snowfallAmount` and
+`iceAccumulation` fields for the FCAST winter strip (a unit the app cannot
+convert is reported as unreadable, never as zero); the NOHRSC National Snow
+Analysis raster for modelled snow depth, resolved **by layer name** so Snow
+Water Equivalent can never be drawn under a "snow depth" label; and WPC's
+probabilistic winter guidance (Day-1 snow and ice accumulation), whose Day-1
+layer is likewise resolved by name — the same catalog carries unrelated ice
+charts and a Winter Storm Severity Index, and none of those may be drawn under
+a winter-guidance label.
+
+**Rivers** — USGS gauges, discovered through the OGC monitoring-locations API
+and read through the classic instantaneous-values service by explicit site id,
+joined to NOAA/NWS National Water Prediction Service gauges for flood
+categories. Categories defined by discharge rather than stage are named and
+never compared against a stage reading.
+
+**Geocoding and basemap** — Zippopotam.us (ZIP → lat/lon), CARTO dark basemap
+(geography and labels as separate layers, so labels draw above the radar).
+
+Weather data by [Open-Meteo.com](https://open-meteo.com/).
 
 Endpoint reachability and CORS are re-verified weekly by
 `.github/workflows/endpoint-checks.yml`; layer ids are re-discovered at

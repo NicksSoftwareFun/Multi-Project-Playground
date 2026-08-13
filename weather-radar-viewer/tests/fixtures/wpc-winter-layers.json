@@ -1,0 +1,79 @@
+{
+  "layers": [
+    {
+      "id": 0,
+      "name": "Day 1 Snow and Ice Accumulation",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 1,
+      "name": "Day 1 Probability of at least 4 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 2,
+      "name": "Day 1 Probability of at least 8 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 3,
+      "name": "Day 1 Probability of at least 12 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 4,
+      "name": "Day 1 Probability of at least 0.25 inch of icing",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 5,
+      "name": "Day 2 Snow and Ice Accumulation",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 6,
+      "name": "Day 2 Probability of at least 4 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 7,
+      "name": "Day 2 Probability of at least 8 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 8,
+      "name": "Day 2 Probability of at least 12 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 9,
+      "name": "Day 2 Probability of at least 0.25 inch of icing",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 10,
+      "name": "Day 3 Snow and Ice Accumulation",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 11,
+      "name": "Day 3 Probability of at least 4 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 12,
+      "name": "Day 3 Probability of at least 8 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 13,
+      "name": "Day 3 Probability of at least 12 inches of snow",
+      "geometryType": "esriGeometryPolygon"
+    },
+    {
+      "id": 14,
+      "name": "Day 3 Probability of at least 0.25 inch of icing",
+      "geometryType": "esriGeometryPolygon"
+    }
+  ]
+}

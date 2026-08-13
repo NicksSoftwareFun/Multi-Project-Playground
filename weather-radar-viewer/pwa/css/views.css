@@ -5,9 +5,17 @@
 /* visibility convention */
 .screen:not([data-view="radar"]) .chrome-radar { display: none; }
 .screen:not([data-view="radar"]):not([data-view="sat"]) .chrome-map { display: none; }
+.screen:not([data-view="sat"]) .chrome-sat { display: none; }
 /* .chrome-all elements are never hidden by view changes */
 
-/* ---- full-screen satellite view (raw GOES image) ---- */
+/* ---- full-screen satellite view ----
+   Two mechanisms live in this one view (see sat.js):
+     GEOCOLOR  a fixed full-CONUS STAR frame — #satview is an opaque black
+               surface with #satimg filling it, exactly as pre-M6.
+     CH13/CH02 real IEM tiles drawn on the Leaflet map underneath. #satview
+               keeps only its chrome: it goes transparent and stops taking
+               pointer events, so drags/pinches reach the map and the channels
+               genuinely pan and zoom. */
 #satview {
   position: absolute; inset: 0; z-index: 600;
   background: #000; overflow: hidden; display: none;
@@ -22,6 +30,40 @@
 }
 #satview.err .satmsg { display: block; }
 #satview.err img { display: none; }
+
+/* tile mechanism: get out of the map's way, keep the chrome clickable */
+#satview.tiles { background: transparent; pointer-events: none; }
+#satview.tiles img { display: none; }
+#satview .chrome-sat { pointer-events: auto; }
+/* The basemap and the radar frames share Leaflet's default tile pane. Left
+   visible under a tile channel, un-covered map edges outside GOES coverage
+   would bleed radar echoes into a satellite view. The place-labels pane is a
+   separate pane and survives, so the imagery still has geographic reference. */
+.screen[data-view="sat"] #lmap .leaflet-tile-pane { display: none; }
+
+#satChannels {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  display: flex; gap: 8px; z-index: 3;
+}
+.satchbtn {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; font-weight: 700;
+  padding: 8px 13px; border-radius: 999px;
+  border: 1px solid var(--btn-line);
+  background: var(--panel-bg-heavy); color: var(--sub-faint);
+  cursor: pointer; white-space: nowrap;
+}
+.satchbtn:hover { background: var(--btn-bg-hover); }
+.satchbtn.on { border-color: var(--accent); color: var(--accent); }
+.satnote {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(62px + env(safe-area-inset-bottom));
+  max-width: 84%; text-align: center;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em;
+  color: var(--sub-faint); text-shadow: 0 0 6px rgba(6, 10, 16, 0.95);
+  z-index: 3;
+}
+.satnote:empty { display: none; }
 
 /* ---- map layers drawer (data-overlay) ---- */
 #layersdrawer {

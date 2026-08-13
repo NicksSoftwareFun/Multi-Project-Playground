@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "numberReturned": 4,
+  "numberMatched": 4,
+  "features": [
+    {
+      "id": "USGS-05485500",
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.6805, 41.7203] },
+      "properties": {
+        "agency_code": "USGS",
+        "monitoring_location_number": "05485500",
+        "monitoring_location_name": "Des Moines River near Saylorville, IA",
+        "site_type_code": "ST",
+        "site_type": "Stream",
+        "state_name": "Iowa"
+      }
+    },
+    {
+      "id": "USGS-05484800",
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.5836, 41.7402] },
+      "properties": {
+        "agency_code": "USGS",
+        "monitoring_location_number": "05484800",
+        "monitoring_location_name": "Fourmile Creek at Ankeny, IA",
+        "site_type_code": "ST",
+        "site_type": "Stream",
+        "state_name": "Iowa"
+      }
+    },
+    {
+      "id": "USGS-05481950",
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.791, 41.698] },
+      "properties": {
+        "agency_code": "USGS",
+        "monitoring_location_number": "05481950",
+        "monitoring_location_name": "Beaver Creek near Grimes, IA",
+        "site_type_code": "ST",
+        "site_type": "Stream",
+        "state_name": "Iowa"
+      }
+    },
+    {
+      "id": "USGS-414400093400001",
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-93.6667, 41.7333] },
+      "properties": {
+        "agency_code": "USGS",
+        "monitoring_location_number": "414400093400001",
+        "monitoring_location_name": "Polk County Observation Well 3",
+        "site_type_code": "GW",
+        "site_type": "Well",
+        "state_name": "Iowa"
+      }
+    }
+  ]
+}

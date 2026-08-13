@@ -138,6 +138,122 @@ export const ALMANAC_MIN_YEARS_BAND = 10;
 export const ALMANAC_MIN_YEARS_CHART = 5;
 export const ALMANAC_NEAR_BAND = 0.10;   // 0.40-0.60 exceedance reads NEAR NORMAL
 
+// --- winter hazards (M6) ---
+export const ARCGIS_RASTER_ROOT = "https://mapservices.weather.noaa.gov/raster";
+// Confirmed live by the M6 discovery probe. The service folder moved obs/ ->
+// snow/ without notice, and the old path still answers HTTP 200 with an
+// {"error":...} body rather than a 404 — which is exactly why winter.js walks
+// the service directory instead of trusting a path. Last-resort fallback only.
+// layerIdHint is the "Snow Depth" GROUP layer in the recorded catalog; its
+// pixels live in the mosaic's Image child (rasterIdHint), because an ArcGIS
+// export does not expand a group id in layers=show. Both are last-resort
+// values used only when /layers cannot be read, and winter.js says "hinted"
+// in the layer's health note whenever it falls back to them.
+export const NOHRSC_SERVICE_HINT = {
+  name: "snow/NOHRSC_Snow_Analysis", type: "MapServer",
+  layerNameHint: "Snow Depth", layerIdHint: 0, rasterIdHint: 3
+};
+export const WINTER_REFRESH_MS = 15 * 60 * 1000;
+export const NOHRSC_REFRESH_MS = 60 * 60 * 1000;   // conservative: NOHRSC's real cadence is unconfirmed
+
+// WPC probabilistic winter guidance — confirmed live at
+// precip/wpc_prob_winter_precip, 15 layers (Day 1-3 x {accumulation, >=4in,
+// >=8in, >=12in snow, icing >0.25in}). No id hint is kept on purpose:
+// wpcDay1LayerId() always resolves by name, and the service is too new to this
+// app to earn a hardcoded fallback.
+export const WPC_WINTER_REFRESH_MS = 30 * 60 * 1000;
+
+// mm/cm/m/in -> inches. Confirmed: the live gridpoint probe returned
+// "wmoUnit:mm" for both snowfallAmount and iceAccumulation. The other rows
+// exist so a WFO reporting a different unit family converts correctly rather
+// than being rendered with a guessed factor.
+export const UOM_TO_IN = {
+  "wmoUnit:mm": 1 / 25.4, "wmoUnit:cm": 1 / 2.54, "wmoUnit:m": 1000 / 25.4, "wmoUnit:in": 1
+};
+
+// --- GOES satellite channels (M6) ---
+// Confirmed live: CH13/CH02 are real IEM tile layers (52 KB / 67 KB PNGs).
+// GEOCOLOR is NOT an IEM tile layer — goes_east_conus_geocolor and
+// _truecolor both 503 live and 404 archived — so GEOCOLOR keeps the existing
+// NOAA STAR full-frame mechanism (GOES_PRIMARY/GOES_FALLBACK above) and only
+// CH13/CH02 use tiles. Never label a legacy visible composite as GeoColor.
+export const IEM_GOES_ARCHIVE = "https://mesonet.agron.iastate.edu/c/tile.py/1.0.0/";
+export const GOES_CHANNELS = [
+  { id: "geocolor", label: "GEOCOLOR", mech: "image" },
+  { id: "ch13", label: "CH13 IR", mech: "tile",
+    layers: ["goes_east_conus_ch13"], aliasLayers: ["goes-east-ir-4km"],
+    aliasNote: "LEGACY 4KM IR COMPOSITE" },
+  { id: "ch02", label: "CH02 VIS", mech: "tile",
+    layers: ["goes_east_conus_ch02"], aliasLayers: ["goes-east-vis-1km"],
+    aliasNote: "LEGACY 1KM VISIBLE COMPOSITE" }
+];
+
+// --- atmospheric profile (M7) ---
+// Confirmed live on a real runner: the 6-level x 5-variable hourly request is
+// accepted (HTTP 200, 30/30 variables returned, ~9.8 KB for one day) and
+// relative_humidity_{p}hPa IS populated — the earlier "RH is null everywhere"
+// finding came from a network-blocked sandbox and was a stub artifact.
+export const OM_LEVELS = [1000, 925, 850, 700, 500, 300];
+export const PROFILE_TTL_MS = 30 * 60 * 1000;      // same cadence as CAST_TTL_MS
+export const PROFILE_FETCH_MS = 15000;             // pressure-level payloads run past fetchT's 8s default
+// JUDGMENT CALLS, on the same footing as airq.js's DRIVER_TOLERANCE: documented,
+// not derived, and biased toward saying "uncertain" rather than printing a number.
+export const CLOUD_RH_THRESHOLD = 80;              // % RH at a level that counts as "cloudy"
+export const PROFILE_GAP_WARN_M = 2500;            // interpolation gap that earns an "approximate" note
+export const PROFILE_INVERSION_MIN_C = 0.1;        // warming-with-height smaller than this is noise, not an inversion
+// An inversion only corrupts a freezing level if it happens in air near 0°C. A
+// nocturnal inversion in an 18°C airmass is real and irrelevant, and blanking
+// the freezing level for it would print "--" on most clear nights.
+export const PROFILE_INVERSION_NEAR_C = 3;         // |t| within this of zero makes an inversion disqualifying
+// Sensitivity test on the crossing layer: shift both endpoints by this much and
+// see how far the interpolated height moves. A near-isothermal layer through
+// 0°C moves kilofeet for a fraction of a degree, which the reader must be told.
+export const PROFILE_LAPSE_DT_C = 0.5;
+export const PROFILE_LAPSE_WARN_M = 300;
+// Warmest sampled level at or above this still leaves room for an unsampled
+// warm nose between levels, so the all-snow verdict must hedge.
+export const PROFILE_NEAR_ZERO_C = -1.5;
+// 2 m humidity is NOT a cloud criterion (80-95% at screen height is an ordinary
+// humid night). It is reported separately, as possible fog, and only this high.
+export const FOG_RH_THRESHOLD = 95;
+export const PROFILE_MIX_SHALLOW_M = 500;
+export const PROFILE_MIX_DEEP_M = 1500;
+// ISA heights, last resort only: geopotential_height is real and populated, so
+// this table should essentially never fire. Any line built on it says so.
+export const STANDARD_ATM_FT_BY_HPA = {
+  1000: 364, 925: 2500, 850: 4781, 700: 9882, 500: 18289, 300: 30065
+};
+
+// --- water: river gauges + flood stages (M7) ---
+// Two-step by necessity. The classic waterservices bbox form is UNUSABLE for
+// discovery — probed live, it did not answer at all (~45 s abort) for 0.2° and
+// 0.5° boxes, and only replied to a ~110 km box with 150 KB / 55 sites. The
+// modern OGC API answers the small box the classic one could not, so discovery
+// runs there and only the READING is fetched from waterservices, by explicit
+// site id (that form is confirmed fast). Never fall back to the bbox form: it
+// would hang the board rather than degrade it.
+export const USGS_OGC_SITES =
+  "https://api.waterdata.usgs.gov/ogcapi/v0/collections/monitoring-locations/items";
+export const USGS_IV = "https://waterservices.usgs.gov/nwis/iv/";
+export const NWPS_GAUGES = "https://api.water.noaa.gov/nwps/v1/gauges";
+export const RIVER_TTL_MS = 15 * 60 * 1000;             // live stage/flow reading
+export const GAUGE_CATALOG_TTL_MS = 24 * 60 * 60 * 1000; // gauges do not move; thresholds barely change
+export const RIVER_BBOX_DEG = 0.25;      // half-width of the discovery box, ~17 mi N-S
+export const RIVER_DISCOVER_LIMIT = 20;  // 50 features cost 127 KB live; a nearby list wants far fewer
+export const RIVER_MAX_GAUGES = 4;       // nearest N stream sites actually rendered
+// USGS<->NWPS proximity join, in MILES rather than degrees: a degree box is ~30%
+// tighter east-west than north-south at these latitudes, which is not a
+// tolerance anyone chose. The join is also one-to-one — a lid claimed by the
+// nearer site is not available to the next one.
+export const GAUGE_MATCH_MI = 0.7;
+// A reading older than this is not "now". USGS answers with the newest value it
+// has, which for a gauge whose radio is down can be many hours stale.
+export const GAUGE_STALE_MS = 2 * RIVER_TTL_MS;
+// NWPS writes -9999 into a flood category's `flow` to mean "not applicable".
+// Read as a number it is a discharge threshold every gauge is above, which
+// would mis-classify all of them, so anything at or below this is ABSENT.
+export const NWPS_ABSENT_SENTINEL = -9998;
+
 export const HOME_VIEW = { center: [38.5, -86], zoom: 5 };
 export const DEFAULT_VIEW_KM = 200;   // boot + home framing around the active location
 export const AUTO_CLOSE_KM = 175;     // auto-mode second radar pass

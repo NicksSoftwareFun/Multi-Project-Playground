@@ -1,0 +1,17 @@
+{
+  "currentVersion": 11.2,
+  "services": [
+    {
+      "name": "obs/asip_ice_chart",
+      "type": "MapServer"
+    },
+    {
+      "name": "obs/usnic_greatlakes_ice_chart",
+      "type": "MapServer"
+    },
+    {
+      "name": "outlooks/wpc_wssi",
+      "type": "MapServer"
+    }
+  ]
+}

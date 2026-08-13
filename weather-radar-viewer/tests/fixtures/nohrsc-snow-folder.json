@@ -1,0 +1,14 @@
+{
+  "currentVersion": 11.2,
+  "folders": [],
+  "services": [
+    {
+      "name": "snow/NOHRSC_Snow_Analysis",
+      "type": "MapServer"
+    },
+    {
+      "name": "snow/nsm_swe_experimental",
+      "type": "ImageServer"
+    }
+  ]
+}

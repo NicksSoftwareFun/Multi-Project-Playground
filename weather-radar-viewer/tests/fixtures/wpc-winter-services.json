@@ -1,0 +1,13 @@
+{
+  "currentVersion": 11.2,
+  "folders": [
+    "aviation",
+    "fire_weather",
+    "hazards",
+    "obs",
+    "outlooks",
+    "precip",
+    "Utilities"
+  ],
+  "services": []
+}

@@ -1,0 +1,150 @@
+{
+  "@context": [
+    "https://geojson.org/geojson-ld/geojson-context.jsonld"
+  ],
+  "id": "https://api.weather.gov/gridpoints/DMX/73,49",
+  "type": "Feature",
+  "properties": {
+    "@id": "https://api.weather.gov/gridpoints/DMX/73,49",
+    "@type": "wx:Gridpoint",
+    "gridId": "DMX",
+    "gridX": "73",
+    "gridY": "49",
+    "updateTime": "2030-01-14T11:34:00+00:00",
+    "snowfallAmount": {
+      "uom": "wmoUnit:mm",
+      "values": [
+        {
+          "validTime": "2030-01-14T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-14T18:00:00+00:00/PT6H",
+          "value": 25.4
+        },
+        {
+          "validTime": "2030-01-15T00:00:00+00:00/PT6H",
+          "value": 50.8
+        },
+        {
+          "validTime": "2030-01-15T06:00:00+00:00/PT6H",
+          "value": 25.4
+        },
+        {
+          "validTime": "2030-01-15T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-15T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T18:00:00+00:00/PT6H",
+          "value": 0
+        }
+      ]
+    },
+    "iceAccumulation": {
+      "uom": "wmoUnit:mm",
+      "values": [
+        {
+          "validTime": "2030-01-14T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-14T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-15T00:00:00+00:00/PT6H",
+          "value": 2.54
+        },
+        {
+          "validTime": "2030-01-15T06:00:00+00:00/PT6H",
+          "value": 5.08
+        },
+        {
+          "validTime": "2030-01-15T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-15T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-01-16T18:00:00+00:00/PT6H",
+          "value": 0
+        }
+      ]
+    },
+    "quantitativePrecipitation": {
+      "uom": "wmoUnit:mm",
+      "values": [
+        {
+          "validTime": "2030-01-14T12:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-14T18:00:00+00:00/PT6H",
+          "value": 28.4
+        },
+        {
+          "validTime": "2030-01-15T00:00:00+00:00/PT6H",
+          "value": 53.8
+        },
+        {
+          "validTime": "2030-01-15T06:00:00+00:00/PT6H",
+          "value": 28.4
+        },
+        {
+          "validTime": "2030-01-15T12:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-15T18:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-16T00:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-16T06:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-16T12:00:00+00:00/PT6H",
+          "value": 3
+        },
+        {
+          "validTime": "2030-01-16T18:00:00+00:00/PT6H",
+          "value": 3
+        }
+      ]
+    }
+  }
+}

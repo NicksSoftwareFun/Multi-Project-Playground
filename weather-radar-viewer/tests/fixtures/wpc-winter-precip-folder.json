@@ -1,0 +1,13 @@
+{
+  "currentVersion": 11.2,
+  "services": [
+    {
+      "name": "precip/wpc_qpf",
+      "type": "MapServer"
+    },
+    {
+      "name": "precip/wpc_prob_winter_precip",
+      "type": "MapServer"
+    }
+  ]
+}

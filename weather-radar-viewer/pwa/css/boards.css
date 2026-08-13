@@ -128,6 +128,70 @@
 
 .srcnote { font-size: 10px; color: var(--sub-dim); letter-spacing: 0.08em; }
 
+/* ---- winter hazard strip (FCAST board, M6) ----
+   The container is left EMPTY, not hidden by a flag, whenever the forecast
+   carries no snow or ice — so the layout collapses with it and there is never
+   a titled box sitting above nothing. */
+#winterStrip:empty { display: none; margin: 0; }
+.winterstrip { display: flex; flex-direction: column; gap: 6px; }
+.winterstrip .winterrow {
+  display: flex; align-items: baseline; gap: 12px; font-size: 13px;
+}
+.winterstrip .winterrow .k { color: var(--sub); letter-spacing: 0.08em; }
+.winterstrip .winterrow .v { letter-spacing: 0.06em; color: var(--ink-mid); }
+.winterstrip .winterrow.snow .v { color: var(--snow); }
+.winterstrip .winterrow.ice .v { color: var(--ice-accum); }
+.winterstrip .winterper {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 11.5px; color: var(--sub-faint); padding-left: 14px;
+}
+.winterstrip .winterper .v { color: var(--ink-mid); }
+.winterstrip .srcnote { margin-top: 4px; }
+
+/* ---- derived profile sections (FCAST + AIR, M7) ----
+   Prose, not a chart: the brief rejected a height-axis sounding plot because a
+   bare profile teaches a non-meteorologist nothing. Empty collapses, so a board
+   never carries a titled box above nothing. */
+#profileStrip:empty, #inversionStrip:empty { display: none; margin: 0; }
+.profstrip { display: flex; flex-direction: column; gap: 6px; }
+.profstrip .subsect {
+  font-size: 11px; letter-spacing: 0.14em; color: var(--sub);
+  margin-top: 10px;
+}
+.profstrip .profline {
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-mid); letter-spacing: 0.04em;
+}
+.profstrip .grid { margin-bottom: 2px; }
+
+/* ---- river gauges (SEVERE board, M7) ---- */
+#riverStrip:empty { display: none; margin: 0; }
+.riverstrip { display: flex; flex-direction: column; gap: 4px; }
+.gaugerow { padding: 10px 0; border-bottom: 1px solid var(--panel-line); }
+.gaugerow .name { font-size: 13px; color: var(--ink-mid); letter-spacing: 0.04em; }
+.gaugerow .stage { font-size: 20px; color: var(--ink-hi); font-weight: 700; }
+.gaugerow .rel { font-size: 11.5px; color: var(--sub-faint); letter-spacing: 0.04em; }
+.gaugerow .grid { margin: 6px 0 4px; }
+/* Flood-category zones reuse the existing severity tokens — no parallel flood
+   palette is invented, and no color value is ever set from JS. */
+.gaugebar {
+  position: relative; height: 6px; border-radius: 3px;
+  background: var(--panel-line); margin: 6px 0 4px;
+}
+.gaugebar .zone { position: absolute; top: 0; bottom: 0; opacity: 0.75; }
+.gaugebar .zone.below { background: var(--ok); }
+.gaugebar .zone.action { background: var(--sev-stmt); }
+.gaugebar .zone.minor { background: var(--sev-adv); }
+.gaugebar .zone.moderate { background: var(--sev-watch); }
+.gaugebar .zone.major { background: var(--sev-warn); }
+.gaugebar .now {
+  position: absolute; top: -3px; width: 2px; height: 12px;
+  background: var(--ink-hi); border-radius: 1px;
+}
+.gaugerow .rel.action { color: var(--sev-stmt); }
+.gaugerow .rel.minor { color: var(--sev-adv); }
+.gaugerow .rel.moderate { color: var(--sev-watch); }
+.gaugerow .rel.major { color: var(--sev-warn); }
+
 /* ---- SKY board ---- */
 /* 84px (the shared .bigtemp size) is sized for "72°" and overflows "13H 59M 41S" */
 #boards #board-sky .bigtemp { font-size: 46px; letter-spacing: 0.02em; }
@@ -164,6 +228,8 @@
   #boards .grid .k { font-size: 11px; }
   #boards .grid .v { font-size: 12px; }
   .alertcard .ev { font-size: 13px; }
+  .gaugerow .stage { font-size: 16px; }
+  .profstrip .profline { font-size: 11.5px; }
   #boards #board-sky .bigtemp { font-size: 32px; }
   #board-sky .moondisc { width: 48px; height: 48px; }
 }

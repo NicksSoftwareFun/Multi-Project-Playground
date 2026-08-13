@@ -1,0 +1,84 @@
+{
+  "type": "FeatureCollection",
+  "name": "wpc_prob_winter_precip Day 1 Snow and Ice Accumulation",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "properties": {
+        "OBJECTID": 1,
+        "Units": "inches",
+        "ProbLabel": "0.01 - 2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -97,
+              40
+            ],
+            [
+              -91,
+              40
+            ],
+            [
+              -91,
+              44
+            ],
+            [
+              -97,
+              44
+            ],
+            [
+              -97,
+              40
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "properties": {
+        "OBJECTID": 2,
+        "Units": "inches",
+        "ProbLabel": "2 - 4"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -95,
+              41
+            ],
+            [
+              -92,
+              41
+            ],
+            [
+              -92,
+              43
+            ],
+            [
+              -95,
+              43
+            ],
+            [
+              -95,
+              41
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -738,10 +738,14 @@ function renderBoard() {
       el("span", { class: "asof" },
         "AS OF " + (rec && rec.fetchedAt ? fmt(new Date(rec.fetchedAt)) : "--:--"))),
     box,
+    // A live river reading is worth seeing before a multi-day outlook, so the
+    // gauges sit above the SPC strip.
+    el("div", { id: "riverStrip" }),
     el("div", { id: "spcStrip" }),
     el("div", { class: "srcnote" }, "NWS api.weather.gov · SPC")
   );
-  // spc.js owns #spcStrip and refills it after every one of our re-renders.
+  // spc.js owns #spcStrip and rivers.js owns #riverStrip; both refill after
+  // every one of our re-renders.
   state.emit("severeboard", { el: boardEl });
 }
 

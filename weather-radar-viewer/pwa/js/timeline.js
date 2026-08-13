@@ -66,6 +66,8 @@ export function init() {
 
   state.on("frame", updateChrome);
   state.on("view", updateChrome);
+  // the SAT badge names the active channel, so a channel switch has to repaint it
+  state.on("goes", updateChrome);
   updateChrome();
 }
 
@@ -92,7 +94,8 @@ export function updateChrome() {
     return;
   }
   if (view === View.SAT) {
-    srcBadge.textContent = "GOES-EAST GEOCOLOR · CONUS";
+    const ch = sat.getActiveChannel();
+    srcBadge.textContent = "GOES-EAST " + (ch ? ch.label : "GEOCOLOR") + " · CONUS";
     srcBadge.className = "badge sat";
     const fetched = sat.getFetched();
     frameTimeEl.textContent = fetched ? "FETCHED " + fmt(fetched) : "--:--";

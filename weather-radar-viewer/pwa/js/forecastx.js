@@ -18,6 +18,7 @@ import { fetchT, okJson, setHealth } from "./net.js";
 import { chart } from "./charts.js";
 import * as locations from "./locations.js";
 import * as boards from "./boards.js";
+import * as state from "./state.js";
 
 let boardEl = null;
 let activeCharts = [];          // torn down before every repaint so ResizeObservers don't leak
@@ -384,8 +385,16 @@ function paint() {
 
   kids.push(meteogramSection(c));
   kids.push(sevenDaySection(c));
+  // winter.js fills this on the "castboard" event below, and leaves it empty
+  // (CSS collapses it) whenever there is no snow or ice in the forecast — which
+  // is most of the year, and is a correct answer rather than a missing one.
+  kids.push(el("div", { id: "winterStrip" }));
   kids.push(confidenceSection(loc, c));
   kids.push(modelAgreementSection(c));
+  // profile.js fills this on the "castboard" event below: freezing level,
+  // precipitation-type reasoning, and cloud bases/tops. Its own fetch, so a
+  // dead pressure-level response never blanks the sections above it.
+  kids.push(el("div", { id: "profileStrip" }));
   // The 15-minute precipitation strip reads as a footnote to the forecast, not
   // a headline: it sits under the model comparison rather than above the 48h
   // meteogram, where it was the first thing on screen.
@@ -395,6 +404,9 @@ function paint() {
     "WEATHER DATA BY ", el("a", { href: "https://open-meteo.com/", target: "_blank", rel: "noopener" }, "OPEN-METEO.COM")));
 
   boardEl.replaceChildren(...kids);
+  // Every repaint builds a fresh #winterStrip node, so the owner has to be told
+  // to refill it. Emitted last, when the node is actually in the document.
+  state.emit("castboard", { el: boardEl });
 }
 
 function render() { paint(); }

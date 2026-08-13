@@ -1,0 +1,265 @@
+{
+  "@context": [
+    "https://geojson.org/geojson-ld/geojson-context.jsonld"
+  ],
+  "id": "https://api.weather.gov/gridpoints/DMX/73,49",
+  "type": "Feature",
+  "properties": {
+    "@id": "https://api.weather.gov/gridpoints/DMX/73,49",
+    "@type": "wx:Gridpoint",
+    "gridId": "DMX",
+    "gridX": "73",
+    "gridY": "49",
+    "updateTime": "2030-08-12T11:34:00+00:00",
+    "snowfallAmount": {
+      "uom": "wmoUnit:mm",
+      "values": [
+        {
+          "validTime": "2030-08-12T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-12T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T18:00:00+00:00/PT6H",
+          "value": 0
+        }
+      ]
+    },
+    "iceAccumulation": {
+      "uom": "wmoUnit:mm",
+      "values": [
+        {
+          "validTime": "2030-08-12T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-12T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-13T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-14T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-15T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-16T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-17T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-18T18:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T00:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T06:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T12:00:00+00:00/PT6H",
+          "value": 0
+        },
+        {
+          "validTime": "2030-08-19T18:00:00+00:00/PT6H",
+          "value": 0
+        }
+      ]
+    }
+  }
+}

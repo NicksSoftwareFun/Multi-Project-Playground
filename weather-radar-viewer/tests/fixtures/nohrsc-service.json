@@ -1,0 +1,17 @@
+{
+  "currentVersion": 11.2,
+  "serviceDescription": "NOHRSC National Snow Analysis",
+  "mapName": "Layers",
+  "singleFusedMapCache": false,
+  "fullExtent": {
+    "xmin": -130.5167,
+    "ymin": 24.1,
+    "xmax": -60.75,
+    "ymax": 58.24,
+    "spatialReference": {
+      "wkid": 4326,
+      "latestWkid": 4326
+    }
+  },
+  "capabilities": "Map,Query"
+}

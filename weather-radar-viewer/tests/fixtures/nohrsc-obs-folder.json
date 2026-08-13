@@ -1,0 +1,10 @@
+{
+  "currentVersion": 11.2,
+  "folders": [],
+  "services": [
+    {
+      "name": "obs/usnic_ims_snow_ice_1km",
+      "type": "MapServer"
+    }
+  ]
+}
