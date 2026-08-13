@@ -44,7 +44,24 @@ export function init() {
       zoomControl: false,
       attributionControl: true
     });
-    L.tileLayer(BASEMAP, { attribution: BASEMAP_ATTRIB, subdomains: "abcd" }).addTo(map);
+    // Geography is drawn one zoom level DEEPER than the map is showing, in
+    // half-size tiles. A raster basemap generalises by zoom level, so at a
+    // regional view an estuary like Hampton Roads is simplified into land and
+    // you have to zoom in before the water appears at all. Requesting z+1 and
+    // painting it into a 128px box restores that detail a level early, and
+    // doubles effective pixel density into the bargain.
+    // Costs: four times the basemap tile requests, and on a 1x display the
+    // downscale is slightly soft. Labels deliberately stay at native scale
+    // (below) — halving THEIR size would make the map less readable, not more.
+    L.tileLayer(BASEMAP, {
+      attribution: BASEMAP_ATTRIB,
+      subdomains: "abcd",
+      tileSize: 128,
+      zoomOffset: 1,
+      maxNativeZoom: 18,
+      updateWhenIdle: true,
+      keepBuffer: 1
+    }).addTo(map);
     // Labels ride in their own pane above radar, alerts, and outlook fills, so
     // no amount of reflectivity can hide which county you are looking at.
     // pointer-events: none keeps drags and polygon taps reaching the layers below.

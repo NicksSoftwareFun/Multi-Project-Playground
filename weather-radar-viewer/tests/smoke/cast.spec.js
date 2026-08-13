@@ -159,3 +159,26 @@ test("day ticks on the meteogram print the date under the weekday", async ({ pag
   const pairs = await svg.locator("text:has(tspan.datesub)").allTextContents();
   expect(pairs[0]).toMatch(/^(SUN|MON|TUE|WED|THU|FRI|SAT)\d{1,2}\/\d{1,2}$/);
 });
+
+// A 7-day chart on a narrow plot used to label every OTHER day, which reads as
+// a chart with missing days. Every day boundary in range gets its own tick.
+test("multi-day charts label every day, not every other day", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });   // the narrow case that used to skip
+  await routeAll(page);
+  await boot(page);
+  await page.locator("#wxPanel").click();
+  await page.locator("#boardDots .dot", { hasText: "FCAST" }).click();
+
+  const ens = page.locator("#board-cast .chart").filter({ has: page.locator("path") }).last();
+  await expect(ens.locator(".plot svg")).toBeVisible({ timeout: 15_000 });
+
+  const dates = await ens.locator("tspan.datesub").allTextContents();
+  expect(dates.length).toBeGreaterThanOrEqual(3);
+
+  // consecutive calendar days: no gaps
+  const days = dates.map((d) => Number(d.split("/")[1]));
+  for (let i = 1; i < days.length; i++) {
+    const gap = days[i] - days[i - 1];
+    expect(gap === 1 || gap < 0).toBe(true);   // +1 day, or a month rollover
+  }
+});

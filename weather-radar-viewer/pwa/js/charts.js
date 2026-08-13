@@ -82,8 +82,14 @@ function niceTicks(lo, hi, count) {
 function timeTicks(min, max, width) {
   const hours = (max - min) / 3600000;
   const target = Math.max(2, Math.min(8, Math.round(width / 90)));
-  const steps = [1, 2, 3, 6, 12, 24, 48];
-  const stepH = steps.find((s) => hours / s <= target) || 48;
+  // 48 is deliberately NOT in the ladder. On a narrow plot a 7-day chart used
+  // to land there and label every OTHER day, which reads as a chart with
+  // missing days rather than a chart with sparse labels — the reader counts
+  // gridlines to find Thursday. A day tick is only ~30px wide (weekday over
+  // date), so a week of them fits even on a phone; below a day, the usual
+  // ladder still applies.
+  const steps = [1, 2, 3, 6, 12, 24];
+  const stepH = steps.find((s) => hours / s <= target) || 24;
   const out = [];
   const d = new Date(min);
   d.setMinutes(0, 0, 0);
