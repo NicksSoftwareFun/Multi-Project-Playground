@@ -629,7 +629,10 @@ function coordLabel(pt) {
 }
 
 // ---- rendering ----------------------------------------------------------------
-// All DOM via el() from util.js — .innerHTML never appears. Colors are CSS
+// All DOM via el() from util.js — no raw HTML strings anywhere. (Deliberately
+// not naming the forbidden property here: the CI gate greps for it and cannot
+// tell prose from a sink, which is the right trade for a security check.)
+// Colors are CSS
 // class toggles (boards.css maps .hot/.cold/.near/.record/.none to tokens);
 // this module never assigns a hex value.
 
