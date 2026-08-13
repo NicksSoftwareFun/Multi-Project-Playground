@@ -156,11 +156,31 @@ function plannedChunks(chunkYears, nowYear) {
   return out.reverse();
 }
 
+// Today as a local ISO date. The archive indexes by calendar date, and the
+// board reads those dates by string slice, so this must be the LOCAL day —
+// toISOString() would hand back the UTC one and be a day off all evening in
+// the Americas.
+function todayIso() {
+  const d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1, 2) + "-" + pad(d.getDate(), 2);
+}
+
 function chunkUrl(cell, y0, y1) {
   // NO timeformat=unixtime — daily.time must come back as ISO date strings
   // ("1940-08-12") so the local calendar date is read by string slice.
+  //
+  // BOTH ends are clamped to the archive's real range. It does NOT clip a
+  // request that overshoots — it answers 400 with "out of allowed range", and
+  // the newest chunk always overshoots because its year ends on Dec 31. That
+  // is the whole board failing with HTTP 400 for anyone opening it before
+  // December.
+  const today = todayIso();
+  let start = y0 + "-01-01";
+  let end = y1 + "-12-31";
+  if (start < ALMANAC_EPOCH_YEAR + "-01-01") start = ALMANAC_EPOCH_YEAR + "-01-01";
+  if (end > today) end = today;
   return OM_ARCHIVE + "?latitude=" + cell.lat + "&longitude=" + cell.lon +
-    "&start_date=" + y0 + "-01-01&end_date=" + y1 + "-12-31" +
+    "&start_date=" + start + "&end_date=" + end +
     "&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto";
 }
 

@@ -97,6 +97,23 @@ function seeded(year, doy) {
   const h = Math.abs(Math.sin(year * 374761393 + doy * 668265263) * 43758.5453) % 1;
   return Math.floor(h * 3) - 1;   // -1, 0, or 1
 }
+// The real archive answers 400 "out of allowed range" for a start_date before
+// 1940-01-01 or an end_date past today — it does NOT clip the request. A stub
+// that cheerfully serves any range hides exactly one class of bug, and did:
+// the newest chunk asked through Dec 31 of the current year and the whole
+// board failed with HTTP 400 in production while every test passed.
+function era5OutOfRange(url) {
+  const s = url.searchParams.get("start_date");
+  const e = url.searchParams.get("end_date");
+  const d = new Date();
+  const today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+                "-" + String(d.getDate()).padStart(2, "0");
+  if (!s || !e) return "missing start_date or end_date";
+  if (s < "1940-01-01") return "start_date " + s + " is out of allowed range from 1940-01-01 to " + today;
+  if (e > today) return "end_date " + e + " is out of allowed range from 1940-01-01 to " + today;
+  return null;
+}
+
 function era5Chunk(url) {
   const s = url.searchParams.get("start_date");
   const e = url.searchParams.get("end_date");
@@ -178,7 +195,16 @@ async function routeAll(page, opts) {
     }
     if (host === "ensemble-api.open-meteo.com") return json(route, OM_ENSEMBLE());
     if (host === "air-quality-api.open-meteo.com") return json(route, OM_AIR());
-    if (host === "archive-api.open-meteo.com") return json(route, era5Chunk(url));
+    if (host === "archive-api.open-meteo.com") {
+      const bad = era5OutOfRange(url);
+      if (bad) {
+        return route.fulfill({
+          status: 400, contentType: "application/json", headers: CORS,
+          body: JSON.stringify({ error: true, reason: "Parameter '" + bad + "'" }),
+        });
+      }
+      return json(route, era5Chunk(url));
+    }
     if (host === "api.weather.gov") {
       // alerts + zones first: /zones/forecast/IAZ060 would otherwise be caught
       // by the "forecast" branch below
