@@ -12,22 +12,35 @@ import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Locale;
+
 /**
  * Full-screen shell around the SKYWATCH PWA.
  *
- * The web app is loaded from its https origin (not bundled into the APK) so
- * that fetches to the weather/radar APIs keep a real origin for CORS, the
- * service worker stays valid, and app updates ship by redeploying the site.
+ * The web app ships inside the APK (assets/www, copied from ../pwa at build
+ * time) and is served to the WebView by intercepting requests to a private
+ * https origin. Nothing is loaded from GitHub Pages — the app runs entirely
+ * on its own, needing the network only for the live weather feeds themselves
+ * (radar tiles, satellite imagery, forecasts, alerts).
+ *
+ * The origin is https, not file://, because the app needs a secure context:
+ * geolocation and ES modules both refuse to run from file URLs. The host is
+ * the androidx-reserved appassets.androidx.dev, which is guaranteed never to
+ * resolve on the real internet, so every request to it lands in
+ * shouldInterceptRequest and is answered from assets.
  */
 public class MainActivity extends Activity {
 
-    private static final String APP_URL =
-            "https://nickssoftwarefun.github.io/Multi-Project-Playground/";
-    private static final String APP_HOST = "nickssoftwarefun.github.io";
+    private static final String APP_HOST = "appassets.androidx.dev";
+    private static final String APP_URL = "https://" + APP_HOST + "/index.html";
     private static final int RC_LOCATION = 41;
 
     private WebView web;
@@ -78,6 +91,16 @@ public class MainActivity extends Activity {
         });
         web.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view,
+                    WebResourceRequest request) {
+                Uri url = request.getUrl();
+                if (!"https".equals(url.getScheme()) || !APP_HOST.equals(url.getHost())) {
+                    return null;               // live feeds go to the real network
+                }
+                return serveAsset(url.getPath());
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
                 if (APP_HOST.equals(url.getHost())) {
@@ -95,6 +118,52 @@ public class MainActivity extends Activity {
         } else {
             web.loadUrl(APP_URL);
         }
+    }
+
+    /** Answer an app-origin request from the bundled web app in assets/www. */
+    private WebResourceResponse serveAsset(String path) {
+        if (path == null || "/".equals(path)) {
+            path = "/index.html";
+        }
+        if (path.contains("..")) {
+            return errorResponse(403, "Forbidden");
+        }
+        try {
+            InputStream in = getAssets().open("www" + path);
+            String mime = mimeFor(path);
+            String charset = mime.startsWith("text/") || mime.endsWith("json")
+                    ? "utf-8" : null;
+            return new WebResourceResponse(mime, charset, in);
+        } catch (IOException e) {
+            return errorResponse(404, "Not Found");
+        }
+    }
+
+    private static WebResourceResponse errorResponse(int code, String reason) {
+        return new WebResourceResponse("text/plain", "utf-8", code, reason,
+                null, new ByteArrayInputStream(new byte[0]));
+    }
+
+    /**
+     * AssetManager knows nothing about types, so map from the extension.
+     * text/javascript matters most: the app is plain ES modules, and the
+     * browser refuses to execute a module served with the wrong MIME type.
+     */
+    private static String mimeFor(String path) {
+        String p = path.toLowerCase(Locale.ROOT);
+        if (p.endsWith(".html")) return "text/html";
+        if (p.endsWith(".js") || p.endsWith(".mjs")) return "text/javascript";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+        if (p.endsWith(".gif")) return "image/gif";
+        if (p.endsWith(".svg")) return "image/svg+xml";
+        if (p.endsWith(".webmanifest")) return "application/manifest+json";
+        if (p.endsWith(".json")) return "application/json";
+        if (p.endsWith(".woff2")) return "font/woff2";
+        if (p.endsWith(".woff")) return "font/woff";
+        if (p.endsWith(".ico")) return "image/x-icon";
+        return "application/octet-stream";
     }
 
     @Override

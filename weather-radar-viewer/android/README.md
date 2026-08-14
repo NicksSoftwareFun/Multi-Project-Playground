@@ -1,7 +1,10 @@
 # SKYWATCH — Android APK
 
-A minimal full-screen shell around the hosted PWA, for sideloading onto a
-phone or tablet.
+A standalone, full-screen build of the SKYWATCH weather app for sideloading
+onto a phone or tablet. The entire web app is **bundled inside the APK** — it
+does not load anything from GitHub Pages and runs entirely on its own. The
+network is used only for the live weather feeds themselves (radar tiles,
+satellite imagery, forecasts, alerts).
 
 **Download the latest build:**
 https://github.com/NicksSoftwareFun/Multi-Project-Playground/releases/download/android-latest/skywatch.apk
@@ -11,30 +14,27 @@ to install unknown apps when prompted.
 
 ## What it is
 
-A single `Activity` hosting a `WebView` pointed at
-`https://nickssoftwarefun.github.io/Multi-Project-Playground/`. It runs
-immersive (no status or navigation bars), holds the screen awake while open,
+A single `Activity` hosting a `WebView`. At build time the PWA
+(`../pwa`) is copied into the APK's assets; at run time the shell serves those
+files to the WebView by intercepting requests to a private https origin
+(`appassets.androidx.dev` — a host reserved for exactly this, guaranteed never
+to resolve on the real internet). An https origin rather than `file://` keeps
+the app in a secure context, which geolocation and ES modules require.
+
+The shell runs immersive (no status bar), holds the screen awake while open,
 keeps the back button navigating inside the app, and opens off-site links in
 the real browser.
 
-Because the app loads the live site rather than bundling it, **web changes
-reach the phone on next launch — no reinstall.** The APK only needs rebuilding
-when this native shell changes.
-
-### Why not a Trusted Web Activity?
-
-A TWA renders through Chrome and would be the usual choice, but it hides the
-address bar only when Digital Asset Links verification passes, and that file
-must be served from the *origin root* (`https://nickssoftwarefun.github.io/.well-known/assetlinks.json`).
-This is a project Pages site living under a subpath, so the root belongs to a
-different repository. A WebView shell sidesteps the problem and is always
-full-screen.
+Because the web app is baked into the APK, **web changes require rebuilding
+and reinstalling the APK** — CI does this automatically on push (see below).
+The service worker is skipped inside the shell (assets are already local and
+offline-capable); it still runs on the hosted PWA.
 
 ## Building
 
-CI does it: `.github/workflows/android.yml` runs on changes here or via
-**Actions → Build Android APK → Run workflow**, then uploads the result to the
-`android-latest` release.
+CI does it: `.github/workflows/android.yml` runs on changes to `android/` or
+`pwa/`, or via **Actions → Build Android APK → Run workflow**, then uploads
+the result to the `android-latest` release.
 
 Locally, with a JDK 17 and the Android SDK installed:
 
@@ -42,6 +42,9 @@ Locally, with a JDK 17 and the Android SDK installed:
 cd weather-radar-viewer/android
 gradle assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The `bundlePwa` task copies `../pwa` into `app/build/generated/pwaAssets/www`
+before every build; the APK serves the app from there.
 
 ### Release signing (optional)
 

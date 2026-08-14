@@ -57,7 +57,9 @@ clockEl.textContent = fmt(new Date());
 mapMod.goDefaultView();
 mapMod.show(NOW_I);         // first frame paint
 
-// PWA: offline app shell
-if ("serviceWorker" in navigator) {
+// PWA: offline app shell. The Android shell serves the app from assets inside
+// the APK (origin appassets.androidx.dev) — already offline-capable, and the
+// worker's fetches would never reach the asset interceptor — so skip it there.
+if ("serviceWorker" in navigator && location.hostname !== "appassets.androidx.dev") {
   navigator.serviceWorker.register("sw.js").catch(() => { /* not fatal */ });
 }

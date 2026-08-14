@@ -45,4 +45,22 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    sourceSets {
+        main {
+            assets.srcDirs += 'build/generated/pwaAssets'
+        }
+    }
 }
+
+// The web app is bundled into the APK (assets/www) so the installed app runs
+// entirely from the device — no hosted origin. It is copied from ../pwa at
+// build time rather than checked in twice.
+tasks.register('bundlePwa', Copy) {
+    from rootProject.file('../pwa')
+    exclude 'README.md'
+    exclude 'sw.js'      // the shell serves from assets; there is no origin to cache
+    into layout.buildDirectory.dir('generated/pwaAssets/www')
+}
+
+preBuild.dependsOn 'bundlePwa'

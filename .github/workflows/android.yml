@@ -3,9 +3,11 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [claude/weather-radar-sources-l13g18]
+    branches: [claude/skywatch-android-apk-6vyllo]
     paths:
+      # the APK bundles the PWA, so web changes need a rebuild too
       - 'weather-radar-viewer/android/**'
+      - 'weather-radar-viewer/pwa/**'
       - '.github/workflows/android.yml'
 
 permissions:
