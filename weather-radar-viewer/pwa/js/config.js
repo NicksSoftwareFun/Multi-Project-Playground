@@ -29,6 +29,28 @@ export const SPC_MD = ARCGIS_VECTOR + "outlooks/spc_mesoscale_discussion/MapServ
 // back to these if discovery fails, because NOAA renumbers periodically.
 export const SPC_LAYER_HINTS = { d1: 1, d2: 9, d3: 17 };
 
+// --- alert notifications (Android shell) ---
+// Category catalog for the notifications menu. Array order is both display
+// order and match priority — the first category with a keyword hit wins, so
+// WINTER sits before WIND to make "Wind Chill Watch" land in WINTER, and
+// TROPICAL before WIND for "Hurricane Force Wind Warning". Anything with no
+// hit falls through to OTHER. The Android shell does the actual background
+// matching with the same table in Alerts.java — keep the two in sync.
+export const NOTIFY_CATS = [
+  { id: "tornado",  label: "TORNADO",   match: ["tornado"] },
+  { id: "tstorm",   label: "T-STORM",   match: ["thunderstorm"] },
+  { id: "flood",    label: "FLOOD",     match: ["flood", "hydrologic"] },
+  { id: "tropical", label: "TROPICAL",  match: ["hurricane", "tropical", "storm surge", "typhoon"] },
+  { id: "winter",   label: "WINTER",    match: ["winter", "blizzard", "ice", "snow", "freez",
+                                                "frost", "chill", "cold", "avalanche"] },
+  { id: "heat",     label: "HEAT",      match: ["heat"] },
+  { id: "wind",     label: "WIND",      match: ["wind", "gale"] },
+  { id: "fire",     label: "FIRE",      match: ["fire", "red flag"] },
+  { id: "airfog",   label: "FOG / AIR", match: ["fog", "air quality", "smoke", "dust",
+                                                "air stagnation", "ashfall"] },
+  { id: "other",    label: "OTHER",     match: [] }
+];
+
 export const ALERT_POLL_QUIET_MS = 10 * 60 * 1000;
 export const ALERT_POLL_ACTIVE_MS = 60 * 1000;
 export const ALERT_STALE_MS = 15 * 60 * 1000;   // hide the chip rather than show maybe-expired warnings

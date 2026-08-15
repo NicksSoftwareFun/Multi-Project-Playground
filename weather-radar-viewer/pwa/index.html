@@ -76,6 +76,9 @@
       <button class="btn chrome-radar" id="layersBtn" aria-label="Map layers" style="font-size:15px">≡</button>
       <button class="btn small chrome-map" id="satBtn" aria-label="Switch between radar and satellite view">SAT</button>
       <button class="btn chrome-all" id="locsBtn" aria-label="Saved locations" style="font-size:15px">⌂</button>
+      <!-- hidden unless the Android shell's JS bridge is present — the hosted
+           site has no background process to deliver notifications -->
+      <button class="btn chrome-all" id="notifBtn" aria-label="Alert notifications" style="font-size:13px" hidden>🔔</button>
     </div>
 
     <div id="layersdrawer">

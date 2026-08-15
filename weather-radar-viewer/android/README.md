@@ -25,6 +25,28 @@ The shell runs immersive (no status bar), holds the screen awake while open,
 keeps the back button navigating inside the app, and opens off-site links in
 the real browser.
 
+## Alert notifications
+
+The bell button (🔔) in the app opens the notifications menu: a master
+toggle, WARNINGS / WATCHES toggles, and per-category checkboxes (Tornado,
+T-Storm, Flood, Tropical, Winter, Heat, Wind, Fire, Fog/Air, Other). While
+enabled, the shell polls `api.weather.gov` about every 15 minutes — the
+JobScheduler floor, also surviving reboots — for every **saved ZIP location**
+and posts a high-priority system notification for each new watch or warning
+in an enabled category. Tapping the notification opens the app.
+
+How the pieces talk: the web app owns the settings UI and persistence
+(`pwa/js/notify.js`), and pushes settings + ZIP list to the shell over the
+`SkywatchShell` JS bridge; `Alerts.java` stores the config, runs the
+background checks, and dedupes so a warning only notifies once. GPS
+locations are excluded — the shell can't re-fix a position in the
+background — and the menu is hidden on the hosted site, which has no
+background process to deliver anything.
+
+Android 13+ asks for the notification permission the first time the master
+toggle is turned on. Expect delivery timing to wobble by a few minutes when
+the phone is dozing; that is Android batching background work, not a bug.
+
 Because the web app is baked into the APK, **web changes require rebuilding
 and reinstalling the APK** — CI does this automatically on push (see below).
 The service worker is skipped inside the shell (assets are already local and

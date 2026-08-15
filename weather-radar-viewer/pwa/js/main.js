@@ -8,6 +8,7 @@ import * as mapMod from "./map.js";
 import * as sat from "./sat.js";
 import * as wx from "./wx.js";
 import * as locations from "./locations.js";
+import * as notify from "./notify.js";
 import * as layers from "./layers.js";
 import * as boards from "./boards.js";
 import * as alerts from "./alerts.js";
@@ -28,6 +29,7 @@ mapMod.init();
 sat.init();
 layers.init();      // loads layer prefs — before any module registers a layer
 locations.init();   // migrates storage, builds the sheet — before wx reads active()
+notify.init();      // notifications menu (Android shell) — after locations, it pushes the ZIP list
 // Board registration order is deck order: NOW ⇄ CAST ⇄ SEVERE ⇄ AIR ⇄ SKY ⇄ ALMANAC
 wx.init();          // reads locations.active(), registers the NOW board
 forecastx.init();   // CAST board (lazy: fetches on first open)

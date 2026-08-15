@@ -3,13 +3,16 @@ package io.github.nickssoftwarefun.skywatch;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -42,6 +45,7 @@ public class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidx.dev";
     private static final String APP_URL = "https://" + APP_HOST + "/index.html";
     private static final int RC_LOCATION = 41;
+    private static final int RC_NOTIFICATIONS = 42;
 
     private WebView web;
     private String pendingGeoOrigin;
@@ -111,6 +115,12 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Safe to expose: only the bundled app ever renders in this WebView
+        // (foreign navigations leave for the real browser), so the bridge is
+        // reachable solely from our own code.
+        web.addJavascriptInterface(new ShellBridge(), "SkywatchShell");
+        Alerts.ensureChannel(this);
+
         setContentView(web);
 
         if (state != null) {
@@ -164,6 +174,42 @@ public class MainActivity extends Activity {
         if (p.endsWith(".woff")) return "font/woff";
         if (p.endsWith(".ico")) return "image/x-icon";
         return "application/octet-stream";
+    }
+
+    /**
+     * The web app's side of the notifications feature (js/notify.js) calls
+     * these. Config flows web → native only: the web UI owns the settings and
+     * localStorage is their source of truth; this side just mirrors the latest
+     * push and runs the background checks.
+     */
+    private class ShellBridge {
+        @JavascriptInterface
+        public void setNotifyConfig(String json) {
+            Alerts.saveConfig(MainActivity.this, json);
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            if (Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                            != PackageManager.PERMISSION_GRANTED) {
+                runOnUiThread(() -> requestPermissions(
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        RC_NOTIFICATIONS));
+            }
+        }
+
+        @JavascriptInterface
+        public boolean areNotificationsEnabled() {
+            NotificationManager nm =
+                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            boolean ok = nm.areNotificationsEnabled();
+            if (Build.VERSION.SDK_INT >= 33) {
+                ok = ok && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        == PackageManager.PERMISSION_GRANTED;
+            }
+            return ok;
+        }
     }
 
     @Override

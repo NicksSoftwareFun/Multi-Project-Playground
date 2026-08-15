@@ -152,6 +152,54 @@
 #locsheet .msg { font-size: 10.5px; color: var(--sub-faint); min-height: 14px; }
 #locsheet .msg.err { color: var(--err); }
 
+/* ---- notifications bottom sheet (data-overlay, Android shell only) ---- */
+#notifsheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 930;
+  background: rgba(8, 14, 22, 0.97);
+  border-top: 1px solid var(--panel-line);
+  border-radius: 14px 14px 0 0;
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  font-family: var(--mono);
+  display: none;
+  flex-direction: column; gap: 10px;
+  max-height: 80%;
+  overflow-y: auto;
+}
+.screen.notifsheet #notifsheet { display: flex; }
+#notifsheet .grab {
+  width: 42px; height: 4px; border-radius: 2px;
+  background: var(--btn-line); margin: 0 auto; flex: none;
+}
+#notifsheet .title {
+  font-size: 12px; letter-spacing: 0.22em; color: var(--sub-faint);
+  text-align: center;
+}
+#notifsheet .sect {
+  font-size: 10px; letter-spacing: 0.18em; color: var(--sub-faint);
+  margin-top: 2px;
+}
+#notifsheet .notifrow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--panel-line); border-radius: 8px;
+  background: var(--btn-bg);
+  cursor: pointer;
+}
+#notifsheet .notifrow.master { border-color: var(--accent); }
+#notifsheet .notifrow .nm { flex: 1; font-size: 12px; color: var(--ink); letter-spacing: 0.06em; }
+#notifsheet .notifrow input {
+  width: 16px; height: 16px; margin: 0; flex: none;
+  accent-color: var(--accent); cursor: pointer;
+}
+#notifsheet .notiftypes { display: flex; gap: 6px; }
+#notifsheet .notiftypes .notifrow { flex: 1; }
+#notifsheet .notifcats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+#notifsheet .msg { font-size: 10.5px; color: var(--sub-faint); min-height: 0; }
+#notifsheet .msg.err { color: var(--err); min-height: 14px; }
+#notifsheet .note { font-size: 9.5px; letter-spacing: 0.06em; color: var(--sub-faint); }
+
 /* ---- alert detail sheet (data-overlay): tap a map polygon ----
    Phone-first bottom sheet. The BODY (#alertsheetBody) is the only scroll
    surface — cards inside it never get their own scroller. */
