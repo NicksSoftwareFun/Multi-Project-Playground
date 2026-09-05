@@ -6,10 +6,13 @@
 const { test, expect } = require("@playwright/test");
 const { routeAll, boot } = require("./_setup");
 
-function zoomsFrom(urls, layer) {
+// Esri tile URLs are .../<service>/MapServer/tile/{z}/{y}/{x} — the zoom is the
+// first path segment after /tile/. `service` names the base vs reference layer.
+function zoomsFrom(urls, service) {
   const out = [];
   for (const u of urls) {
-    const m = new URL(u).pathname.match(new RegExp("/" + layer + "/(\\d+)/"));
+    if (!u.includes(service)) continue;
+    const m = new URL(u).pathname.match(/\/tile\/(\d+)\//);
     if (m) out.push(Number(m[1]));
   }
   return out;
@@ -18,7 +21,7 @@ function zoomsFrom(urls, layer) {
 test("geography tiles come from one zoom deeper than the labels", async ({ page }) => {
   const urls = [];
   page.on("request", (r) => {
-    if (r.url().includes("basemaps.cartocdn.com")) urls.push(r.url());
+    if (r.url().includes("server.arcgisonline.com")) urls.push(r.url());
   });
 
   await routeAll(page);
@@ -26,8 +29,8 @@ test("geography tiles come from one zoom deeper than the labels", async ({ page 
   await expect(page.locator("#lmap .leaflet-tile-pane")).toBeAttached({ timeout: 15_000 });
   await page.waitForTimeout(2500);
 
-  const geo = zoomsFrom(urls, "dark_nolabels");
-  const lab = zoomsFrom(urls, "dark_only_labels");
+  const geo = zoomsFrom(urls, "World_Dark_Gray_Base");
+  const lab = zoomsFrom(urls, "World_Dark_Gray_Reference");
   expect(geo.length).toBeGreaterThan(0);
   expect(lab.length).toBeGreaterThan(0);
 

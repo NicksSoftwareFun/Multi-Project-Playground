@@ -184,9 +184,15 @@
       zoomControl: true,
       attributionControl: true
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap &copy; CARTO · Radar: IEM/NOAA · Sat: NOAA STAR",
-      subdomains: "abcd"
+    // Esri "Dark Gray Canvas" — keyless. Replaced CARTO, which began requiring
+    // an API key and served "API KEY REQUIRED" watermark tiles for keyless use.
+    const esri = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
+    L.tileLayer(esri + "/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "&copy; Esri · OSM · Radar: IEM/NOAA · Sat: NOAA STAR",
+      maxNativeZoom: 16
+    }).addTo(map);
+    L.tileLayer(esri + "/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+      maxNativeZoom: 16
     }).addTo(map);
   }
 

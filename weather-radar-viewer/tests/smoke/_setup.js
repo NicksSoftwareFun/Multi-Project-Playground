@@ -23,7 +23,8 @@
 // Stubbed feeds: api.open-meteo.com, ensemble-api.open-meteo.com,
 // air-quality-api.open-meteo.com, archive-api.open-meteo.com (era5Chunk(),
 // M5 ALMANAC), api.weather.gov, api.zippopotam.us, mapservices.weather.noaa.gov,
-// mesonet.agron.iastate.edu, *.basemaps.cartocdn.com, cdn.star.nesdis.noaa.gov.
+// mesonet.agron.iastate.edu, server.arcgisonline.com (basemap),
+// cdn.star.nesdis.noaa.gov.
 "use strict";
 const fs = require("fs");
 const path = require("path");
@@ -488,7 +489,7 @@ async function routeAll(page, opts) {
     // map/radar/satellite imagery → 1x1 png
     if (
       host === "mesonet.agron.iastate.edu" ||
-      host.endsWith("basemaps.cartocdn.com") ||
+      host === "server.arcgisonline.com" ||        // Esri basemap tiles
       host === "cdn.star.nesdis.noaa.gov"
     ) return png(route);
 

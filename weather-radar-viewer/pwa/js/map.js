@@ -1,7 +1,7 @@
 // Leaflet map + the radar frame engine (window-of-two tile layers).
 
-import { IEM, BASEMAP, BASEMAP_LABELS, BASEMAP_ATTRIB, HOME_VIEW, DEFAULT_VIEW_KM,
-         PAST, NFRAMES, NOW_I, frameT, REFRESH_MS, PAL } from "./config.js";
+import { IEM, BASEMAP, BASEMAP_LABELS, BASEMAP_ATTRIB, BASEMAP_MAXZOOM, HOME_VIEW,
+         DEFAULT_VIEW_KM, PAST, NFRAMES, NOW_I, frameT, REFRESH_MS, PAL } from "./config.js";
 import { pad, utcStamp, el } from "./util.js";
 import * as net from "./net.js";
 import * as state from "./state.js";
@@ -55,10 +55,9 @@ export function init() {
     // (below) — halving THEIR size would make the map less readable, not more.
     L.tileLayer(BASEMAP, {
       attribution: BASEMAP_ATTRIB,
-      subdomains: "abcd",
       tileSize: 128,
       zoomOffset: 1,
-      maxNativeZoom: 18,
+      maxNativeZoom: BASEMAP_MAXZOOM,   // Esri serves no {s} subdomain; caps at z16
       updateWhenIdle: true,
       keepBuffer: 1
     }).addTo(map);
@@ -68,7 +67,7 @@ export function init() {
     const lab = map.createPane("labels");
     lab.style.zIndex = 465;
     lab.style.pointerEvents = "none";
-    L.tileLayer(BASEMAP_LABELS, { pane: "labels", subdomains: "abcd" }).addTo(map);
+    L.tileLayer(BASEMAP_LABELS, { pane: "labels", maxNativeZoom: BASEMAP_MAXZOOM }).addTo(map);
     net.setHealth("radar", "RADAR ", true, "ok");
   } else {
     net.setHealth("radar", "RADAR ", false, "map lib unavailable");

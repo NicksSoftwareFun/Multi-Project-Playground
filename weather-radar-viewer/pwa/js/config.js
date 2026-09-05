@@ -7,9 +7,18 @@ export const GOES_FALLBACK = GOES_DIR + "latest.jpg";
 // Basemap split in two: geography underneath the radar, place labels on a pane
 // above it. A wide swath of 60 dBZ returns used to bury every city name in the
 // state, which is exactly when you most want to know what is under the storm.
-export const BASEMAP = "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png";
-export const BASEMAP_LABELS = "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png";
-export const BASEMAP_ATTRIB = "&copy; OSM &copy; CARTO · IEM/NOAA · NOAA STAR";
+//
+// Provider: Esri "Dark Gray Canvas", which is keyless (attribution required).
+// We moved off CARTO's basemaps.cartocdn.com after it began requiring an API
+// key for its previously-free basemap tiles and silently served an
+// "API KEY REQUIRED" watermark PNG in place of the map. Endpoint check
+// "basemap-tiles-live" guards against a repeat (see integration/endpoint-checks).
+// Esri's scheme differs from CARTO's: no {s} subdomain, tile path is
+// /tile/{z}/{y}/{x} (row before column), and there is no retina {r} token.
+export const BASEMAP = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+export const BASEMAP_LABELS = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+export const BASEMAP_MAXZOOM = 16;   // Esri Dark Gray Canvas tops out at z16
+export const BASEMAP_ATTRIB = "&copy; Esri · OSM · IEM/NOAA · NOAA STAR";
 export const OM_FORECAST = "https://api.open-meteo.com/v1/forecast";
 export const NWS_POINTS = "https://api.weather.gov/points/";
 export const ZIPPO = "https://api.zippopotam.us/us/";

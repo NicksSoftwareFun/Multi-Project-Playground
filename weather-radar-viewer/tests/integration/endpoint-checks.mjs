@@ -74,6 +74,13 @@ async function getBin(url, { timeoutMs = 30000 } = {}) {
   };
 }
 
+// Tile fetch that keeps the bytes, so two tiles can be compared for identity.
+async function getTile(url, { timeoutMs = 20000 } = {}) {
+  const res = await fetch(url, { headers: { Origin: ORIGIN }, signal: AbortSignal.timeout(timeoutMs) });
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { url, status: res.status, bytes: buf.byteLength, contentType: res.headers.get("content-type") || "", buf };
+}
+
 // Truncate anything for the results file — probes must never dump a whole feed.
 function clip(v, n = 400) {
   let s;
@@ -875,6 +882,47 @@ await check("wpc-winter-guidance-discovery", async () => {
     null;
   detail.bestProbabilisticCandidate = best;
   if (best && best.type === "MapServer") detail.bestCandidateLayers = await arcgisLayers(best.url);
+  return detail;
+});
+
+// 19. Basemap tiles (Esri Dark Gray Canvas base + reference layers).
+//     This is the guard for the failure that took the map down: CARTO began
+//     requiring an API key and silently returned an "API KEY REQUIRED"
+//     watermark PNG — HTTP 200, valid image/* — for EVERY tile, so a plain
+//     status + content-type check would have passed while the map was broken.
+//     The tell of that mode is that the provider serves one identical image for
+//     every request; two genuinely different map tiles are never byte-identical.
+//     So fetch two well-separated tiles per layer and assert (a) 200, (b)
+//     image/*, (c) non-empty, (d) the two tiles are NOT the same bytes. This
+//     catches a key-required / placeholder swap for any provider, not just the
+//     status-code failures a naive check would find.
+await check("basemap-tiles-live", async () => {
+  const CANVAS = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
+  const layers = {
+    base: `${CANVAS}/World_Dark_Gray_Base/MapServer/tile`,
+    reference: `${CANVAS}/World_Dark_Gray_Reference/MapServer/tile`,
+  };
+  // two land points far apart so tiles must differ: DC metro and Denver metro.
+  const a = tileXY(-77.04, 38.9, 7);
+  const b = tileXY(-104.99, 39.74, 7);
+  const detail = {};
+  for (const [name, tileBase] of Object.entries(layers)) {
+    // Esri path order is /tile/{z}/{y}/{x} — row (y) before column (x).
+    const ta = await getTile(`${tileBase}/${a.z}/${a.y}/${a.x}`);
+    const tb = await getTile(`${tileBase}/${b.z}/${b.y}/${b.x}`);
+    assert(ta.status === 200 && tb.status === 200, `${name}: HTTP ${ta.status}/${tb.status}`);
+    assert(
+      ta.contentType.startsWith("image/") && tb.contentType.startsWith("image/"),
+      `${name}: content-type ${ta.contentType}/${tb.contentType}, expected image/*`
+    );
+    assert(ta.bytes > 0 && tb.bytes > 0, `${name}: empty tile (${ta.bytes}/${tb.bytes} bytes)`);
+    assert(
+      !ta.buf.equals(tb.buf),
+      `${name}: two different tiles returned byte-identical ${ta.bytes}-byte images — ` +
+        "provider is likely serving a placeholder / API-key-required tile"
+    );
+    detail[name] = { z: a.z, bytesA: ta.bytes, bytesB: tb.bytes, contentType: ta.contentType, distinct: true };
+  }
   return detail;
 });
 
