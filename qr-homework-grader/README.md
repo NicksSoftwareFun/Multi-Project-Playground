@@ -43,8 +43,19 @@ in a browser). Three panels:
 - **Worksheet** — a printable page with the questions and the QR in the corner.
   The answer key is *not* printed. `Ctrl/Cmd+P` → "Save as PDF".
 - **Decode / Grade** — upload a photo or screenshot of the QR (or paste the
-  payload) to recover the exact ground truth, then score a set of read answers
-  against the key. This stands in for the vision model's job for now.
+  payload) to **reproduce the entire worksheet from the QR alone** (page *and*
+  its QR), with an integrity check that re-encoding the decoded data reproduces
+  the scanned payload byte-for-byte. Then score read answers against the key.
+  The handwriting read stands in for the vision model's job for now.
+
+### Reproducibility
+
+The QR is the single source of truth: everything the printed page shows is
+derived only from the decoded payload, so scanning the QR is enough to
+regenerate the whole worksheet — including an identical QR. The payload carries
+the QR's error-correction level (`ec`) for exactly this reason, and the decoder
+proves the round trip by re-encoding the decoded worksheet and comparing it to
+what was scanned.
 
 Libraries are vendored under `vendor/` (versions in `vendor/VERSIONS.txt`) so the
 page is fully self-contained and works offline — no CDN, no build step:
@@ -70,6 +81,7 @@ Compact JSON (short keys keep it small — but gzip does most of the work):
 | `tr`  | teacher                              |
 | `dt`  | date issued (`YYYY-MM-DD`)           |
 | `due` | due date                             |
+| `ec`  | QR error-correction level (`L/M/Q/H`)|
 | `pts` | total points                         |
 | `p`   | problems: `[{n, q, a, pt}, ...]`     |
 

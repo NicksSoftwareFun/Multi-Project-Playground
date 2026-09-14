@@ -171,8 +171,18 @@
       </div>
     </div>
 
+    <div class="card" id="reprocard" style="display:none">
+      <h2>2 · Worksheet reproduced from the QR</h2>
+      <div id="integrity" class="hint" style="margin-bottom:10px"></div>
+      <div class="row noprint" style="margin-bottom:12px">
+        <button class="btn small" id="reproPrint">Print this reproduction</button>
+        <button class="btn ghost small" id="reproEdit">Load into editor</button>
+      </div>
+      <div class="sheet" id="reprosheet"></div>
+    </div>
+
     <div class="card" id="truthcard" style="display:none">
-      <h2>Ground truth</h2>
+      <h2>3 · Grade against the key</h2>
       <div id="truthmeta" class="hint" style="margin-bottom:10px"></div>
       <div class="row" style="margin-bottom:8px">
         <button class="btn ghost small" id="fillCorrect">Simulate: all correct</button>
@@ -226,6 +236,7 @@ function collectWorksheet(){
   const ws={v:1,
     id:val('f-id'), t:val('f-title'), tr:val('f-teacher'), cl:val('f-class'),
     s:val('f-student'), dt:val('f-date'), due:val('f-due'),
+    ec:document.getElementById('f-ec').value,
     pts:probs.reduce((s,p)=>s+(p.pt||1),0), p:probs};
   Object.keys(ws).forEach(k=>{ if(ws[k]==='') delete ws[k]; });
   return ws;
@@ -262,18 +273,17 @@ function autoGen(n){
   }
 }
 
-/* ---------- render worksheet + QR ---------- */
-function renderSheet(){
-  const ws=collectWorksheet();
+/* ---------- deterministic worksheet builder ----------
+   The one source of truth for the printed page. Everything it draws comes
+   only from `ws` (which itself round-trips through the QR), so scanning the
+   QR is enough to reproduce the entire worksheet — QR included. */
+function buildSheet(ws){
   const payload=encodePayload(ws);
-  document.getElementById('payloadout').textContent=payload;
-  document.getElementById('paysize').textContent=payload.length+' chars';
-
-  const ec=document.getElementById('f-ec').value;
-  let svg='', ver='';
+  const ec=ws.ec||'Q';
+  let svg='', ver='?';
   try{
     const qr=qrcode(0, ec); qr.addData(payload); qr.make();
-    ver=qr.getModuleCount(); // module count reflects version
+    ver=qr.getModuleCount();
     svg=qr.createSvgTag({cellSize:4, margin:2, scalable:true});
   }catch(e){ svg=`<div style="color:#b91c1c;font-size:11px">Too large for one QR: ${e}</div>`; }
 
@@ -284,29 +294,56 @@ function renderSheet(){
     ws.due?`Due: ${esc(ws.due)}`:''
   ].filter(Boolean).map(f=>`<span>${f}</span>`).join('');
 
-  const items=ws.p.map(p=>
+  const items=(ws.p||[]).map(p=>
     `<li><span class="qtext">${esc(p.q)}</span><span class="pts">(${p.pt||1} pt)</span>
       <div class="answerline"></div></li>`).join('');
 
-  document.getElementById('sheet').innerHTML=`
+  const html=`
     <div class="head">
       <div class="meta">
         <h2>${esc(ws.t||'Worksheet')}</h2>
-        <div class="sub">${esc(ws.tr||'')} ${ws.id?'· '+esc(ws.id):''} · ${ws.pts||ws.p.length} pts</div>
+        <div class="sub">${esc(ws.tr||'')} ${ws.id?'· '+esc(ws.id):''} · ${ws.pts||(ws.p||[]).length} pts</div>
       </div>
       <div class="qrbox">${svg}<div class="cap">SCAN TO GRADE · ${esc(ws.id||'')}</div></div>
     </div>
     <div class="fields">${fields}</div>
     <ol class="qlist">${items}</ol>`;
 
+  return {html, payload, ver, ec};
+}
+
+function renderSheet(){
+  const ws=collectWorksheet();
+  const r=buildSheet(ws);
+  document.getElementById('sheet').innerHTML=r.html;
+  document.getElementById('payloadout').textContent=r.payload;
+  document.getElementById('paysize').textContent=r.payload.length+' chars';
   document.getElementById('sheetinfo').textContent=
-    `${ws.p.length} problems · payload ${payload.length} chars · QR ${ver}×${ver} modules · EC ${ec}`;
+    `${(ws.p||[]).length} problems · payload ${r.payload.length} chars · QR ${r.ver}×${r.ver} modules · EC ${r.ec}`;
 }
 
 /* ---------- decode / grade ---------- */
 let currentTruth=null;
-function showTruth(ws){
+function showTruth(ws, scanned){
   currentTruth=ws;
+
+  // Reproduce the ENTIRE worksheet from the decoded data (QR included).
+  const r=buildSheet(ws);
+  document.getElementById('reprocard').style.display='';
+  document.getElementById('reprosheet').innerHTML=r.html;
+
+  // Integrity: re-encoding the decoded worksheet must yield the same payload
+  // that was scanned — proof that nothing lives outside the QR.
+  const el=document.getElementById('integrity');
+  if(scanned){
+    const identical = r.payload===scanned.trim();
+    el.innerHTML = identical
+      ? `<span class="result ok">✓ Exact reproduction</span> — re-encoding the decoded worksheet reproduces the scanned payload byte-for-byte (${r.payload.length} chars, QR ${r.ver}×${r.ver}, EC ${r.ec}).`
+      : `<span class="result ok">Decoded ✓</span> — worksheet rebuilt from ${(ws.p||[]).length} problems (payload ${r.payload.length} chars, QR ${r.ver}×${r.ver}, EC ${r.ec}).`;
+  } else {
+    el.innerHTML=`Worksheet rebuilt from the payload (${r.payload.length} chars, QR ${r.ver}×${r.ver}, EC ${r.ec}).`;
+  }
+
   document.getElementById('truthcard').style.display='';
   document.getElementById('truthmeta').innerHTML=
     `<b>${esc(ws.t||'')}</b> · ${esc(ws.id||'')} · ${esc(ws.tr||'')} · ${esc(ws.cl||'')}`
@@ -359,9 +396,30 @@ function doDecode(){
   const s=document.getElementById('payin').value.trim();
   const st=document.getElementById('decodestatus');
   if(!s){st.textContent='Nothing to decode.';return;}
-  try{ const ws=decodePayload(s); st.textContent='Decoded ✓'; showTruth(ws); }
+  try{ const ws=decodePayload(s); st.textContent='Decoded ✓'; showTruth(ws, s); }
   catch(e){ st.textContent='Decode failed: '+e.message; }
 }
+
+/* Rehydrate the Build editor from a decoded worksheet. */
+function loadIntoEditor(ws){
+  const set=(id,v)=>{document.getElementById(id).value=v||'';};
+  set('f-id',ws.id); set('f-title',ws.t); set('f-teacher',ws.tr);
+  set('f-class',ws.cl); set('f-student',ws.s); set('f-date',ws.dt); set('f-due',ws.due);
+  if(ws.ec) document.getElementById('f-ec').value=ws.ec;
+  document.getElementById('probrows').innerHTML='';
+  (ws.p||[]).forEach(p=>addProbRow(p.q,p.a,p.pt||1));
+}
+document.getElementById('reproEdit').onclick=()=>{
+  if(!currentTruth) return;
+  loadIntoEditor(currentTruth);
+  document.querySelector('.tabs button[data-tab="build"]').click();
+};
+document.getElementById('reproPrint').onclick=()=>{
+  if(!currentTruth) return;
+  loadIntoEditor(currentTruth);
+  document.querySelector('.tabs button[data-tab="sheet"]').click();
+  setTimeout(()=>window.print(),150);
+};
 document.getElementById('imgin').onchange=e=>{
   const file=e.target.files[0]; if(!file) return;
   const st=document.getElementById('decodestatus'); st.textContent='Reading image…';
