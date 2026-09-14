@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Homework Grader</title>
+<!-- Libraries vendored locally (see vendor/VERSIONS.txt) so the tool is self-contained and works offline. -->
+<script src="vendor/pako.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jsQR.js"></script>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #1c2530; --muted: #64748b;
+    --line: #dde3ea; --accent: #2563eb; --accent-ink: #fff;
+    --ok: #15803d; --ok-bg: #dcfce7; --bad: #b91c1c; --bad-bg: #fee2e2;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         color: var(--ink); background: var(--bg); }
+  header.app { padding: 18px 22px; background: var(--ink); color: #fff; }
+  header.app h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+  header.app p { margin: 4px 0 0; color: #c7d0db; font-size: 13px; }
+  .tabs { display: flex; gap: 4px; padding: 10px 18px 0; background: var(--ink); }
+  .tabs button { border: 0; background: #2b3644; color: #c7d0db; padding: 9px 16px;
+                 border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; }
+  .tabs button.active { background: var(--bg); color: var(--ink); font-weight: 600; }
+  main { padding: 22px; max-width: 1000px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 18px; margin-bottom: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 15px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line);
+          border-radius: 8px; font: inherit; background: #fff; color: var(--ink); }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  button.btn { border: 0; background: var(--accent); color: var(--accent-ink); padding: 9px 16px;
+          border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  button.btn.ghost { background: #eef2f7; color: var(--ink); }
+  button.btn.small { padding: 5px 10px; font-size: 13px; font-weight: 500; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  table.probs { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.probs th, table.probs td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line);
+          font-size: 13px; vertical-align: top; }
+  table.probs th { color: var(--muted); font-weight: 600; }
+  table.probs input { padding: 5px 8px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+          background: #eef2f7; color: var(--muted); }
+  .stat { font-variant-numeric: tabular-nums; }
+
+  /* Worksheet (also the print target) */
+  .sheet { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+           padding: 32px; max-width: 800px; margin: 0 auto; color: #111; }
+  .sheet .head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start;
+                 border-bottom: 2px solid #111; padding-bottom: 14px; margin-bottom: 8px; }
+  .sheet .meta h2 { margin: 0 0 2px; font-size: 20px; }
+  .sheet .meta .sub { color: #333; font-size: 13px; }
+  .sheet .fields { margin: 10px 0 18px; font-size: 13px; color: #222; }
+  .sheet .fields span { display: inline-block; margin-right: 22px; }
+  .sheet .qrbox { text-align: center; flex: 0 0 auto; }
+  .sheet .qrbox svg { width: 132px; height: 132px; display: block; }
+  .sheet .qrbox .cap { font-size: 9px; color: #555; margin-top: 3px; letter-spacing: .3px; }
+  .sheet ol.qlist { padding-left: 26px; margin: 0; }
+  .sheet ol.qlist li { margin: 0 0 16px; font-size: 15px; }
+  .sheet .qtext { font-weight: 500; }
+  .sheet .answerline { margin-top: 10px; border-bottom: 1.5px solid #94a3b8; height: 20px; width: 60%; }
+  .sheet .pts { color: #666; font-size: 11px; margin-left: 8px; }
+
+  .result { padding: 4px 8px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .result.ok { background: var(--ok-bg); color: var(--ok); }
+  .result.bad { background: var(--bad-bg); color: var(--bad); }
+  pre.payload { background: #0f172a; color: #cbd5e1; padding: 12px; border-radius: 8px;
+                overflow-x: auto; font-size: 11px; white-space: pre-wrap; word-break: break-all; }
+  .scorebar { font-size: 22px; font-weight: 700; }
+
+  @media print {
+    header.app, .tabs, .panelnav, .noprint { display: none !important; }
+    body, main { background: #fff; padding: 0; margin: 0; max-width: none; }
+    .panel { display: none !important; }
+    #panel-sheet { display: block !important; }
+    .sheet { border: 0; border-radius: 0; max-width: none; padding: 24px 30px; }
+    .card { border: 0; padding: 0; }
+    .card h2 { display: none; }
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>QR Homework Grader</h1>
+  <p>Pack an entire worksheet — problems, answer key, and admin data — into one corner QR. Grade from a photo.</p>
+</header>
+
+<nav class="tabs noprint">
+  <button data-tab="build" class="active">1 · Build</button>
+  <button data-tab="sheet">2 · Worksheet</button>
+  <button data-tab="decode">3 · Decode / Grade</button>
+</nav>
+
+<main>
+  <!-- ============ BUILD ============ -->
+  <section id="panel-build" class="panel active">
+    <div class="card">
+      <h2>Assignment details</h2>
+      <div class="grid">
+        <div><label>Assignment ID</label><input id="f-id" value="HW-2026-0914-A"></div>
+        <div><label>Title</label><input id="f-title" value="Two-Digit Addition & Subtraction"></div>
+        <div><label>Teacher</label><input id="f-teacher" value="Mr. Alvarez"></div>
+        <div><label>Class / period</label><input id="f-class" value="Period 4 · Grade 4"></div>
+        <div><label>Student (optional)</label><input id="f-student" value=""></div>
+        <div><label>Date issued</label><input id="f-date" type="date" value="2026-09-14"></div>
+        <div><label>Due date</label><input id="f-due" type="date" value="2026-09-20"></div>
+        <div>
+          <label>QR error correction</label>
+          <select id="f-ec">
+            <option value="L">L · ~7% (smallest)</option>
+            <option value="M">M · ~15%</option>
+            <option value="Q" selected>Q · ~25% (recommended)</option>
+            <option value="H">H · ~30% (most robust)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Problems <span class="pill" id="probcount">0</span></h2>
+      <table class="probs">
+        <thead><tr><th style="width:36px">#</th><th>Question</th><th style="width:120px">Answer (key)</th><th style="width:60px">Pts</th><th style="width:36px"></th></tr></thead>
+        <tbody id="probrows"></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <button class="btn small" id="addprob">+ Add problem</button>
+        <button class="btn ghost small" id="gen">Auto-generate 20</button>
+        <span class="hint">The answer column is the key — it goes in the QR, never on the printed page.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="tosheet">Build worksheet →</button>
+    </div>
+  </section>
+
+  <!-- ============ WORKSHEET ============ -->
+  <section id="panel-sheet" class="panel">
+    <div class="row noprint panelnav" style="margin-bottom:14px">
+      <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+      <span class="hint" id="sheetinfo"></span>
+    </div>
+    <div class="sheet" id="sheet"></div>
+    <div class="card noprint" style="margin-top:18px">
+      <h2>QR payload <span class="pill" id="paysize"></span></h2>
+      <pre class="payload" id="payloadout"></pre>
+    </div>
+  </section>
+
+  <!-- ============ DECODE / GRADE ============ -->
+  <section id="panel-decode" class="panel">
+    <div class="card">
+      <h2>1 · Recover ground truth from the QR</h2>
+      <div class="row">
+        <button class="btn ghost small" id="useCurrent">Use current worksheet's QR</button>
+        <label class="btn ghost small" style="display:inline-block;width:auto">Upload QR photo / screenshot
+          <input id="imgin" type="file" accept="image/*" hidden></label>
+      </div>
+      <p class="hint" style="margin:10px 0 4px">…or paste the payload string:</p>
+      <textarea id="payin" rows="3" placeholder="base64url payload…"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn small" id="decodeBtn">Decode</button>
+        <span id="decodestatus" class="hint"></span>
+      </div>
+    </div>
+
+    <div class="card" id="truthcard" style="display:none">
+      <h2>Ground truth</h2>
+      <div id="truthmeta" class="hint" style="margin-bottom:10px"></div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn ghost small" id="fillCorrect">Simulate: all correct</button>
+        <button class="btn ghost small" id="fillSome">Simulate: some wrong</button>
+        <span class="hint">Enter what the vision model "read" from the student's handwriting, then grade.</span>
+      </div>
+      <table class="probs">
+        <thead><tr><th style="width:36px">#</th><th>Question</th><th style="width:120px">Key</th><th style="width:140px">Student wrote</th><th style="width:90px">Result</th></tr></thead>
+        <tbody id="graderows"></tbody>
+      </table>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="gradeBtn">Grade</button>
+        <span class="scorebar" id="scoreout"></span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- payload codec ---------- */
+function b64urlEncode(bytes){
+  let bin=''; for(const b of bytes) bin+=String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlDecode(str){
+  str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
+  const bin=atob(str); const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out;
+}
+function encodePayload(obj){
+  const json=JSON.stringify(obj);
+  const gz=pako.gzip(json);
+  return b64urlEncode(gz);
+}
+function decodePayload(str){
+  const gz=b64urlDecode(str.trim());
+  const bytes=pako.ungzip(gz);            // returns Uint8Array
+  const json=new TextDecoder().decode(bytes);
+  return JSON.parse(json);
+}
+
+/* ---------- model ---------- */
+function collectWorksheet(){
+  const probs=[];
+  document.querySelectorAll('#probrows tr').forEach((tr,i)=>{
+    const q=tr.querySelector('.p-q').value.trim();
+    const a=tr.querySelector('.p-a').value.trim();
+    const pt=parseInt(tr.querySelector('.p-pt').value,10)||1;
+    if(q) probs.push({n:i+1,q,a,pt});
+  });
+  const ws={v:1,
+    id:val('f-id'), t:val('f-title'), tr:val('f-teacher'), cl:val('f-class'),
+    s:val('f-student'), dt:val('f-date'), due:val('f-due'),
+    pts:probs.reduce((s,p)=>s+(p.pt||1),0), p:probs};
+  Object.keys(ws).forEach(k=>{ if(ws[k]==='') delete ws[k]; });
+  return ws;
+}
+const val=id=>document.getElementById(id).value.trim();
+
+/* ---------- problem rows ---------- */
+function addProbRow(q='',a='',pt=1){
+  const tb=document.getElementById('probrows');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="rn"></td>
+    <td><input class="p-q" value="${esc(q)}" placeholder="e.g. 47 + 38"></td>
+    <td><input class="p-a" value="${esc(a)}" placeholder="answer"></td>
+    <td><input class="p-pt" type="number" min="1" value="${pt}"></td>
+    <td><button class="btn ghost small delrow">✕</button></td>`;
+  tb.appendChild(tr);
+  tr.querySelector('.delrow').onclick=()=>{tr.remove();renumber();};
+  renumber();
+}
+function renumber(){
+  const rows=document.querySelectorAll('#probrows tr');
+  rows.forEach((tr,i)=>tr.querySelector('.rn').textContent=i+1);
+  document.getElementById('probcount').textContent=rows.length;
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function autoGen(n){
+  document.getElementById('probrows').innerHTML='';
+  for(let i=1;i<=n;i++){
+    const a=12+i*7, b=34+((i*13)%40);
+    if(i%3===0){ const x=Math.max(a,b)+20, y=Math.min(a,b);
+      addProbRow(`${x} − ${y}`, String(x-y), 1); }
+    else addProbRow(`${a} + ${b}`, String(a+b), 1);
+  }
+}
+
+/* ---------- render worksheet + QR ---------- */
+function renderSheet(){
+  const ws=collectWorksheet();
+  const payload=encodePayload(ws);
+  document.getElementById('payloadout').textContent=payload;
+  document.getElementById('paysize').textContent=payload.length+' chars';
+
+  const ec=document.getElementById('f-ec').value;
+  let svg='', ver='';
+  try{
+    const qr=qrcode(0, ec); qr.addData(payload); qr.make();
+    ver=qr.getModuleCount(); // module count reflects version
+    svg=qr.createSvgTag({cellSize:4, margin:2, scalable:true});
+  }catch(e){ svg=`<div style="color:#b91c1c;font-size:11px">Too large for one QR: ${e}</div>`; }
+
+  const fields=[
+    ws.s?`Name: ${esc(ws.s)}`:'Name: __________________',
+    ws.cl?`Class: ${esc(ws.cl)}`:'',
+    ws.dt?`Date: ${esc(ws.dt)}`:'',
+    ws.due?`Due: ${esc(ws.due)}`:''
+  ].filter(Boolean).map(f=>`<span>${f}</span>`).join('');
+
+  const items=ws.p.map(p=>
+    `<li><span class="qtext">${esc(p.q)}</span><span class="pts">(${p.pt||1} pt)</span>
+      <div class="answerline"></div></li>`).join('');
+
+  document.getElementById('sheet').innerHTML=`
+    <div class="head">
+      <div class="meta">
+        <h2>${esc(ws.t||'Worksheet')}</h2>
+        <div class="sub">${esc(ws.tr||'')} ${ws.id?'· '+esc(ws.id):''} · ${ws.pts||ws.p.length} pts</div>
+      </div>
+      <div class="qrbox">${svg}<div class="cap">SCAN TO GRADE · ${esc(ws.id||'')}</div></div>
+    </div>
+    <div class="fields">${fields}</div>
+    <ol class="qlist">${items}</ol>`;
+
+  document.getElementById('sheetinfo').textContent=
+    `${ws.p.length} problems · payload ${payload.length} chars · QR ${ver}×${ver} modules · EC ${ec}`;
+}
+
+/* ---------- decode / grade ---------- */
+let currentTruth=null;
+function showTruth(ws){
+  currentTruth=ws;
+  document.getElementById('truthcard').style.display='';
+  document.getElementById('truthmeta').innerHTML=
+    `<b>${esc(ws.t||'')}</b> · ${esc(ws.id||'')} · ${esc(ws.tr||'')} · ${esc(ws.cl||'')}`
+    +(ws.s?` · student ${esc(ws.s)}`:'')+` · ${(ws.p||[]).length} problems`;
+  const tb=document.getElementById('graderows'); tb.innerHTML='';
+  (ws.p||[]).forEach(p=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${p.n}</td><td>${esc(p.q)}</td><td>${esc(p.a)}</td>
+      <td><input class="g-in" data-n="${p.n}" placeholder="read answer"></td>
+      <td class="g-res"></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('scoreout').textContent='';
+}
+function norm(s){return String(s).trim().replace(/\s+/g,'').toLowerCase();}
+function grade(){
+  const rows=document.querySelectorAll('#graderows tr');
+  let got=0,total=0;
+  rows.forEach((tr,i)=>{
+    const p=currentTruth.p[i]; const pt=p.pt||1; total+=pt;
+    const wrote=tr.querySelector('.g-in').value;
+    const cell=tr.querySelector('.g-res');
+    const ok=wrote!=='' && norm(wrote)===norm(p.a);
+    if(ok){got+=pt; cell.innerHTML='<span class="result ok">✓ correct</span>';}
+    else cell.innerHTML='<span class="result bad">✗</span>';
+  });
+  const pct=total?Math.round(got/total*100):0;
+  document.getElementById('scoreout').textContent=`Score: ${got} / ${total}  (${pct}%)`;
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById('panel-'+b.dataset.tab).classList.add('active');
+  if(b.dataset.tab==='sheet') renderSheet();
+});
+document.getElementById('addprob').onclick=()=>addProbRow();
+document.getElementById('gen').onclick=()=>autoGen(20);
+document.getElementById('tosheet').onclick=()=>{
+  document.querySelector('.tabs button[data-tab="sheet"]').click();
+};
+document.getElementById('useCurrent').onclick=()=>{
+  document.getElementById('payin').value=document.getElementById('payloadout').textContent||encodePayload(collectWorksheet());
+  doDecode();
+};
+document.getElementById('decodeBtn').onclick=doDecode;
+function doDecode(){
+  const s=document.getElementById('payin').value.trim();
+  const st=document.getElementById('decodestatus');
+  if(!s){st.textContent='Nothing to decode.';return;}
+  try{ const ws=decodePayload(s); st.textContent='Decoded ✓'; showTruth(ws); }
+  catch(e){ st.textContent='Decode failed: '+e.message; }
+}
+document.getElementById('imgin').onchange=e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const st=document.getElementById('decodestatus'); st.textContent='Reading image…';
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+    const ctx=c.getContext('2d'); ctx.drawImage(img,0,0);
+    const data=ctx.getImageData(0,0,c.width,c.height);
+    const code=jsQR(data.data,c.width,c.height);
+    if(code){ document.getElementById('payin').value=code.data; doDecode(); }
+    else st.textContent='No QR found in image. Try a sharper / closer crop.';
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+};
+document.getElementById('fillCorrect').onclick=()=>{
+  document.querySelectorAll('#graderows tr').forEach((tr,i)=>{
+    tr.querySelector('.g-in').value=currentTruth.p[i].a; });
+};
+document.getElementById('fillSome').onclick=()=>{
+  document.querySelectorAll('#graderows tr').forEach((tr,i)=>{
+    const a=currentTruth.p[i].a;
+    tr.querySelector('.g-in').value = (i%4===0) ? a+'1' : a; });
+};
+document.getElementById('gradeBtn').onclick=grade;
+
+/* ---------- init ---------- */
+autoGen(20);
+</script>
+</body>
+</html>
