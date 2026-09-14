@@ -41,7 +41,9 @@ in a browser). Three panels:
 
 - **Build** — enter admin fields and problems, or auto-generate a practice set.
 - **Worksheet** — a printable page with the questions and the QR in the corner.
-  The answer key is *not* printed. `Ctrl/Cmd+P` → "Save as PDF".
+  The QR prints at **2 inches** square (comfortable for a home printer and any
+  phone scanner, with margin up to ~50 problems). The answer key is *not*
+  printed. `Ctrl/Cmd+P` → "Save as PDF".
 - **Decode / Grade** — upload a photo or screenshot of the QR (or paste the
   payload) to **reproduce the entire worksheet from the QR alone** (page *and*
   its QR), with an integrity check that re-encoding the decoded data reproduces
