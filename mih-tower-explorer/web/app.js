@@ -260,6 +260,7 @@
     if (REDUCED) dur = 0.25;
     if (instant) dur = 0.001;
     S.tween = { from, to, t0: performance.now(), dur: dur * 1000, toView: view, cross: prevView === 'stack' || view === 'stack' || prevLevel !== level };
+    S.selT0 = view === 'room' ? performance.now() + dur * 1000 * 0.62 : null;
     if (view !== 'stack') S.hoverLevel = null;
     updateUI();
     writeHash();
@@ -376,7 +377,8 @@
     const vec2 P[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
     void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }`;
   const FS_POST = `
-    uniform sampler2D uScene; uniform vec2 uRes; uniform float uCell, uDim, uSel, uGrid, uGridR, uGridAmt, uReveal, uRevealW;
+    uniform sampler2D uScene; uniform vec2 uRes; uniform float uCell, uDim, uSel, uGrid, uGridR, uGridAmt, uReveal, uRevealW, uSelT;
+    uniform vec4 uRoomBox;
     out vec4 o;
     void main() {
       vec2 fc = gl_FragCoord.xy, uv = fc / uRes;
@@ -398,8 +400,17 @@
                      texture(uScene, uv + vec2(0.0, px.y)).a - texture(uScene, uv - vec2(0.0, px.y)).a);
       float edge = clamp(length(gg) * 1.8, 0.0, 1.0);
       float hedge = clamp(length(gh) * 2.4, 0.0, 1.0);
+      // selection: the room's dots sweep in corner to corner, then sweep out the same way
+      vec2 ct = vec2(cc.x, uRes.y - cc.y);
+      vec2 dd = uRoomBox.zw - uRoomBox.xy;
+      float w = clamp(dot(ct - uRoomBox.xy, dd) / max(dot(dd, dd), 1.0), 0.0, 1.0);
+      float fIn = uSelT / 0.42 * 1.3 - 0.15;
+      float fOut = (uSelT - 0.55) / 0.6 * 1.3 - 0.15;
+      float sweep = (1.0 - smoothstep(fIn - 0.06, fIn + 0.02, w)) * smoothstep(fOut - 0.06, fOut + 0.02, w);
+      float crest = exp(-pow((w - fIn) / 0.05, 2.0)) * (1.0 - smoothstep(0.45, 0.65, uSelT));
       float v = max(s.r * dimK, led * dimK);
-      v = max(v, fs * 0.8 * uSel);
+      v = max(v, fs * 0.95 * sweep * uSel);
+      v = max(v, fs * 1.35 * crest * uSel);
       v = max(v, fh * 0.5);
       v = max(v, edge * uSel);
       v = max(v, hedge * 0.6);
@@ -760,6 +771,17 @@
     gl.uniform1f(P.post.u.uGridAmt, S.fx.grid);
     const reveal = S.intro < 1 ? Math.hypot(W, H) * 0.62 * easeOut(clamp(S.intro / 0.8)) : 0;
     gl.uniform1f(P.post.u.uReveal, reveal);
+    // flash timing + the selected room's screen box (device px, top-left origin)
+    let selT = 99, box = [0, 0, 1, 1];
+    if (S.room && S.selT0 != null) {
+      selT = (now - S.selT0) / 1000;
+      const [bx0, by0, bx1, by1] = S.room.bbox;
+      const c = [[bx0, by0], [bx1, by0], [bx0, by1], [bx1, by1]].map(([x, y]) => project(cam, x, y, S.lv[S.room.level].z));
+      box = [Math.min(...c.map((q) => q[0])) * dpr, Math.min(...c.map((q) => q[1])) * dpr,
+             Math.max(...c.map((q) => q[0])) * dpr, Math.max(...c.map((q) => q[1])) * dpr];
+    }
+    gl.uniform1f(P.post.u.uSelT, REDUCED ? 99 : selT);
+    gl.uniform4f(P.post.u.uRoomBox, ...box);
     gl.uniform1f(P.post.u.uRevealW, 160 * dpr);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
