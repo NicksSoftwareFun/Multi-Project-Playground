@@ -208,16 +208,30 @@ def text_layer(path, off, k=K, clip=None):
                           graphics=fitz.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED,
                           text=fitz.PDF_REDACT_TEXT_NONE)
     x0, y0, x1, y1 = clip if clip else (0.0, 0.0, CAN_W, CAN_H)
-    r = fitz.Rect(x0 - off[0], y0 - off[1], x1 - off[0], y1 - off[1])
-    pix = page.get_pixmap(matrix=fitz.Matrix(k, k), clip=r, alpha=False)
-    a = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w, pix.n)[..., :3].astype(np.int16)
     W, H = int(round((x1 - x0) * k)), int(round((y1 - y0) * k))
-    a = cv2.resize(a.astype(np.uint8), (W, H), interpolation=cv2.INTER_AREA).astype(np.int16) \
-        if (a.shape[1], a.shape[0]) != (W, H) else a
+    txt = np.zeros((H, W), np.uint8)
+    grd = np.zeros((H, W), np.uint8)
+    # The window can run past the page edge; MuPDF then renders only the part on the
+    # page, so pad the result into place (never stretch it: that shifts the text).
+    r = fitz.Rect(x0 - off[0], y0 - off[1], x1 - off[0], y1 - off[1])
+    rp = r & page.rect
+    if rp.is_empty:
+        return txt, grd
+    pix = page.get_pixmap(matrix=fitz.Matrix(k, k), clip=rp, alpha=False)
+    a = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w, pix.n)[..., :3].astype(np.int16)
+    px0 = int(round(pix.x - r.x0 * k))
+    py0 = int(round(pix.y - r.y0 * k))
+    sx0, sy0 = max(0, -px0), max(0, -py0)
+    dx0, dy0 = max(0, px0), max(0, py0)
+    w = min(pix.w - sx0, W - dx0)
+    h = min(pix.h - sy0, H - dy0)
+    if w <= 0 or h <= 0:
+        return txt, grd
+    a = a[sy0:sy0 + h, sx0:sx0 + w]
     ink = 255 - a.min(axis=2)
     blue = (a[..., 2] - a[..., 0]) > 40            # grid bubble labels
-    txt = np.where(blue, 0, ink).astype(np.uint8)
-    grd = np.where(blue, ink, 0).astype(np.uint8)
+    txt[dy0:dy0 + h, dx0:dx0 + w] = np.where(blue, 0, ink).astype(np.uint8)
+    grd[dy0:dy0 + h, dx0:dx0 + w] = np.where(blue, ink, 0).astype(np.uint8)
     return txt, grd
 
 

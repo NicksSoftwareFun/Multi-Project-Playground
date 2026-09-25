@@ -1,0 +1,15 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PW_MODULE);
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+page.on('pageerror', (e) => console.log('pageerror:', e.message));
+await page.goto('http://127.0.0.1:8765/?debug#T3118', { waitUntil: 'load' });
+await page.waitForSelector('#loader.done', { timeout: 120000 });
+await page.waitForTimeout(6000);
+console.log(await page.evaluate(() => JSON.stringify({ cam: window.__mih.S.cam, fx: window.__mih.S.fx, dpr: window.__mih.S.dpr })));
+await page.screenshot({ path: 'build/test/shots/t_tiles_on.png' });
+await page.evaluate(() => { window.__mih.S.fx.tiles = 0; });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: 'build/test/shots/t_tiles_off.png' });
+await browser.close();

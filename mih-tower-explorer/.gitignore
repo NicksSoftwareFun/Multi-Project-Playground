@@ -1,0 +1,4 @@
+build/qa/
+build/test/shots/
+dist/
+__pycache__/

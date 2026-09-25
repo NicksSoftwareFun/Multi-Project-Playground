@@ -1,0 +1,16 @@
+grid cols: [(371.3, '11.4'), (458.9, '11.2'), (495.6, '11'), (591.3, '10'), (689.2, '9'), (811.8, '8'), (933.3, '7'), (1090.8, '6'), (1230.3, '5'), (1369.8, '4'), (1509.3, '3'), (1627.2, '2.1'), (1648.8, '2'), (1750.1, '1')]
+grid rows: [(306.4, 'G'), (441.4, 'F'), (508.7, 'F.2'), (580.9, 'E'), (664.1, 'D'), (747.4, 'C'), (859.5, 'B.2'), (886.9, 'B'), (955.7, 'A.1'), (977.6, 'A')]
+L1: 207 rooms, 58 open-plan
+L2: 215 rooms, 49 open-plan
+L3: 121 rooms, 19 open-plan
+L4: 12 rooms, 1 open-plan
+rooms.json 836 KB
+tile bbox 0,0 -> 2048.0,1280.0  (8 x 5 tiles)
+L1: rasterising detail at 8.0 px/pt ...
+   38 tiles
+L2: rasterising detail at 8.0 px/pt ...
+   37 tiles
+L3: rasterising detail at 8.0 px/pt ...
+   29 tiles
+L4: rasterising detail at 8.0 px/pt ...
+   40 tiles

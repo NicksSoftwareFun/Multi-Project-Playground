@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MIH Tower Explorer</title>
+<meta name="description" content="Explore the MIH Tower floor plans: pick a floor from the exploded stack, then a room.">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MIH Tower">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!--FONTS-->
+<style>
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/IBMPlexMono-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/IBMPlexMono-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/IBMPlexMono-SemiBold.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans Condensed'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/IBMPlexSansCondensed-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans Condensed'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/IBMPlexSansCondensed-SemiBold.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans Condensed'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/IBMPlexSansCondensed-Bold.woff2') format('woff2'); }
+</style>
+<!--/FONTS-->
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<!--BODY-->
+<div id="app" data-view="stack">
+  <canvas id="gl" aria-label="Floor plans of the MIH Tower. Use the level buttons, the search box or the room list to navigate."></canvas>
+  <svg id="leaders" aria-hidden="true"></svg>
+
+  <header class="hud hud-tl">
+    <div class="proj"><span class="proj-name">MIH TOWER</span><span class="proj-tag">FLOOR EXPLORER</span></div>
+    <div class="title" id="title" aria-hidden="true"></div>
+    <h1 class="sub" id="sub">EXPLODED STACK · 4 LEVELS</h1>
+    <nav class="crumbs" id="crumbs" aria-label="Location"></nav>
+  </header>
+
+  <nav class="hud hud-tr levels" id="levels" aria-label="Levels"></nav>
+
+  <div class="search" id="search">
+    <label class="sr-only" for="q">Find a room by name or number</label>
+    <input id="q" type="search" placeholder="Find a room · name or T-number" autocomplete="off" spellcheck="false">
+    <ul id="results" role="listbox" hidden></ul>
+  </div>
+
+  <div id="stackLabels" class="stack-labels"></div>
+
+  <aside id="panel" class="panel" aria-live="polite" hidden></aside>
+
+  <div id="tip" class="tip" hidden></div>
+
+  <footer class="hud hud-bl" id="readout" aria-hidden="true">
+    <div id="ro1">&nbsp;</div>
+    <div id="ro2">&nbsp;</div>
+  </footer>
+  <footer class="hud hud-br" id="hint">
+    <div class="scalebar" id="scalebar" hidden><i></i><span></span></div>
+    <div id="hinttext">SELECT A FLOOR</div>
+  </footer>
+
+  <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+
+  <div id="loader" class="loader">
+    <div class="loader-title" id="loaderTitle"></div>
+    <div class="loader-bar"><i id="loaderBar"></i></div>
+    <div class="loader-text" id="loaderText">LOADING DRAWINGS</div>
+  </div>
+  <div id="fatal" class="fatal" hidden></div>
+</div>
+<!--/BODY-->
+<script src="app.js"></script>
+<!--SW-->
+<script>
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+<!--/SW-->
+</body>
+</html>
