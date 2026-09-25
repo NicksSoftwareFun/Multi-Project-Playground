@@ -1,4 +1,5 @@
 build/qa/
 build/test/shots/
+build/*.log
 dist/
 __pycache__/
