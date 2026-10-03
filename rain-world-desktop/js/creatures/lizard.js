@@ -217,6 +217,14 @@
         if (hp && homeD > 45 && this.state !== 'eat' && !(this.state === 'carry' && this.stateT > 45)) {
           this.setState('carry');
           this.speed *= 0.85;
+          // every so often, stop and give the carcass a good hard shake
+          // (the more aggressive the lizard, the more often)
+          this.shakeCd = (this.shakeCd === undefined ? U.rand(1.5, 4) : this.shakeCd) - dt;
+          if (this.shakeCd <= 0 && this.grip && !this.turn) {
+            this.shakeCd = U.rand(3, 7) * (1.4 - 0.7 * pe.aggression);
+            this.shakeT = U.rand(0.5, 1);
+          }
+          if (this.shakeT > 0) this.speed = 0;
           this.pather.interval = 0.8;
           this.pather.setGoal(hp.x, hp.y);
           // no route, or no progress for a while: eat it here after all
@@ -231,8 +239,10 @@
           if (!stuck) return;
           this.carryCheck = null;
         }
+        if (this.state !== 'eat' && Math.random() < 0.4) this.shakeT = U.rand(0.5, 0.9); // one last shake
         this.setState('eat');
         this.pather.clear();
+        if (this.shakeT > 0) return; // swallowing waits for the shaking
         this.eatT += dt;
         if (this.eatT > 3) {
           eco.consume(prey, this);
@@ -1278,7 +1288,28 @@
         this.thrashT -= dt;
         ang += Math.sin(this.age * 38) * 0.45 * Math.min(1, this.thrashT);
       }
-      this.headAng = U.lerpAngle(this.headAng, ang, U.approach(this.thrashT > 0 ? 40 : 12, dt));
+      if (this.shakeT > 0) {
+        // a vigorous shake of the kill: the head whips side to side and the
+        // neck and shoulders swing with it, flinging the carcass about
+        this.shakeT -= dt;
+        if (!this.holding) this.shakeT = 0;
+        const k = Math.min(1, this.shakeT * 4) * Math.min(1, (this.shakeDur = (this.shakeDur || 0) + dt) * 6);
+        const w = Math.sin(this.age * 30);
+        ang += w * 0.85 * k;
+        let nx = -(P[0].y - P[2].y);
+        let ny = P[0].x - P[2].x;
+        const nl = Math.hypot(nx, ny) || 1;
+        nx /= nl;
+        ny /= nl;
+        P[1].x += nx * w * 1.6 * L * k;
+        P[1].y += ny * w * 1.6 * L * k;
+        P[2].x += nx * Math.sin(this.age * 30 - 0.9) * 0.9 * L * k;
+        P[2].y += ny * Math.sin(this.age * 30 - 0.9) * 0.9 * L * k;
+        this.jawTarget = 0.35;
+      } else {
+        this.shakeDur = 0;
+      }
+      this.headAng = U.lerpAngle(this.headAng, ang, U.approach(this.thrashT > 0 || this.shakeT > 0 ? 40 : 12, dt));
       this.jaw += (this.jawTarget - this.jaw) * U.approach(this.jawTarget > this.jaw ? 25 : 8, dt);
 
       // Tongue flicks while idle, stalking or sizing up a rival.
