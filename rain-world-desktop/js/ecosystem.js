@@ -375,7 +375,23 @@
       this.late = [];
       for (const c of sorted) {
         if (c.ghostAlpha && c.ghostAlpha() < 0.99) this.late.push(c);
-        else c.draw(ctx);
+        else if (c.burrow) {
+          // only the part still above the surface it's digging into shows
+          const b = c.burrow;
+          const tx = -b.ny;
+          const ty = b.nx;
+          const F = 1e4;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(b.sx + tx * F, b.sy + ty * F);
+          ctx.lineTo(b.sx - tx * F, b.sy - ty * F);
+          ctx.lineTo(b.sx - tx * F + b.nx * F, b.sy - ty * F + b.ny * F);
+          ctx.lineTo(b.sx + tx * F + b.nx * F, b.sy + ty * F + b.ny * F);
+          ctx.closePath();
+          ctx.clip();
+          c.draw(ctx);
+          ctx.restore();
+        } else c.draw(ctx);
       }
       for (const it of this.items) if (over(it)) it.draw(ctx);
       for (const p of this.particles) {

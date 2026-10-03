@@ -276,6 +276,7 @@
     tick(dt) {
       this.age += dt;
       this.stateT += dt;
+      if (this.burrow) return this.burrowStep(dt);
       if (this.leaving) {
         this.alpha -= dt * 2;
         if (this.alpha <= 0) this.dead = true;
@@ -317,10 +318,49 @@
         this.lastCheck = { x: m.x, y: m.y };
         const busy = this.pather && this.pather.goal && !this.grabbedBy && !this.holding;
         this.stillFor = moved < 3 && busy ? (this.stillFor || 0) + 5 : 0;
-        if (this.stillFor >= 25) this.leave();
+        if (this.stillFor >= 25) this.burrowAway();
       }
       return true;
     }
+    // Stuck too long (or walled in): dig down into the surface underfoot and
+    // disappear. The surface clips the creature as it sinks (see
+    // Ecosystem.draw), with a little dirt kicked up.
+    burrowAway() {
+      if (this.burrow || this.dead) return;
+      if (this.holding) this.release();
+      if (this.grabbedBy) return; // not while something has hold of it
+      const W = this.W;
+      const m = this.mainPoint();
+      let s = W.nearestSurface(m.x, m.y, 80, { floor: true, walls: true, ceil: true, poles: false });
+      if (!s) {
+        const hit = W.raycast(m.x, m.y, m.x, m.y + 400);
+        s = hit ? { x: hit.x, y: hit.y, nx: 0, ny: -1 } : { x: m.x, y: m.y + 10, nx: 0, ny: -1 };
+      }
+      this.burrow = { t: 0, dur: 1.4, sx: s.x, sy: s.y, nx: s.nx, ny: s.ny, dustT: 0 };
+      this.label = '';
+      if (this.pather) this.pather.clear();
+    }
+    burrowStep(dt) {
+      const b = this.burrow;
+      b.t += dt;
+      // sink into the surface (against its normal), slowly then quicker
+      const sp = 18 + 40 * (b.t / b.dur);
+      this.shiftAll(-b.nx * sp * dt, -b.ny * sp * dt);
+      b.dustT -= dt;
+      if (b.dustT <= 0) {
+        b.dustT = 0.12;
+        const m = this.mainPoint();
+        // dirt flicks up where the body meets the surface
+        const d = (m.x - b.sx) * b.nx + (m.y - b.sy) * b.ny;
+        this.eco.burst(m.x - b.nx * d, m.y - b.ny * d, '#2b241d', 3);
+      }
+      if (b.t >= b.dur) {
+        this.dead = true;
+        this.eco.stats.left++;
+      }
+      return false;
+    }
+
     // Eaten, despawned or left the screen.
     remove() {
       this.dead = true;
@@ -615,7 +655,7 @@
         const m = this.mainPoint();
         const exit = this.findExit(m.x, m.y);
         if (!exit) {
-          this.leave();
+          this.burrowAway();
           return true;
         }
         if (this.holding) this.release();
