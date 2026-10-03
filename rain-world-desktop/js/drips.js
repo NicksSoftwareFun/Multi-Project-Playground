@@ -81,8 +81,9 @@
       return out.concat(this.free);
     }
 
-    update(dt, world, decor, amount, wind, t) {
+    update(dt, world, decor, amount, wind, t, flow) {
       this.t = t;
+      this.flow = flow === undefined ? 1 : flow; // how hard the ledge ends pour (0 = dry)
       if (world.version !== this.version) this.rebuild(world, decor);
       const H = world.h;
       for (const src of this.sources(world)) {
@@ -124,7 +125,7 @@
         }
         const hit = world.raycast(tr.x, tr.y, tr.x, H + 5);
         tr.land = hit ? hit.y : H;
-        if (Math.random() < dt * 14 * tr.flow * Math.max(0.3, amount)) this.splash(tr.x + U.rand(-1, 1), tr.land, 0.5, true);
+        if (Math.random() < dt * 14 * tr.flow * this.flow * Math.max(0.3, amount)) this.splash(tr.x + U.rand(-1, 1), tr.land, 0.5, true);
       }
 
       for (const p of this.spray) {
@@ -160,10 +161,12 @@
       const waterCol = (a) => U.rgba(water, a);
 
       // Trickles: a thin broken stream with a little mist at the bottom.
+      const fl = this.flow === undefined ? 1 : this.flow;
       for (const tr of this.trickles) {
-        if (tr.land == null) continue;
+        if (tr.land == null || fl < 0.02) continue;
+        const waterCol = (a) => U.rgba(water, a * fl); // fades out as the rain eases
         ctx.strokeStyle = waterCol(0.18);
-        ctx.lineWidth = 1.8;
+        ctx.lineWidth = 1.8 * (0.5 + 0.5 * fl);
         ctx.beginPath();
         for (let y = tr.y; y < tr.land; y += 6) {
           const wob = Math.sin(y * 0.05 + this.t * 3) * 0.6 * Math.min(1, (y - tr.y) / 60);

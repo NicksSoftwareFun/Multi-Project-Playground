@@ -815,24 +815,36 @@
       this.drips = RW.Drips ? new RW.Drips() : null;
     }
 
-    // Rain cycle: drizzle for most of it, building to a downpour at the end.
+    // Rain cycle: light rain for most of it. Approaching the downpour the
+    // rain builds on an exponential curve (barely at first, then fast), and
+    // once it ends it eases back off the same way: a sharp drop, then a long
+    // tail down to the light rain.
     update(dt, cfg, W, H, world) {
       this.t += dt;
       const rc = cfg.rain;
       const cycle = Math.max(0.5, rc.cycleMinutes) * 60;
       this.phase = (this.t % cycle) / cycle;
       const dp = U.clamp(rc.downpourFraction, 0.02, 0.6);
-      const buildStart = 1 - dp - 0.12;
-      let target = rc.drizzle;
-      if (this.phase > buildStart) target = U.lerp(rc.drizzle, 1, U.smooth(U.clamp((this.phase - buildStart) / 0.12, 0, 1)));
+      const K = 4;
+      const ex = (u) => (Math.exp(K * U.clamp(u, 0, 1)) - 1) / (Math.exp(K) - 1);
+      const up = 0.3; // share of the cycle the build-up takes
+      const down = 0.18; // ...and the easing off afterwards
+      const base = U.clamp(+rc.drizzle || 0, 0, 1);
+      let target = base;
+      if (this.phase >= 1 - dp) target = 1;
+      else if (this.phase > 1 - dp - up) target = base + (1 - base) * ex((this.phase - (1 - dp - up)) / up);
+      else if (this.t >= cycle && this.phase < down) target = base + (1 - base) * ex(1 - this.phase / down);
       if (!rc.enabled) target = 0;
       this.intensity = target;
+      // Water only pours off the ledge ends in proper rain; light rain just drips.
+      const wf = rc.waterfallsFrom ?? 0.35;
+      this.waterfalls = rc.enabled ? U.smooth(U.clamp((this.intensity - wf) / 0.2, 0, 1)) : 0;
       this.downpour = rc.enabled && this.phase > 1 - dp;
 
-      // Drips: present from the start of the cycle, building as it goes on.
+      // Drips: light in light rain, more as it comes down harder.
       if (this.drips && world) {
-        const amount = rc.enabled ? (rc.drips ?? 0.7) * (0.6 + 0.6 * this.phase + this.intensity * 1.2) : 0;
-        this.drips.update(dt, world, this.decor, amount, 60 + this.intensity * 220, this.t);
+        const amount = rc.enabled ? (rc.drips ?? 0.7) * (0.5 + this.intensity * 1.6) : 0;
+        this.drips.update(dt, world, this.decor, amount, 60 + this.intensity * 220, this.t, this.waterfalls);
         this.world = world;
       }
       for (const c of this.curtains) {
