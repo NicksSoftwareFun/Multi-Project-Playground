@@ -110,19 +110,16 @@
       });
     }
 
-    // After the wildlife mix changes: whatever no longer belongs heads for a
-    // den and leaves (rather than vanishing on the spot).
-    retireUnwanted() {
-      for (const c of this.creatures) {
-        if (c.dead || c.corpse || c.leaving) continue;
-        const s = this.cfg.species[c.species];
-        if (s && s.weight > 0) continue;
-        c.migrating = true;
-        if (c.species === 'slugcat' || c.species === 'daddy') {
-          const m = c.mainPoint();
-          c.exitDen = this.nearestDen(m.x, m.y);
-        }
-      }
+    // A fresh start (the wildlife mix changed): everything currently about
+    // goes, corpses included, and the map fills straight from the new mix.
+    // (Held weapons and fruit drop where they are.)
+    repopulate() {
+      for (const c of this.creatures) c.remove();
+      this.creatures = [];
+      this.stats = { born: 0, eaten: 0, left: 0 };
+      this.noSlugT = 0;
+      this.spawnT = 60 / Math.max(0.1, +this.cfg.ecosystem.spawnPerMinute || 0.1);
+      this.populate();
     }
 
     nearestDen(x, y) {

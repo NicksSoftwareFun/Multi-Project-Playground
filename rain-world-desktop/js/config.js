@@ -16,7 +16,7 @@
     world: {
       palette: 'industrial', // industrial | shoreline | outskirts | chimney | subterranean
       mapSize: 1, // how much world fits on screen: bigger = more map, everything smaller
-      pixelScale: 2, // 1 = full res, 2-3 = chunkier Rain World pixels
+      pixelScale: 2, // 1 = full res, 1.5-3 = chunkier Rain World pixels
       cellSize: 20, // navigation grid cell (px). Rain World tiles are 20px.
       seed: 0, // 0 = new background every load
       layout: 'tiers', // 'tiers': rows of ledges at shared heights, bridged by horizontal poles; 'scatter': anywhere
@@ -46,8 +46,8 @@
       startPopulated: true, // fill the screen immediately on load
       predation: true, // predators actually eat prey (off = chase, bite, release)
       migrationPerMinute: 0.3,
-      rocks: 6, // rocks kept lying about for slugcats to throw
-      spears: 2, // spears likewise (the wiki: about one weapon in five is a spear) // chance per creature per minute to wander off into a den
+      rocks: 15, // rocks kept lying about for slugcats to throw (plenty: they're the slugcats' main tool)
+      spears: 3, // spears likewise, fewer (the wiki: about one weapon in five is a spear)
       cursorInteraction: true,
       clickDropsFood: false, // off: pressing on a creature picks it up instead
     },
@@ -352,17 +352,19 @@
 
   // ---- presets --------------------------------------------------------------
   // Size: how much world there is and how much lives in it. Map size zooms
-  // out (ledges, poles and plants scale with the area, see generateDecor);
+  // out (ledges, poles and plants scale with the area, see generateDecor),
+  // and the art pixels get finer so zoomed-out creatures keep their detail;
   // population, spawn rate, weapons and each species' cap scale with it.
   RW.SIZE_PRESETS = {
-    compact: { label: 'Compact', mapSize: 1, maxPopulation: 12, spawnPerMinute: 2.5, rocks: 6, spears: 2, caps: 1 },
-    normal: { label: 'Normal', mapSize: 1.4, maxPopulation: 20, spawnPerMinute: 4, rocks: 11, spears: 4, caps: 1.7 },
-    large: { label: 'Large', mapSize: 1.8, maxPopulation: 30, spawnPerMinute: 6, rocks: 17, spears: 6, caps: 2.5 },
-    xl: { label: 'XL', mapSize: 2.4, maxPopulation: 45, spawnPerMinute: 9, rocks: 26, spears: 9, caps: 3.6 },
+    compact: { label: 'Compact', mapSize: 1, pixelScale: 2, maxPopulation: 12, spawnPerMinute: 2.5, rocks: 15, spears: 3, caps: 1 },
+    normal: { label: 'Normal', mapSize: 1.4, pixelScale: 2, maxPopulation: 20, spawnPerMinute: 4, rocks: 28, spears: 6, caps: 1.7 },
+    large: { label: 'Large', mapSize: 1.8, pixelScale: 1.5, maxPopulation: 30, spawnPerMinute: 6, rocks: 42, spears: 8, caps: 2.5 },
+    xl: { label: 'XL', mapSize: 2.4, pixelScale: 1, maxPopulation: 45, spawnPerMinute: 9, rocks: 65, spears: 13, caps: 3.6 },
   };
   // Wildlife: which creatures turn up (spawn weights; anything not listed
-  // stays away), each mix chosen to show off a set of behaviours. `weapons`
-  // scales the rocks and spears lying about.
+  // stays away), each mix chosen to show off a set of behaviours. `caps`
+  // multiplies the featured species' caps; `weapons` scales the rocks and
+  // spears lying about.
   const LIZ = ['lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white', 'lizard_red', 'lizard_yellow', 'lizard_cyan'];
   RW.WILDLIFE_PRESETS = {
     balanced: { label: 'Balanced', note: 'a bit of everything', weights: null },
@@ -370,27 +372,32 @@
       label: 'Lizard turf wars',
       note: 'every colour of lizard staking out ledges, fighting over hangouts and kills',
       weights: { lizard_pink: 3, lizard_green: 2, lizard_blue: 3, lizard_white: 1.5, lizard_red: 1, lizard_yellow: 2.5, lizard_cyan: 2, slugcat: 2, batfly: 3, centipede: 4 },
+      caps: { lizard_pink: 2, lizard_green: 2, lizard_blue: 2, lizard_white: 2, lizard_red: 2, lizard_yellow: 2, lizard_cyan: 2 },
     },
     hunters: {
       label: 'Slugcat hunters',
       note: 'slugcats with rocks and spears knocking down fruit and batflies, fending off a few lizards',
       weights: { slugcat: 8, batfly: 5, centipede: 5, centipede_medium: 1, lizard_pink: 1, lizard_green: 1 },
+      caps: { slugcat: 2 },
       weapons: 1.6,
     },
     centipedes: {
       label: 'Centipede hunt',
       note: 'centipedes of every size; the big ones go after lizards',
       weights: { centipede: 5, centipede_medium: 3, centipede_large: 2, lizard_pink: 2, lizard_blue: 2, lizard_green: 1.5, slugcat: 2, batfly: 3 },
+      caps: { centipede_medium: 2, centipede_large: 2 },
     },
     ambush: {
       label: 'Ambushers',
       note: 'dropwigs on the ceilings and white lizards stalking in camouflage',
       weights: { dropwig: 5, lizard_white: 3, slugcat: 4, batfly: 4, centipede: 4 },
+      caps: { dropwig: 2, lizard_white: 3 },
     },
     daddy: {
       label: "Daddy's buffet",
       note: 'Daddy Long Legs drifting through a crowd of prey',
       weights: { daddy: 2.5, slugcat: 5, batfly: 4, centipede: 5, lizard_pink: 1 },
+      caps: { daddy: 2 },
     },
     peaceful: {
       label: 'Peaceful',
@@ -407,8 +414,10 @@
     cfg.presets = cfg.presets || {};
     cfg.presets.size = P ? name : 'custom';
     if (!P) return;
-    const W = (RW.WILDLIFE_PRESETS[cfg.presets.wildlife] || {}).weapons || 1;
+    const wild = RW.WILDLIFE_PRESETS[cfg.presets.wildlife] || {};
+    const W = wild.weapons || 1;
     cfg.world.mapSize = P.mapSize;
+    cfg.world.pixelScale = P.pixelScale;
     cfg.ecosystem.maxPopulation = P.maxPopulation;
     cfg.ecosystem.spawnPerMinute = P.spawnPerMinute;
     cfg.ecosystem.rocks = Math.round(P.rocks * W);
@@ -416,7 +425,7 @@
     for (const k of Object.keys(cfg.species)) {
       const base = RW.BASE_CONFIG.species[k];
       // batflies cost nothing toward the population, so they grow more slowly
-      const f = base && base.popCost === 0 ? Math.pow(P.caps, 0.6) : P.caps;
+      const f = (base && base.popCost === 0 ? Math.pow(P.caps, 0.6) : P.caps) * ((wild.caps && wild.caps[k]) || 1);
       if (base) cfg.species[k].max = Math.max(1, Math.round(base.max * f));
     }
   };
@@ -440,7 +449,7 @@
   RW.DEFAULT_CONFIG.presets = { size: 'normal', wildlife: 'balanced' };
   RW.applySizePreset(RW.DEFAULT_CONFIG, 'normal');
 
-  const STORAGE_KEY = 'rw-desktop-config-v13'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v14'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

@@ -179,9 +179,11 @@
         h('div', { class: 'presets' },
           this.presetPicker('Size', RW.SIZE_PRESETS, 'size', (name) => {
             const before = cfg.world.mapSize;
+            const ps = cfg.world.pixelScale;
             RW.applySizePreset(cfg, name);
             this.save();
             if (cfg.world.mapSize !== before) eng.regenerate(false);
+            else if (cfg.world.pixelScale !== ps) eng.applyPalette();
             this.render();
           }),
           this.presetPicker('Wildlife', W, 'wildlife', (name) => {
@@ -189,7 +191,7 @@
             RW.applyWildlifePreset(cfg, name);
             this.save();
             if (cfg.world.mapSize !== before) eng.regenerate(false);
-            eng.eco.retireUnwanted();
+            eng.restartWildlife();
             this.render();
           }),
           this.noteEl
@@ -243,8 +245,8 @@
           this.slider('max population', E, 'maxPopulation', 0, 80, 1, sized),
           this.slider('spawns /min', E, 'spawnPerMinute', 0.5, 30, 0.5, sized),
           this.slider('migration /min', E, 'migrationPerMinute', 0, 1, 0.05),
-          this.slider('rocks', E, 'rocks', 0, 40, 1, sized),
-          this.slider('spears', E, 'spears', 0, 20, 1, sized),
+          this.slider('rocks', E, 'rocks', 0, 120, 1, sized),
+          this.slider('spears', E, 'spears', 0, 30, 1, sized),
           this.toggleCtl('predators eat prey', E, 'predation'),
           this.toggleCtl('creatures react to cursor', E, 'cursorInteraction'),
           this.toggleCtl('click wallpaper drops fruit', E, 'clickDropsFood'),
@@ -288,7 +290,10 @@
       this.el.appendChild(
         this.section('World',
           this.select('palette', Wc, 'palette', Object.keys(RW.PALETTES), () => eng.applyPalette()),
-          this.select('pixel scale', Wc, 'pixelScale', [1, 2, 3], () => eng.applyPalette()),
+          this.select('pixel scale', Wc, 'pixelScale', [1, 1.5, 2, 3], () => {
+            this.custom('size');
+            eng.applyPalette();
+          }),
           this.slider('map size', Wc, 'mapSize', 0.7, 3, 0.05, () => {
             this.custom('size');
             // rebuild once the slider settles, not on every pixel of the drag

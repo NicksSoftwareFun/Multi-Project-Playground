@@ -87,7 +87,7 @@
       cfg.presets.wildlife = wildNames[val - 1] || 'custom';
       if (cfg.presets.wildlife !== was && RW.WILDLIFE_PRESETS[cfg.presets.wildlife]) {
         RW.applyWildlifePreset(cfg, cfg.presets.wildlife);
-        engine.eco.retireUnwanted();
+        engine.restartWildlife();
       }
     } else if (name.startsWith('w_')) {
       const s = cfg.species[name.slice(2)];

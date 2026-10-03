@@ -99,6 +99,13 @@
       hand.vx = hand.vy = 0;
       return true;
     }
+    // New wildlife: a fresh set of creatures and a rain cycle starting over.
+    restartWildlife() {
+      this.dropHand();
+      this.eco.repopulate();
+      this.weather.t = 0;
+    }
+
     // Let go: it drops (or flies a little, if the mouse was moving).
     dropHand() {
       const hand = this.hand;
