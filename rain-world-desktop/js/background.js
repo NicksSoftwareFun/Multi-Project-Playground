@@ -904,7 +904,8 @@
       const x0min = -slant * H - 20;
       const n = Math.ceil((world.w - x0min) / step) + 2;
       const hits = new Float32Array(n);
-      const solids = world.solids.filter((q) => q.kind !== 'edge');
+      // (thin horizontal poles don't shelter anything: rain falls past them)
+      const solids = world.solids.filter((q) => q.kind !== 'edge' && q.kind !== 'beam');
       for (let i = 0; i < n; i++) {
         const x0 = x0min + i * step;
         let hit = Infinity;
