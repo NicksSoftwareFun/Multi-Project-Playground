@@ -603,15 +603,16 @@
       // tail
       const T = this.tail.pts;
       ctx.fillStyle = main;
-      U.taperPath(ctx, T, [5, 4.4, 3.6, 2.6, 1.2]);
+      U.taperPath(ctx, T, [5.4, 4.6, 3.6, 2.6, 1.2]);
       ctx.fill();
 
-      // body: a teardrop, broad at the hips
+      // body: one soft sack as wide as the head where they meet (no neck),
+      // easing a little toward the hips and on into the tail
       const mid = { x: U.lerp(hip.x, h.x, 0.5) - f * 0.5, y: U.lerp(hip.y, h.y, 0.5) };
-      U.taperPath(ctx, [{ x: hip.x, y: hip.y - 1 }, mid, h], [5, 4.2, 3.7]);
+      U.taperPath(ctx, [{ x: hip.x, y: hip.y - 1 }, mid, h], [5.8, 6.6, 7]);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(hip.x, hip.y - 1.2, 4.8 + lie * 0.6, 0, U.TAU);
+      ctx.arc(hip.x, hip.y - 1.2, 5.6 + lie * 0.4, 0, U.TAU);
       ctx.fill();
 
       // near leg
@@ -729,8 +730,8 @@
           // arms swing opposite the legs, held a little out from the body
           for (const k of [Math.PI, 0]) {
             hands.push({
-              x: shoulder.x + Math.sin(ph + k) * 4.5 * moving + f * (k ? 6.5 : -4.5),
-              y: shoulder.y + 6 - Math.max(0, -Math.cos(ph + k)) * 2 * moving,
+              x: shoulder.x + Math.sin(ph + k) * 4.5 * moving + f * (k ? 8.5 : -6),
+              y: shoulder.y + 7.5 - Math.max(0, -Math.cos(ph + k)) * 2 * moving,
             });
           }
         }
