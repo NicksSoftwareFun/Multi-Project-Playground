@@ -47,6 +47,7 @@
       // and out through the pipe farthest from where we came in.
       this.hunger = U.rand(0.6, 0.85);
       this.meals = 0;
+      this.mealKinds = { fruit: 0, meat: 0 }; // one of each, given the choice
       this.origin = null;
       this.exitDen = null;
       this.item = null;
@@ -278,7 +279,7 @@
         this.snackT -= dt;
         if (this.snackT <= 0) {
           this.hunger = Math.max(0, this.hunger - this.snackVal);
-          this.ate();
+          this.ate('meat');
           this.setState('rest');
           this.restT = U.rand(1, 3);
         }
@@ -293,7 +294,7 @@
           this.item.dead = true;
           this.item = null;
           this.hunger = Math.max(0, this.hunger - 0.6);
-          this.ate();
+          this.ate('fruit');
           this.eatT = 0;
           this.setState('rest');
           this.restT = U.rand(1, 3);
@@ -309,7 +310,7 @@
         if (this.eatT > 1.8) {
           eco.consume(this.holding, this);
           this.hunger = Math.max(0, this.hunger - 0.35);
-          this.ate();
+          this.ate('meat');
           this.eatT = 0;
           this.setState('rest');
           this.restT = U.rand(1, 3);
@@ -379,7 +380,7 @@
       }
 
       // Prey knocked down by a rock: go and pick it up.
-      if (perceive && this.hunger > 0.3 && this.state !== 'forage') {
+      if (perceive && this.hunger > 0.3 && this.state !== 'forage' && this.wants('meat')) {
         let downed = this.nearestOf(['batfly', 'centipede'], 320, (c) => c.stunT > 0.4 && c.canBeGrabbed() && (c.size || 1) <= 1);
         if (!downed) {
           const c = this.nearestCorpse(['batfly', 'centipede'], 320);
@@ -408,7 +409,7 @@
         }
       }
       // Food: fruit on the ground, or a batfly flying past.
-      if (perceive && (this.hunger > 0.35 || this.state === 'forage')) {
+      if (perceive && (this.hunger > 0.35 || this.state === 'forage') && this.wants('fruit')) {
         const fruit = this.findFruit(this.hunger > 0.6 ? 700 : 300);
         if (fruit) {
           this.food = fruit;
@@ -441,7 +442,7 @@
           return;
         }
       }
-      if (this.hunger > 0.3) {
+      if (this.hunger > 0.3 && this.wants('meat')) {
         const bf = this.nearestOf(['batfly'], 50, (c) => c.canBeGrabbed());
         if (bf) {
           this.reachTo = bf.mainPoint();
@@ -463,14 +464,12 @@
 
       // Armed and hungry: knock prey out of the air, or fruit off its vine.
       if (perceive && this.weapon && this.hunger > 0.35 && this.throwCd <= 0 && !this.item && Math.random() < 0.35) {
-        const bf = this.nearestOf(['batfly', 'centipede'], 240, (c) => !c.grabbedBy && !(c.stunT > 0) && (c.size || 1) <= 1 && U.dist(c.x, c.y, hip.x, hip.y) > 40 && this.canSee(c.x, c.y, 240));
+        const bf = this.wants('meat') && this.nearestOf(['batfly', 'centipede'], 240, (c) => !c.grabbedBy && !(c.stunT > 0) && (c.size || 1) <= 1 && U.dist(c.x, c.y, hip.x, hip.y) > 40 && this.canSee(c.x, c.y, 240));
         if (bf) this.startThrow(bf);
-        else if (this.hasKind('rock') && !this.findFruit(500)) {
-          const pl = this.eco.plants.find((pp) => {
-            if (pp.grow < 0.8) return false;
-            const tp = pp.tip();
-            return U.dist(tp.x, tp.y, hip.x, hip.y) < 260 && this.W.lineClear(hip.x, hip.y - 8, tp.x, tp.y + 5);
-          });
+        else if (this.wants('fruit') && !this.findFruit(500)) {
+          // ripe fruit only comes down when something hits it (a rock's
+          // best, but a spear will do)
+          const pl = this.ripePlant(hip, 260, true);
           if (pl) this.startThrow(pl);
         }
       }
@@ -497,8 +496,10 @@
         }
       }
       this.ignoreWeaponT = (this.ignoreWeaponT || 0) - dt;
-      if (!(this.weapon && this.offhand) && perceive && this.state === 'wander' && Math.random() < 0.4) {
-        const w = this.findWeapon(300);
+      // (hungry, empty-handed and ripe fruit overhead: look further afield)
+      const forFruit = !this.weapon && this.hunger > 0.35 && this.wants('fruit') && !!this.ripePlant(hip, 600, false);
+      if (!(this.weapon && this.offhand) && perceive && this.state === 'wander' && Math.random() < (forFruit ? 0.8 : 0.4)) {
+        const w = this.findWeapon(forFruit ? 600 : 300);
         if (w) {
           this.fetch = w;
           this.setState('fetch');
@@ -542,7 +543,10 @@
           this.restT = U.rand(3, 12);
           return;
         }
-        const g = this.wanderGoal(this.caps, 550);
+        // only meat will do (had fruit already): go where the batflies are
+        const prey = this.hunger > 0.3 && !this.wants('fruit') && this.meatTarget(900);
+        const near = prey && Nav.nearestValid(this.W, prey.x, prey.y + 30, this.caps, 6);
+        const g = near ? { x: this.W.centerX(near.cx), y: this.W.centerY(near.cy) } : this.wanderGoal(this.caps, 550);
         if (g) this.pather.setGoal(g.x, g.y, true);
         this.stateT = 0;
         this.stuckT = 0;
@@ -561,9 +565,27 @@
       }
       return !!this.exitDen;
     }
-    ate() {
+    ate(kind) {
       this.meals++;
+      if (kind) this.mealKinds[kind]++;
       if (this.meals < 2) this.hunger = Math.max(this.hunger, 0.6); // still peckish
+    }
+    // Would we eat this kind of food now? After a fruit we want meat (and
+    // after meat, fruit) as long as the map has some of the other kind.
+    wants(kind) {
+      if (!this.mealKinds[kind]) return true;
+      const other = kind === 'fruit' ? 'meat' : 'fruit';
+      if (this.mealKinds[other]) return true;
+      return !this.foodAround(other);
+    }
+    foodAround(kind) {
+      const eco = this.eco;
+      if (kind === 'fruit') return eco.items.some((it) => it instanceof RW.Fruit && !it.dead && !it.heldBy) || eco.plants.some((p) => p.ripe());
+      return eco.creatures.some((c) => (c.species === 'batfly' || (c.species === 'centipede' && (c.size || 1) <= 1)) && !c.dead && !c.leaving && !c.grabbedBy);
+    }
+    // Hunting for meat: the nearest small prey to head towards.
+    meatTarget(range) {
+      return this.nearestOf(['batfly', 'centipede'], range, (c) => !c.grabbedBy && (c.size || 1) <= 1);
     }
     findWeapon(range) {
       const hip = this.hip;
@@ -609,6 +631,15 @@
     // Which of our weapons suits this target: a spear into a captor (it lets
     // go) or a red lizard (rocks don't faze them) or anything big; a rock to
     // flip other lizards, to down small prey for the taking, and for fruit.
+    // A vine with ripe fruit near `from` (in clear sight, if `see`).
+    ripePlant(from, range, see) {
+      return this.eco.plants.find((pp) => {
+        if (!pp.ripe()) return false;
+        const tp = pp.tip();
+        if (U.dist(tp.x, tp.y, from.x, from.y) > range) return false;
+        return !see || this.W.lineClear(from.x, from.y - 8, tp.x, tp.y + 5);
+      });
+    }
     pickWeaponFor(t) {
       if (t === this.grabbedBy) return 'spear';
       if (t.tip && !t.spine && !t.chain) return 'rock';
@@ -625,7 +656,6 @@
         this.weapon = this.offhand;
         this.offhand = w;
       }
-      if (want === 'rock' && t.tip && !t.spine && !t.chain && this.weapon.kind !== 'rock') return false; // fruit: rocks only
       const tp = this.aimPoint(t);
       this.throwAt = t;
       this.throwT = 0.16;

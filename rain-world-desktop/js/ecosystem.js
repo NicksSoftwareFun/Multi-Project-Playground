@@ -20,6 +20,7 @@
       this.dens = [];
       this.plants = [];
       this.grass = [];
+      this.nests = [];
       this.weather = null;
       this.t = 0;
       this.spawnT = 1;
@@ -32,6 +33,23 @@
       this.dens = decor.dens.map((d) => Object.assign({}, d));
       this.grass = decor.grass.map((g) => Object.assign({}, g));
       this.plants = decor.fruitPlants.map((p) => new RW.FruitPlant(this, p.x, p.y, p.len));
+      this.nests = (decor.nests || []).map((n) => ({ x: n.x, y: n.y, phase: n.x % 10, pulse: 0 }));
+    }
+    // Batflies hatch from the nest (not from dens) unless it's buried under a
+    // window; with a window or icon right below it they slip out sideways.
+    openNests() {
+      return this.nests.filter((n) => !this.world.isSolidPt(n.x, n.y + 4) && this.nestExit(n));
+    }
+    nestExit(n) {
+      const W = this.world;
+      for (let r = 0; r <= 120; r += 20) {
+        for (const dx of r ? [-r, r] : [0]) {
+          const x = n.x + dx;
+          const y = n.y + 30;
+          if (x > 8 && x < W.w - 8 && !W.isSolidPt(x, y) && !W.isSolidPt(x, y - 12) && !W.isSolidPt(x, y + 10)) return { x, y };
+        }
+      }
+      return null;
     }
 
     // ---- cursor -----------------------------------------------------------
@@ -130,6 +148,13 @@
     spawn(species, x, y) {
       const Cls = this.classFor(species);
       if (!Cls) return null;
+      if (x === undefined && species === 'batfly' && this.openNests().length) {
+        const n = U.pick(this.openNests());
+        const ex = this.nestExit(n);
+        x = ex.x;
+        y = ex.y;
+        n.pulse = 0.6;
+      }
       if (x === undefined) {
         const pos = this.pickSpawnPoint(species, false);
         if (!pos) return null;
@@ -333,6 +358,22 @@
         }
       }
 
+      // The nest keeps batflies about (prey for everyone): whenever they run
+      // low it lets out a fresh flock. They don't count toward the cap.
+      for (const n of this.nests) n.pulse = Math.max(0, n.pulse - dt);
+      this.nestT = (this.nestT === undefined ? 4 : this.nestT) - dt;
+      if (this.nestT <= 0) {
+        this.nestT = 18;
+        const bf = cfg.species.batfly;
+        const open = this.openNests();
+        if (bf && bf.enabled !== false && open.length && !this.shouldShelter() && this.count('batfly') < Math.min(bf.max || 14, 6)) {
+          const n = U.pick(open);
+          const ex = this.nestExit(n);
+          this.spawn('batfly', ex.x, ex.y);
+          n.pulse = 0.6;
+        }
+      }
+
       for (const p of this.plants) p.update(dt);
       const Wd = this.world;
       for (const c of this.creatures) {
@@ -369,6 +410,10 @@
       for (const p of this.plants) {
         p.draw(ctx);
         dirty.push([p.x - 14, p.y - 2, p.x + 14, p.y + p.len + 14]);
+      }
+      for (const n of this.nests) {
+        this.drawNest(ctx, n);
+        dirty.push([n.x - 16, n.y - 2, n.x + 16, n.y + 36]);
       }
       for (const it of this.items) dirty.push(it.bounds ? it.bounds() : [it.x - 9, it.y - 9, it.x + 9, it.y + 9]);
       for (const c of this.creatures) if (c.alpha > 0) dirty.push(c.bounds());
@@ -435,6 +480,42 @@
         ctx.quadraticCurveTo(bx + sway * 0.3, g.y - h * 0.6, bx + sway + (k - 3) * 2, g.y - h);
       }
       ctx.stroke();
+    }
+    // A batfly nest: a lumpy woven pod on a short stalk, with a dark
+    // opening at the bottom; it swells a little as a flock squeezes out.
+    drawNest(ctx, n) {
+      const pal = this.palette;
+      if (!pal) return;
+      const sway = Math.sin(this.t * 0.7 + n.phase) * 1.5;
+      const k = 1 + n.pulse * 0.25;
+      const cx = n.x + sway;
+      const cy = n.y + 17;
+      ctx.strokeStyle = U.rgba(U.mix(pal.near, '#3b3424', 0.4));
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y);
+      ctx.lineTo(cx, cy - 10);
+      ctx.stroke();
+      ctx.fillStyle = U.rgba(U.mix(pal.near, '#7d6a45', 0.45));
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 9 * k, 12 * k, 0, 0, U.TAU);
+      ctx.fill();
+      // woven bands
+      ctx.strokeStyle = U.rgba(U.mix(pal.near, '#2c2618', 0.5));
+      ctx.lineWidth = 1.2;
+      for (let i = -1; i <= 1; i++) {
+        const by = cy + i * 6 * k;
+        const hw = Math.sqrt(Math.max(0, 1 - (i * 6 / 12) ** 2)) * 9 * k;
+        ctx.beginPath();
+        ctx.moveTo(cx - hw, by - 1);
+        ctx.quadraticCurveTo(cx, by + 3, cx + hw, by - 1);
+        ctx.stroke();
+      }
+      // the way in and out
+      ctx.fillStyle = U.rgba(U.mix(pal.near, '#000000', 0.6));
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 9 * k, 3.5, 2.5, 0, 0, U.TAU);
+      ctx.fill();
     }
   }
 

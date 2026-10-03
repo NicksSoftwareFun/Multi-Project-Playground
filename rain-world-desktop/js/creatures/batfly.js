@@ -82,6 +82,8 @@
       if (f.roost && !this.W.isSolidPt(f.roost.x, f.roost.y)) return f.roost;
       const opts = [];
       for (const g of this.eco.grass) opts.push({ x: g.x, y: g.y - g.h * 0.8 });
+      // home: the nest is the favourite roost
+      for (const n of this.eco.openNests()) if (!this.W.isSolidPt(n.x, n.y + 18)) for (let k = 0; k < 4; k++) opts.push({ x: n.x, y: n.y + 18 });
       for (const p of this.W.poles) opts.push({ x: p.x, y: p.y1 - 2 });
       const valid = opts.filter((o) => !this.W.isSolidPt(o.x, o.y));
       f.roost = valid.length ? U.pick(valid) : null;

@@ -597,7 +597,7 @@
         if (d < 80) continue;
         // height only counts where you can stand (not clinging to the top edge)
         const hw = list === vc.stand ? 1.2 : 0.2;
-        cands.push({ x, y, sc: (1 - y / W.h) * hw + Math.random() * 0.6 - d / 3000 });
+        cands.push({ x, y, sc: (1 - y / W.h) * hw * this.heightBias() + Math.random() * 0.6 - d / 3000 });
       }
       cands.sort((a, b) => b.sc - a.sc);
       for (const c of cands.slice(0, 5)) {
@@ -605,6 +605,10 @@
         if (r && r.complete) return c;
       }
       return null;
+    }
+    // How strongly roaming favours high ground (negative: keeps low).
+    heightBias() {
+      return 1;
     }
     // Shelter / migration: head for the nearest den and vanish into it.
     wantsToLeave(dt) {

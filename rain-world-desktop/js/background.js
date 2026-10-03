@@ -341,13 +341,28 @@
       if (rnd() < 0.6) grass.push({ x: Math.round(l.x + R(12, l.w - 12)), y: l.y, h: R(22, 38), phase: rnd() * 10 });
     }
 
+    // There's always a batfly nest: a woven pod hanging under a ledge with
+    // room beneath it (clear of the fruit vines), else from the top edge.
+    const nests = [];
+    const roomy = ledges.filter((l) => l.w >= 60 && l.y + l.h + 60 < H * 0.85);
+    if (roomy.length) {
+      const l = roomy[Math.floor(rnd() * roomy.length)];
+      // (clear of the desktop icon column on the left, where there's room)
+      const x0 = Math.max(l.x + 18, Math.min(110, l.x + l.w - 18));
+      let x = Math.round(R(x0, l.x + l.w - 18));
+      for (const f of fruitPlants) if (f.y === l.y + l.h && Math.abs(f.x - x) < 16) x = f.x + (x < l.x + l.w / 2 ? 18 : -18);
+      nests.push({ x, y: l.y + l.h });
+    } else {
+      nests.push({ x: Math.round(R(W * 0.2, W * 0.8)), y: 0 });
+    }
+
     const chains = [];
     const nC = 3 + Math.floor(rnd() * 4);
     for (let i = 0; i < nC; i++) {
       chains.push({ x: R(W * 0.05, W * 0.95), len: R(60, H * 0.35), phase: rnd() * 10, depth: R(0.25, 0.6) });
     }
 
-    return { ledges, beams, poles, dens, fruitPlants, grass, chains, removed };
+    return { ledges, beams, poles, dens, fruitPlants, grass, nests, chains, removed };
   }
 
   // ---- static painting ----------------------------------------------------

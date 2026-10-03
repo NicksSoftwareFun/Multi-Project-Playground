@@ -1,9 +1,13 @@
-// Food: dangle fruit grows on vines under ledges, ripens, drops, and gets
-// carried off and eaten by slugcats. Clicking the desktop drops one too.
+// Food: dangle fruit grows on vines under ledges and ripens. It only drops
+// when something hits it (a thrown rock or spear, or a creature barging
+// through), then gets carried off and eaten by slugcats, or rots away.
 (function () {
   'use strict';
   const RW = window.RW;
   const U = RW.U;
+
+  const FRUIT_LIFE = 60; // seconds a dropped fruit lasts unclaimed
+  const SHRIVEL = 4; // ...the last few of them spent shrinking away
 
   class Fruit {
     constructor(eco, x, y) {
@@ -57,10 +61,21 @@
       // Drop a claim whose slugcat gave up, fled, left or was eaten.
       const cl = this.claimedBy;
       if (cl && (cl.dead || cl.leaving || (cl.item !== this && (cl.food !== this || cl.state !== 'forage')))) this.claimedBy = null;
-      if (this.age > 240 && !this.claimedBy) this.dead = true; // rots away eventually
+      // rots away if nobody comes for it (a claim holds it a while longer)
+      if (this.age > FRUIT_LIFE * (this.claimedBy ? 2 : 1)) this.dead = true;
     }
     draw(ctx) {
-      drawFruit(ctx, this.x, this.y, this.rot, 1);
+      const left = FRUIT_LIFE * (this.claimedBy ? 2 : 1) - this.age;
+      if (left < SHRIVEL && !this.heldBy) {
+        const k = Math.max(0.2, left / SHRIVEL);
+        ctx.save();
+        ctx.translate(this.x, this.y + 5 * (1 - k)); // shrivels down onto the floor
+        ctx.scale(k, k);
+        drawFruit(ctx, 0, 0, this.rot, 1);
+        ctx.restore();
+      } else {
+        drawFruit(ctx, this.x, this.y, this.rot, 1);
+      }
     }
   }
 
@@ -82,8 +97,8 @@
     ctx.restore();
   }
 
-  // A vine hanging from a ceiling that grows a fruit, drops it when ripe,
-  // then regrows.
+  // A vine hanging from a ceiling that grows a fruit and holds it once ripe
+  // until something knocks it off, then regrows.
   class FruitPlant {
     constructor(eco, x, y, len) {
       this.eco = eco;
@@ -98,23 +113,36 @@
       const sway = Math.sin(this.eco.t * 0.9 + this.phase) * 4;
       return { x: this.x + sway, y: this.y + this.len };
     }
-    // Hit by a thrown rock or spear: a ripe fruit drops.
-    knockOff() {
-      if (this.grow < 0.8) return;
+    ripe() {
+      return this.grow >= 1;
+    }
+    // Hit by a thrown rock or spear, or a creature: a ripe fruit drops.
+    knockOff(vx, vy) {
+      if (!this.ripe()) return;
       const t = this.tip();
       const f = new Fruit(this.eco, t.x, t.y + 5);
-      f.vy = 40;
+      f.vx = (vx || 0) * 0.3;
+      f.vy = 40 + Math.max(0, (vy || 0) * 0.3);
       this.eco.items.push(f);
       this.grow = 0;
     }
     update(dt) {
       if (this.eco.world.isSolidPt(this.x, this.y + 4)) return; // covered by a window
-      this.grow = Math.min(1.2, this.grow + dt * this.regrowRate);
-      if (this.grow >= 1.2) {
-        const t = this.tip();
-        const f = new Fruit(this.eco, t.x, t.y + 5);
-        this.eco.items.push(f);
-        this.grow = 0;
+      this.grow = Math.min(1, this.grow + dt * this.regrowRate);
+      if (!this.ripe()) return;
+      // a creature barging into the ripe fruit knocks it loose
+      const t = this.tip();
+      const fy = t.y + 5;
+      for (const c of this.eco.creatures) {
+        if (c.dead || c.burrow || !c.hitParts) continue;
+        const sp = Math.hypot(c.vx || 0, c.vy || 0);
+        if (sp < 120 || Math.abs(c.x - t.x) > 80 || Math.abs(c.y - fy) > 80) continue;
+        for (const pt of c.hitParts()) {
+          if (U.dist(pt.x, pt.y, t.x, fy) < pt.r + 5) {
+            this.knockOff(c.vx, c.vy);
+            return;
+          }
+        }
       }
     }
     draw(ctx) {

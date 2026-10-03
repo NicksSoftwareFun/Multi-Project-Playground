@@ -194,10 +194,10 @@
       }
       // fruit hanging on a vine
       for (const p of eco.plants) {
-        if (p.grow < 0.8) continue;
+        if (!p.ripe()) continue;
         const t = p.tip();
         if (U.dist(lead.x, lead.y, t.x, t.y + 5) < 7) {
-          p.knockOff();
+          p.knockOff(this.vx, this.vy);
           this.vx *= 0.5;
         }
       }

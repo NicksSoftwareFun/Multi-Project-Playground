@@ -86,6 +86,7 @@
       this.pather.interval = 2;
       this.speed = p.speed || 42;
       this.fullT = U.rand(5, 20);
+      this.meals = 0; // a transient: two meat meals, then off out of another pipe
       this.huntT = 0;
       this.diet = ['slugcat', 'lizard_*', 'dropwig', 'centipede', 'batfly'];
       this.isFlier = true;
@@ -156,7 +157,7 @@
 
       if (!holding && this.wantsToLeave(dt)) {
         this.setState('leave');
-        const den = eco.nearestDen(b.x, b.y);
+        const den = this.exitDen && !eco.shouldShelter() ? this.exitDen : eco.nearestDen(b.x, b.y);
         if (den) {
           this.pather.setGoal(den.x, den.y);
           if (U.dist(b.x, b.y, den.x, den.y) < 35) this.leave();
@@ -190,10 +191,25 @@
       if (this.readyForGoal(dt, 25)) {
         const W = this.W;
         const rc = this.caps.surfacePenalty;
-        const g = this.wanderGoal(this.caps, 450, (cx, cy) => W.surfDist(cx, cy) <= rc && W.surfDist(cx, cy) >= 4);
+        // hungry: drift towards something to eat rather than anywhere
+        const prey = this.fullT <= 0 && Math.random() < 0.6 && (this.nearestOf(this.diet, 900, (c) => c.canBeGrabbed()) || this.nearestCorpse(this.diet, 900));
+        const near = prey && RW.Nav.nearestValid(W, prey.x, prey.y - 20, this.caps, 8);
+        const g = near ? { x: W.centerX(near.cx), y: W.centerY(near.cy) } : this.wanderGoal(this.caps, 450, (cx, cy) => W.surfDist(cx, cy) <= rc && W.surfDist(cx, cy) >= 4);
         if (g) this.pather.setGoal(g.x, g.y, true);
         this.stateT = 0;
       }
+    }
+
+    // Transit, like a slugcat: the rain sends it to the nearest den; otherwise
+    // after two meals (or a long fruitless while) it heads for the den
+    // farthest from the one it came in by.
+    wantsToLeave(dt) {
+      if (this.eco.shouldShelter()) return true;
+      if (!this.origin) this.origin = this.eco.nearestDen(this.spawnX, this.spawnY) || { x: this.spawnX, y: this.spawnY };
+      if (!this.exitDen && (this.meals >= 2 || this.age > 300)) {
+        this.exitDen = this.eco.farthestDen(this.origin.x, this.origin.y, this.body.x, this.body.y, this.caps);
+      }
+      return !!this.exitDen;
     }
 
     // Send the free tentacle best aimed at the target.
@@ -373,7 +389,8 @@
           if (U.dist(tip.x, tip.y, b.x, b.y) < this.R * 0.9) {
             this.eco.consume(prey, this);
             this.holding = null;
-            this.fullT = U.rand(35, 70);
+            this.meals++;
+            this.fullT = this.meals >= 2 ? U.rand(35, 70) : U.rand(6, 12); // one isn't enough
             t.release();
           }
           break;

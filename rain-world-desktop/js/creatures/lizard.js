@@ -584,8 +584,11 @@
           if (c !== this && c.home && c.home.sid === sol.id && isLizard(c) && !c.dead && !c.corpse) owner = c;
         }
         const claim = owner ? (this.pers.dominance - owner.pers.dominance) * 0.8 - 0.25 : 0.3;
-        // up high is a better lookout than the floor
-        const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400 + (1 - y / W.h) * 0.5;
+        // greens keep to the ground; the rest stake out the middle and top
+        // tiers, and the bottom one is a last resort
+        const h = 1 - y / W.h;
+        const height = this.species === 'lizard_green' ? -h * 0.8 : h * 1.4 - (h < 0.2 ? 0.5 : 0);
+        const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400 + height;
         cands.push({ sc, sid: sol.id, ox, x, y });
       }
       // best-scoring spot we can actually walk to (checking only a few)
@@ -600,6 +603,10 @@
       }
       this.home = best || (cands[0] ? { sid: cands[0].sid, ox: cands[0].ox } : null);
       this.homeAwayT = 0;
+    }
+    // Roaming follows the same taste: greens low, climbers up high.
+    heightBias() {
+      return this.species === 'lizard_green' ? -0.4 : 1.6;
     }
     updateHome(dt) {
       const hp = this.homePos();
