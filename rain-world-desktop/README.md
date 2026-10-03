@@ -39,8 +39,10 @@ and saves to `localStorage`:
 - **Spawn weights**: when the spawner adds a creature it picks a species at
   random in proportion to `weight`, among enabled species below their `max`.
 - **`ecosystem.maxPopulation`**: the total the spawner keeps the screen near.
-  Each species has a `popCost` (a batfly counts 0.25, a Daddy Long Legs 4).
-- **`world.creatureScale`**: overall size of creatures (and the world's ledges and poles).
+  Each species has a `popCost` (a batfly counts 0, a Daddy Long Legs 4).
+- **`world.mapSize`**: how much of the world fits on screen. 1 is the default;
+  bigger shows more map with everything (creatures, ledges, poles) smaller,
+  smaller zooms in so everything is bigger.
 - **Rain**: cycle length, drizzle level, and whether creatures take shelter
   in dens during the downpour.
 - Every creature's parameters (speeds, colours, climbing abilities, vision…)

@@ -47,7 +47,9 @@
 
     init(keepSeed) {
       const cfg = this.cfg;
-      this.zoom = U.clamp(+cfg.world.creatureScale || 1, 0.5, 3);
+      // Map size 1 shows the world at 2x magnification; a bigger map zooms out.
+      const map = +cfg.world.mapSize || (cfg.world.creatureScale ? 2 / cfg.world.creatureScale : 1);
+      this.zoom = U.clamp(2 / map, 0.5, 3);
       this.W = Math.max(320, window.innerWidth) / this.zoom;
       this.H = Math.max(240, window.innerHeight) / this.zoom;
       this.world = new RW.World(cfg.world.cellSize || 20);
@@ -85,11 +87,41 @@
     regenerate(newSeed) {
       if (newSeed) this.cfg.world.seed = 0;
       const keep = this.eco ? this.eco.creatures : [];
+      const keepItems = this.eco ? this.eco.items : [];
       const t = this.weather ? this.weather.t : 0;
       const oldZoom = this.zoom;
       this.init(!newSeed);
       this.weather.t = t;
-      if (!newSeed && this.zoom === oldZoom) {
+      if (!newSeed && this.zoom !== oldZoom) {
+        // Map resized: everyone stays put on screen and simply becomes
+        // bigger or smaller relative to it (unburrowing sorts out anyone who
+        // lands inside the rebuilt ledges).
+        const r = oldZoom / this.zoom;
+        for (const c of keep) {
+          if (c.dead || c.leaving) continue;
+          const m = c.mainPoint();
+          c.eco = this.eco;
+          c.W = this.world;
+          c.shiftAll(m.x * r - m.x, m.y * r - m.y);
+          if (c.pather) {
+            c.pather.version = -1;
+            c.pather.clear();
+          }
+          c.home = null;
+          this.eco.creatures.push(c);
+        }
+        for (const it of keepItems) {
+          if (it.dead || !(it instanceof RW.Fruit || it instanceof RW.Weapon)) continue;
+          it.eco = this.eco;
+          if (!it.heldBy && it.state !== 'embedded') {
+            it.x *= r;
+            it.y *= r;
+            if (it.state === 'stuck') it.state = 'free';
+          }
+          this.eco.items.push(it);
+        }
+        this.eco.populated = true;
+      } else if (!newSeed && this.zoom === oldZoom) {
         for (const c of keep) {
           if (c.x >= 0 && c.y >= 0 && c.x < this.W && c.y < this.H && !this.world.isSolidPt(c.x, c.y)) {
             c.eco = this.eco;

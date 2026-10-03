@@ -13,7 +13,7 @@
   RW.DEFAULT_CONFIG = {
     world: {
       palette: 'industrial', // industrial | shoreline | outskirts | chimney | subterranean
-      creatureScale: 2, // magnifies the whole world: creatures, ledges, poles
+      mapSize: 1, // how much world fits on screen: bigger = more map, everything smaller
       pixelScale: 2, // 1 = full res, 2-3 = chunkier Rain World pixels
       cellSize: 20, // navigation grid cell (px). Rain World tiles are 20px.
       seed: 0, // 0 = new background every load
@@ -38,7 +38,7 @@
       spawnPerMinute: 2.5, // new arrivals per minute while below the population cap
       startPopulated: true, // fill the screen immediately on load
       predation: true, // predators actually eat prey (off = chase, bite, release)
-      migrationPerMinute: 0.5,
+      migrationPerMinute: 0.3,
       rocks: 6, // rocks kept lying about for slugcats to throw
       spears: 2, // spears likewise (the wiki: about one weapon in five is a spear) // chance per creature per minute to wander off into a den
       cursorInteraction: true,
@@ -341,7 +341,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v6'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v7'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

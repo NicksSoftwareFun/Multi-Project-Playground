@@ -49,7 +49,7 @@
   if (editing) panel.toggle(true);
 
   // Settings that need the world rebuilt rather than just read live.
-  const rebuildKey = () => JSON.stringify([cfg.world.palette, cfg.world.pixelScale, cfg.world.creatureScale, cfg.world.decorLedges, cfg.world.decorPoles, cfg.world.fruitPlants]);
+  const rebuildKey = () => JSON.stringify([cfg.world.palette, cfg.world.pixelScale, cfg.world.mapSize, cfg.world.decorLedges, cfg.world.decorPoles, cfg.world.fruitPlants]);
   let lastKey = rebuildKey();
   let rebuildT = null;
   function applied() {
@@ -80,8 +80,8 @@
       if (s) s.weight = +val;
     } else if (name === 'palette') {
       cfg.world.palette = palettes[val] || palettes[0];
-    } else if (name === 'creatureScale') {
-      cfg.world.creatureScale = +val;
+    } else if (name === 'mapSize') {
+      cfg.world.mapSize = +val;
     } else if (name === 'maxPopulation') {
       cfg.ecosystem.maxPopulation = +val;
     } else if (name === 'rain') {

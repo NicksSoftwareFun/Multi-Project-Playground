@@ -186,7 +186,11 @@
           h('div', { class: 'st', text: 'World' }),
           this.select('palette', Wc, 'palette', Object.keys(RW.PALETTES), () => eng.applyPalette()),
           this.select('pixel scale', Wc, 'pixelScale', [1, 2, 3], () => eng.applyPalette()),
-          this.select('creature scale', Wc, 'creatureScale', [1, 1.15, 1.35, 1.5, 1.75, 2], () => eng.regenerate(false)),
+          this.slider('map size', Wc, 'mapSize', 0.7, 3, 0.05, () => {
+            // rebuild once the slider settles, not on every pixel of the drag
+            clearTimeout(this.mapT);
+            this.mapT = setTimeout(() => eng.regenerate(false), 250);
+          }),
           this.slider('time scale', Wc, 'timeScale', 0, 3, 0.05),
           this.select('max fps', Wc, 'maxFps', [60, 30]),
           this.slider('ledges', Wc, 'decorLedges', 0, 14, 1),
