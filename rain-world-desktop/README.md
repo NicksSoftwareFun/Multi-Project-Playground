@@ -9,9 +9,13 @@ Everything is plain JavaScript + `<canvas>`, with no build step and no dependenc
 
 ## Try it
 
-- **Browser prototype**: open `index.html`. It shows a mock Windows desktop
-  with draggable, resizable windows and icons over the wallpaper. They are real
-  geometry: drag a window and creatures standing on it ride along.
+- **Browser prototype**: open `index.html` (or the hosted copy at
+  <https://nickssoftwarefun.github.io/rain-world-desktop/>). It shows a mock
+  Windows desktop with draggable, resizable windows and icons over the
+  wallpaper. They are real geometry: drag a window and creatures standing on
+  it ride along. **It's a preview only**: as a wallpaper it would only ever
+  see its own pretend windows. For the real desktop use `wallpaper.html` via
+  the helper (below).
   - Press **`** (backtick) or the ≡ button for the **ecosystem panel**.
   - **Drag** a creature (living or dead) to pick it up: it hangs limp from
     the cursor and drops where you let go. (Clicking bare wallpaper to drop

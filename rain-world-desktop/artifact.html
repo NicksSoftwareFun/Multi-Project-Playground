@@ -1,0 +1,111 @@
+<!--
+  The shared claude.ai Artifact build of the prototype (published at
+  https://claude.ai/artifact/3nynyHKbbWPEskKUEZJxfX). Same as index.html but
+  with a first-visit hint and no file downloads. The publish wraps this in a
+  document skeleton, so it has no <html>/<head>. See CLAUDE.md for how to
+  republish it.
+-->
+<title>Rain World Desktop</title>
+<link rel="stylesheet" href="css/desktop.css">
+<style>
+  /* A deliberately single-theme page: the wallpaper is its own dark world. */
+  :root { color-scheme: dark; }
+  html, body { height: 100%; background: #0b0e0d; }
+  .rw-hint {
+    position: fixed;
+    left: 50%;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 100000;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    background: rgba(9, 12, 12, 0.88);
+    color: #d9d4bd;
+    font: 12px/1.45 "Cascadia Mono", Consolas, ui-monospace, monospace;
+    text-align: center;
+    transition: opacity 0.6s ease;
+  }
+  .rw-hint button {
+    margin-left: 8px;
+    background: none;
+    border: 0;
+    color: #9fb7a8;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .rw-hint[hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .rw-hint { transition: none; } }
+</style>
+
+<canvas id="wallpaper"></canvas>
+<div id="desktop"></div>
+<div id="ui"></div>
+<div class="rw-hint" id="rw-hint">
+  Drag the windows: creatures walk on them. Drag a creature to pick it up and move it. Rest the cursor near a lizard.
+  Press <b>`</b> or tap <b>≡</b> for spawn weights.
+  <button type="button" id="rw-hint-close">Got it</button>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/background.js"></script>
+<script src="js/drips.js"></script>
+<script src="js/items.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/creatures/base.js"></script>
+<script src="js/creatures/lizard.js"></script>
+<script src="js/creatures/slugcat.js"></script>
+<script src="js/creatures/daddy.js"></script>
+<script src="js/creatures/dropwig.js"></script>
+<script src="js/creatures/batfly.js"></script>
+<script src="js/creatures/centipede.js"></script>
+<script src="js/ecosystem.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/geometry/mock-desktop.js"></script>
+<script src="js/debug-panel.js"></script>
+<script>
+(function () {
+  RW.noFileDownloads = true; // artifact viewers can't save files
+  const cfg = RW.loadConfig();
+  const provider = new RW.MockDesktop(document.getElementById('desktop'));
+  const engine = new RW.Engine(document.getElementById('wallpaper'), cfg, provider);
+  const panel = new RW.Panel(engine, document.getElementById('ui'));
+
+  let rz;
+  window.addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => engine.resize(), 250);
+  });
+  document.addEventListener('visibilitychange', () => (document.hidden ? engine.stop() : engine.start()));
+
+  // First-visit hint; remembered per viewer when storage is available.
+  const hint = document.getElementById('rw-hint');
+  let seen = false;
+  try {
+    seen = localStorage.getItem('rw-hint-seen') === '1';
+  } catch (e) {
+    /* storage blocked: show the hint every time */
+  }
+  const closeHint = () => {
+    hint.style.opacity = '0';
+    setTimeout(() => (hint.hidden = true), 600);
+    try {
+      localStorage.setItem('rw-hint-seen', '1');
+    } catch (e) {
+      /* ignore */
+    }
+  };
+  if (seen) hint.hidden = true;
+  else setTimeout(closeHint, 14000);
+  document.getElementById('rw-hint-close').addEventListener('click', closeHint);
+
+  window.RW_APP = { engine, panel, provider };
+  engine.start();
+})();
+</script>
