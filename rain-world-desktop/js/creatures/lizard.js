@@ -1036,6 +1036,20 @@
       ctx.save();
       ctx.globalAlpha = this.alpha * (this.p.camouflage ? this.camo : 1);
 
+      // An open mouth is a gap: keep the lizard's own neck and legs out of it
+      // (clip, rather than erase, so whatever is behind still shows).
+      ctx.save();
+      const wedge = this.mouthWedge();
+      if (wedge) {
+        const b = this.bounds();
+        ctx.beginPath();
+        ctx.rect(b[0] - 40, b[1] - 40, b[2] - b[0] + 80, b[3] - b[1] + 80);
+        ctx.moveTo(wedge[0][0], wedge[0][1]);
+        for (let i = 1; i < wedge.length; i++) ctx.lineTo(wedge[i][0], wedge[i][1]);
+        ctx.closePath();
+        ctx.clip('evenodd');
+      }
+
       for (const l of this.legs) if (!l.near) this.drawLeg(ctx, l, px);
 
       // Flat silhouette; the pixel pass gives it hard edges.
@@ -1145,6 +1159,7 @@
       }
 
       for (const l of this.legs) if (l.near) this.drawLeg(ctx, l, px);
+      ctx.restore(); // end of the mouth clip
       this.drawHead(ctx, px);
       ctx.restore();
       this.drawPath(ctx, this.pather);
@@ -1252,6 +1267,29 @@
       }
     }
 
+    // Head-local art coordinates -> world, mirroring drawHead's transform.
+    headToWorld(x, y) {
+      const hd = this.spine.pts[0];
+      const L = this.L * 1.3;
+      const a = this.headAng;
+      const flip = Math.sin(a) * this.ux - Math.cos(a) * this.uy < 0 ? -1 : 1;
+      const lx = (x - 3) * L;
+      const ly = (y + 1.6) * L * flip;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      return [hd.x + lx * c - ly * s, hd.y + lx * s + ly * c];
+    }
+    // The open gape between the jaws (world points), or null when shut.
+    mouthWedge() {
+      const jawA = this.jaw * 0.95;
+      if (jawA <= 0.04) return null;
+      const c = Math.cos(jawA);
+      const s = Math.sin(jawA);
+      const lx = -4 + 20.4 * c;
+      const ly = 0.5 + 20.4 * s;
+      return [this.headToWorld(-4, 0.5), this.headToWorld(16.4, 0.5), this.headToWorld(lx, ly)];
+    }
+
     // Big boxy head, flat colour, black tooth marks along the mouth line and
     // a black eye: the Rain World lizard face.
     drawHead(ctx, px) {
@@ -1290,21 +1328,6 @@
         ctx.stroke();
       }
 
-      // open mouth: punch the gape out of whatever is already on the sprite
-      // layer (the neck under the head) so the wallpaper shows between the jaws
-      if (jawA > 0.04) {
-        const lt = rot(16.4, 0.5);
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.moveTo(-4, 0.5);
-        ctx.lineTo(16.4, 0.5);
-        ctx.lineTo(lt[0], lt[1]);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
       // lower jaw
       ctx.fillStyle = jawCol;
       ctx.beginPath();
