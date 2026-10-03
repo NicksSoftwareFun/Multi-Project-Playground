@@ -423,32 +423,30 @@
         ctx.arc(b.x + Math.cos(l.a) * l.d, b.y + Math.sin(l.a) * l.d, r, 0, U.TAU);
         ctx.fill();
       }
+      // Flat two-tone bulbs (no gradients) so the pixel pass keeps them crisp.
       for (const bl of this.bulbs) {
         const r = bl.r * (1 + 0.06 * Math.sin(t * 1.6 + bl.ph));
-        const x = b.x + bl.ox;
-        const y = b.y + bl.oy;
-        const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
-        g.addColorStop(0, U.rgba(U.mix(this.colBulb, this.colSpot, 0.18)));
-        g.addColorStop(0.7, U.rgba(this.colBody));
-        g.addColorStop(1, U.rgba(U.scale(this.colBody, 0.75)));
-        ctx.fillStyle = g;
+        ctx.fillStyle = U.rgba(this.colBody);
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, U.TAU);
+        ctx.arc(b.x + bl.ox, b.y + bl.oy, r, 0, U.TAU);
         ctx.fill();
       }
-      // glowing eye-spots
+      for (const bl of this.bulbs) {
+        const r = bl.r * (1 + 0.06 * Math.sin(t * 1.6 + bl.ph));
+        ctx.fillStyle = U.rgba(this.colBulb);
+        ctx.beginPath();
+        ctx.arc(b.x + bl.ox - r * 0.22, b.y + bl.oy - r * 0.25, r * 0.55, 0, U.TAU);
+        ctx.fill();
+      }
+      // Eye-spots: hard pixel dots that pulse between dim and bright.
+      const px = this.eco.artPx || 1;
       for (const s of this.spots) {
-        const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + s.ph);
+        const pulse = Math.sin(t * 2.4 + s.ph);
         const x = b.x + Math.cos(s.a) * s.d;
         const y = b.y + Math.sin(s.a) * s.d;
-        ctx.fillStyle = U.rgba(this.colSpot, 0.12 + 0.18 * pulse);
-        ctx.beginPath();
-        ctx.arc(x, y, s.r * 2.2, 0, U.TAU);
-        ctx.fill();
-        ctx.fillStyle = U.rgba(this.colSpot, 0.55 + 0.45 * pulse);
-        ctx.beginPath();
-        ctx.arc(x, y, s.r, 0, U.TAU);
-        ctx.fill();
+        const sz = Math.max(px * 2, s.r * 1.4);
+        ctx.fillStyle = U.rgba(pulse > 0.2 ? U.mix(this.colSpot, '#ffffff', 0.25) : U.mix(this.colSpot, this.colBody, 0.45));
+        ctx.fillRect(Math.round(x / px) * px - sz / 2, Math.round(y / px) * px - sz / 2, sz, sz);
       }
       ctx.restore();
       this.drawPath(ctx, this.pather);

@@ -180,30 +180,24 @@
       ctx.globalAlpha = this.alpha;
       ctx.translate(p.x, p.y);
       const face = this.vx >= 0 ? 1 : -1;
-      if (this.perched) {
-        ctx.fillStyle = '#c9d2dc';
-        ctx.globalAlpha *= 0.7;
+      // dark wing blades that flap; pale only at the leading edge
+      const w = this.perched ? -0.9 : Math.sin(this.flap);
+      for (const s of [-1, 1]) {
+        const tipX = s * 5.5;
+        const tipY = -1 - w * 4;
+        ctx.fillStyle = '#3a414b';
         ctx.beginPath();
-        ctx.ellipse(-1.5 * face, -1, 3.5, 1.4, -0.6 * face, 0, U.TAU);
+        ctx.moveTo(0, -0.5);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(s * 2.5, 1.2);
         ctx.fill();
-        ctx.globalAlpha = this.alpha;
-      } else {
-        const w = Math.sin(this.flap);
-        ctx.fillStyle = '#d7dee6';
-        ctx.globalAlpha *= 0.75;
-        for (const s of [-1, 1]) {
-          ctx.beginPath();
-          ctx.ellipse(s * 1.5, -1 - w * 2.5, 4.5, 1.6 + Math.abs(w) * 0.8, s * (0.3 + w * 0.9), 0, U.TAU);
-          ctx.fill();
-        }
-        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = '#8b96a3';
+        ctx.fillRect(tipX - 0.6, tipY - 0.6, 1.2, 1.2);
       }
       ctx.fillStyle = '#17171d';
       ctx.beginPath();
-      ctx.ellipse(0, 0, 2.6, 3.2, this.perched ? 0 : this.vx * 0.003, 0, U.TAU);
+      ctx.ellipse(0, 0.5, 2.2, 3, this.perched ? 0 : face * 0.3, 0, U.TAU);
       ctx.fill();
-      ctx.fillStyle = '#ff6a3a';
-      ctx.fillRect(face * 1.2 - 0.5, -1.2, 1, 1);
       ctx.restore();
       this.drawDebug(ctx);
     }

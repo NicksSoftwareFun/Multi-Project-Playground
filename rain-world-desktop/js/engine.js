@@ -77,6 +77,7 @@
       this.spriteCanvas.width = this.canvas.width;
       this.spriteCanvas.height = this.canvas.height;
       this.eco.artPx = this.ps / this.zoom; // world units per art pixel
+      this.weather.artPx = this.eco.artPx;
       RW.Background.paint(this.bgCanvas, this.W, this.H, this.ps / this.zoom, this.pal, this.decor, this.seed % 100000);
     }
 

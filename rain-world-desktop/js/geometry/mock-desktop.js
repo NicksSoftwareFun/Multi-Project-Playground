@@ -18,9 +18,9 @@
   const DESKTOP_ICONS = [
     ['This PC', 'pc'],
     ['Recycle Bin', 'bin'],
-    ['MIH Tower — MEP', 'folder'],
-    ['RFI Log.xlsx', 'xlsx'],
-    ['Riser Diagrams.pdf', 'pdf'],
+    ['Documents', 'folder'],
+    ['Budget.xlsx', 'xlsx'],
+    ['Manual.pdf', 'pdf'],
     ['Rain World', 'slug'],
   ];
 
@@ -60,7 +60,7 @@
       // Windows
       const W = window.innerWidth;
       const H = window.innerHeight;
-      this.addWindow('explorer', 'MIH Tower — MEP', this.explorerHtml(), W * 0.16, H * 0.1, Math.min(640, W * 0.4), Math.min(400, H * 0.42));
+      this.addWindow('explorer', 'Documents', this.explorerHtml(), W * 0.16, H * 0.1, Math.min(640, W * 0.4), Math.min(400, H * 0.42));
       this.addWindow('notepad', 'readme.txt — Notepad', this.notepadHtml(), W * 0.6, H * 0.18, Math.min(470, W * 0.3), Math.min(300, H * 0.34));
       this.addWindow('tasks', 'Task Manager', this.tasksHtml(), W * 0.36, H * 0.6, Math.min(420, W * 0.26), Math.min(210, H * 0.24));
 
@@ -218,16 +218,16 @@
 
     explorerHtml() {
       const rows = [
-        ['01 Submittals — Mechanical', 'folder', '9/28/2026'],
-        ['02 Submittals — Plumbing', 'folder', '9/30/2026'],
-        ['03 Coordination Models', 'folder', '10/1/2026'],
-        ['RFI Log.xlsx', 'xlsx', '10/2/2026'],
-        ['Riser Diagrams.pdf', 'pdf', '9/22/2026'],
-        ['Equipment Schedule — AHU.xlsx', 'xlsx', '9/19/2026'],
-        ['Hydronic Piping Isometrics.pdf', 'pdf', '9/12/2026'],
+        ['Photos', 'folder', '9/28/2026'],
+        ['Music', 'folder', '9/30/2026'],
+        ['Projects', 'folder', '10/1/2026'],
+        ['Budget.xlsx', 'xlsx', '10/2/2026'],
+        ['Manual.pdf', 'pdf', '9/22/2026'],
+        ['Recipes.xlsx', 'xlsx', '9/19/2026'],
+        ['Field Guide to Lizards.pdf', 'pdf', '9/12/2026'],
       ];
       return (
-        '<div class="ex-side"><div>Home</div><div>Desktop</div><div class="sel">MIH Tower — MEP</div><div>Downloads</div><div>This PC</div></div>' +
+        '<div class="ex-side"><div>Home</div><div>Desktop</div><div class="sel">Documents</div><div>Downloads</div><div>This PC</div></div>' +
         '<div class="ex-main"><div class="ex-head"><span>Name</span><span>Date modified</span></div>' +
         rows.map((r) => `<div class="ex-row"><span><i>${ICONS[r[1]]}</i>${r[0]}</span><span>${r[2]}</span></div>`).join('') +
         '</div>'
@@ -250,9 +250,9 @@
       return (
         '<div class="tm"><div class="tm-row tm-h"><span>Name</span><span>CPU</span></div>' +
         '<div class="tm-row"><span>Rain World Desktop</span><span>2.1%</span></div>' +
-        '<div class="tm-row"><span>Revit 2026</span><span>14.0%</span></div>' +
-        '<div class="tm-row"><span>Bluebeam Revu</span><span>3.2%</span></div>' +
-        '<div class="tm-row"><span>Procore</span><span>0.8%</span></div></div>'
+        '<div class="tm-row"><span>Web Browser</span><span>6.4%</span></div>' +
+        '<div class="tm-row"><span>Music Player</span><span>1.2%</span></div>' +
+        '<div class="tm-row"><span>Photos</span><span>0.8%</span></div></div>'
       );
     }
   }

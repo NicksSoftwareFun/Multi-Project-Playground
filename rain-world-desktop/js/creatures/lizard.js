@@ -41,8 +41,8 @@
       };
       this.mask = { floor: true, walls: !!p.climbWalls, ceil: !!p.climbCeilings, poles: !!p.poles };
       this.pather = new RW.Pather(this, this.caps);
-      const l1 = 10 * L;
-      const l2 = 10.5 * L;
+      const l1 = 13 * L;
+      const l2 = 13.5 * L;
       const o = { stepDur: 0.17, lift: 6 * L };
       this.legs = [
         { leg: new RW.Leg(l1, l2, Object.assign({ group: 0, forward: 0.65 }, o)), at: 2, near: true },
@@ -94,6 +94,15 @@
       this.breathe = U.rand(0, 10);
       // Fixed markings, Rain World style: colour flecks bleeding from the head
       // down the neck, plus a species pattern. t = position along the spine.
+      this.spineSet = [];
+      if (p.spines) {
+        let t = 0.06;
+        for (let k = 0; k < p.spines && t < 0.62; k++) {
+          const stubby = Math.random() < 0.25;
+          this.spineSet.push({ t, len: stubby ? U.rand(2.5, 4) : U.rand(6, 10), lean: U.rand(0.35, 0.8) });
+          t += U.rand(0.035, 0.07);
+        }
+      }
       this.specks = [];
       const pat = p.pattern;
       const add = (t, side, size, kind) => this.specks.push({ t, side, size, kind: kind || 'fleck' });
@@ -102,9 +111,9 @@
         for (let i = 0; i < 14; i++) add(U.rand(0.15, 0.6), U.rand(-0.8, 0.8), 1);
         for (let i = 0; i < 18; i++) add(1 - Math.pow(Math.random(), 1.5) * 0.2, U.rand(-0.9, 0.9), 1);
       } else if (pat === 'dots') {
-        for (let i = 0; i < 22; i++) add(U.rand(0.12, 0.7), U.rand(-0.8, 0.8), 2);
+        for (let i = 0; i < 22; i++) add(0.1 + Math.pow(Math.random(), 1.6) * 0.6, U.rand(-0.8, 0.8), 2);
       } else if (pat === 'fins') {
-        for (let i = 0; i < 12; i++) add(U.rand(0.1, 0.55), U.sign(), U.rand(2.5, 4.5), 'fin');
+        for (let i = 0; i < 10; i++) add(U.rand(0.04, 0.5), Math.random() < 0.75 ? 1 : -1, U.rand(5, 9), 'fin');
         for (let i = 0; i < 20; i++) add(1 - Math.pow(Math.random(), 1.4) * 0.25, U.rand(-0.9, 0.9), 1);
       } else if (pat === 'spots') {
         for (let i = 0; i < 26; i++) add(U.rand(0.08, 0.8), U.rand(-0.85, 0.85), U.randInt(1, 2), 'dark');
@@ -138,7 +147,7 @@
       this.jawTarget = 0;
       this.pather.interval = 1.2;
       this.lookAt = null;
-      this.raise = 0;
+      this.raise = 0.35; // carry the head a little high, as in the game
       this.lash = 0.15;
 
       if (this.holding) {
@@ -424,7 +433,7 @@
       if (g && this.lungeT <= 0 && !this.leavingSurface) {
         // hug the surface at a fixed body height
         this.raiseS = (this.raiseS || 0) + (this.raise - (this.raiseS || 0)) * U.approach(5, dt);
-        const err = g.d - (11 + this.raiseS * 7) * L;
+        const err = g.d - (14 + this.raiseS * 8) * L;
         head.x -= g.nx * err * 0.25;
         head.y -= g.ny * err * 0.25;
         this.contactId = g.id;
@@ -448,7 +457,7 @@
         if (g && !this.leavingSurface && i < this.bodyN + 4) {
           const s = W.nearestSurface(pt.x, pt.y, 22 * L, this.mask);
           if (s) {
-            const e = s.d - (i < this.bodyN ? 10 : 4.5 + (this.bodyN + 4 - i) * 1.2) * L;
+            const e = s.d - (i < this.bodyN ? 13 - i * 0.5 : 5 + (this.bodyN + 4 - i) * 1.4) * L;
             pt.x -= s.nx * e * 0.3;
             pt.y -= s.ny * e * 0.3;
           }
@@ -578,12 +587,12 @@
       // Flat silhouette; the pixel pass gives it hard edges.
       const breath = 1 + 0.05 * Math.sin(this.age * 2.3 + this.breathe) * (this.state === 'display' ? 2.5 : 1);
       const widths = new Array(n);
-      const prof = [3.9, 4, 5, 5.6, 5.7, 5.3, 4.6];
+      const prof = [4.6, 5.6, 6.6, 6.4, 6, 5.3, 4.6];
       for (let i = 0; i < n; i++) {
         if (i < this.bodyN) widths[i] = prof[i] * L * (i >= 2 && i <= 5 ? breath : 1);
         else {
           const t = (i - this.bodyN + 1) / (n - this.bodyN);
-          widths[i] = Math.max(px * 0.6, 4.2 * L * Math.pow(1 - t, 1.15));
+          widths[i] = Math.max(px * 0.8, 4.4 * L * (t < 0.75 ? 1 - t * 0.6 : 0.55 * (1 - t) / 0.25));
         }
       }
       const N = this.backNormals(P);
@@ -634,19 +643,20 @@
         ctx.fillRect(Math.round(x / px) * px - sz / 2, Math.round(y / px) * px - sz / 2, sz, sz);
       }
 
-      // Dorsal spines (green lizards): solid jagged triangles.
+      // Dorsal spines (green lizards): wide-based jagged pixel spikes,
+      // irregular in height, spacing and lean.
       if (this.p.spines) {
         ctx.fillStyle = headCol;
-        const count = this.p.spines;
-        for (let k = 0; k < count; k++) {
-          const q = at(0.08 + (k / count) * 0.45);
-          const len = (3.5 + 2.5 * Math.sin((k / count) * Math.PI)) * L * (1 + this.raiseS * 0.5);
+        for (const sp of this.spineSet) {
+          const q = at(sp.t);
+          const len = sp.len * L * (1 + this.raiseS * 0.4);
+          const half = Math.max(px * 1.6, 1.8 * L);
           const bx = q.x + q.nx * (q.w - px);
           const by = q.y + q.ny * (q.w - px);
           ctx.beginPath();
-          ctx.moveTo(bx + q.tx * px * 1.5, by + q.ty * px * 1.5);
-          ctx.lineTo(bx - q.tx * px * 1.5, by - q.ty * px * 1.5);
-          ctx.lineTo(bx + q.nx * len - q.tx * len * 0.75, by + q.ny * len - q.ty * len * 0.75);
+          ctx.moveTo(bx + q.tx * half, by + q.ty * half);
+          ctx.lineTo(bx - q.tx * half, by - q.ty * half);
+          ctx.lineTo(bx + q.nx * len - q.tx * len * sp.lean, by + q.ny * len - q.ty * len * sp.lean);
           ctx.fill();
         }
       }
@@ -664,34 +674,36 @@
       const leg = l.leg;
       const k = leg.solve(h.x, h.y, this.ux, this.uy);
       const L = this.L;
-      const body = U.rgba(this.p.camouflage ? this.bodyColor : U.mix(this.bodyColor, this.headColor, l.near ? 0.22 : 0.12));
-      const foot = U.rgba(this.p.camouflage ? this.bodyColor : this.headColor);
-      // thick, dark, splayed
+      // near-black legs; only the feet carry the species colour
+      const base = this.p.camouflage ? this.bodyColor : U.scale(this.bodyColor, l.near ? 1.6 : 1);
+      const body = U.rgba(base);
+      const foot = U.rgba(this.p.camouflage ? U.scale(this.bodyColor, 0.85) : this.headColor);
       ctx.fillStyle = body;
-      U.taperPath(ctx, [{ x: h.x, y: h.y }, { x: k.kx, y: k.ky }], [2.8 * L, 1.9 * L]);
+      U.taperPath(ctx, [{ x: h.x, y: h.y }, { x: k.kx, y: k.ky }], [3.2 * L, 2.2 * L]);
       ctx.fill();
-      U.taperPath(ctx, [{ x: k.kx, y: k.ky }, { x: k.ex, y: k.ey }], [1.9 * L, 1.3 * L]);
+      U.taperPath(ctx, [{ x: k.kx, y: k.ky }, { x: k.ex, y: k.ey }], [2.2 * L, 1.5 * L]);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(k.kx, k.ky, 1.9 * L, 0, U.TAU);
+      ctx.arc(k.kx, k.ky, 2.2 * L, 0, U.TAU);
       ctx.fill();
-      // spiky coloured foot; toes curl while the foot is in the air
+      // three chunky toes, splayed forward along the surface; curled in the air
       const nx = leg.planted || leg.stepping ? leg.n.x : this.ux;
       const ny = leg.planted || leg.stepping ? leg.n.y : this.uy;
-      const curl = leg.stepping ? 0.6 : leg.planted ? 1 : 0.5;
+      // forward along the surface = body heading projected onto the surface
+      const a = P[l.at - 1];
+      const b = P[l.at + 1];
+      const d = (a.x - b.x) * -ny + (a.y - b.y) * nx;
+      const sx = -ny * Math.sign(d || 1);
+      const sy = nx * Math.sign(d || 1);
+      const curl = leg.stepping ? 0.55 : leg.planted ? 1 : 0.5;
       ctx.strokeStyle = foot;
-      ctx.fillStyle = foot;
       ctx.lineCap = 'butt';
-      ctx.lineWidth = Math.max(px, 1.3 * L);
+      ctx.lineWidth = Math.max(px * 1.6, 1.6 * L);
       ctx.beginPath();
-      ctx.arc(k.ex, k.ey, Math.max(px * 0.6, 0.9 * L), 0, U.TAU);
-      ctx.fill();
-      ctx.lineWidth = Math.max(px * 0.9, 0.9 * L);
-      ctx.beginPath();
-      for (const s of [-1, -0.3, 0.4, 1]) {
-        const len = 3 * L * curl;
-        ctx.moveTo(k.ex, k.ey);
-        ctx.lineTo(k.ex - ny * s * len + nx * 0.4 * L, k.ey + nx * s * len + ny * 0.4 * L);
+      for (const s of [-0.35, 0.25, 0.9]) {
+        const len = 3.6 * L * curl;
+        ctx.moveTo(k.ex - sx * L, k.ey - sy * L);
+        ctx.lineTo(k.ex + sx * s * len + nx * (s < 0 ? 0.6 : -0.2) * L, k.ey + sy * s * len + ny * (s < 0 ? 0.6 : -0.2) * L);
       }
       ctx.stroke();
     }
@@ -700,10 +712,10 @@
     // a black eye: the Rain World lizard face.
     drawHead(ctx, px) {
       const hd = this.spine.pts[0];
-      const L = this.L * 1.1;
+      const L = this.L * 1.4;
       const a = this.headAng;
       const col = U.rgba(this.headColor);
-      const jawCol = U.rgba(U.scale(this.headColor, 0.88));
+      const jawCol = U.rgba(U.scale(this.headColor, 0.7));
       const ink = '#0a0608';
       ctx.save();
       ctx.translate(hd.x, hd.y);
@@ -757,39 +769,53 @@
       ctx.fillStyle = col;
       ctx.beginPath();
       ctx.moveTo(-5.5, 0.6);
-      ctx.lineTo(-7, -2.2);
-      ctx.lineTo(-5.8, -5.4);
-      ctx.lineTo(-2, -6.2);
-      ctx.lineTo(8, -5.6);
-      ctx.lineTo(16, -4.4);
-      ctx.lineTo(20, -2.4);
-      ctx.lineTo(20.2, 0.6);
+      ctx.lineTo(-7, -2.6);
+      ctx.lineTo(-5.6, -6.6);
+      ctx.lineTo(-1, -7.4); // raised back of the skull
+      ctx.lineTo(3, -7.2);
+      ctx.lineTo(5, -5.8); // brow step down to the snout
+      ctx.lineTo(15, -4.8);
+      ctx.lineTo(19.4, -3);
+      ctx.lineTo(20.2, -0.4);
+      ctx.lineTo(19.6, 0.6);
       ctx.closePath();
       ctx.fill();
 
-      // tooth marks: black dashes crossing the mouth line, on both jaws
+      // tooth marks: small irregular black ticks on the upper jaw along the
+      // mouth line (gap at the snout tip); lower ones only show when it gapes
       const toothW = Math.max(u, 0.7);
-      const step = Math.max(2.5 * u + toothW, 2.6);
+      const step = Math.max(3 * u, 2.6);
       ctx.fillStyle = ink;
-      for (let x = 5; x <= 19; x += step) {
-        ctx.fillRect(x, -0.9, toothW, Math.max(u * 1.6, 1.5)); // upper
-        const r0 = rot(x, 0.6);
-        const r1 = rot(x, 1.7);
-        const r2 = rot(x + toothW, 1.7);
-        const r3 = rot(x + toothW, 0.6);
+      let k = 0;
+      for (let x = 4 + step; x <= 17.5 - step; x += step, k++) {
+        const th = Math.max(u * 2, 1.7) * (k % 3 === 1 ? 0.7 : 1);
+        ctx.fillRect(x, 0.6 - th, toothW, th);
+        if (jawA > 0.15) {
+          const r0 = rot(x + 0.5, 0.6);
+          const r1 = rot(x + 0.5, 0.6 + th * 0.8);
+          ctx.fillRect(Math.min(r0[0], r1[0]), Math.min(r0[1], r1[1]), toothW, Math.abs(r1[1] - r0[1]) + 0.01);
+        }
+      }
+      // dark line under the jaw
+      ctx.fillStyle = 'rgba(10,6,8,0.9)';
+      {
+        const r0 = rot(-4, 4.3);
+        const r1 = rot(17, 2.9);
         ctx.beginPath();
         ctx.moveTo(r0[0], r0[1]);
         ctx.lineTo(r1[0], r1[1]);
-        ctx.lineTo(r2[0], r2[1]);
-        ctx.lineTo(r3[0], r3[1]);
+        ctx.lineTo(r1[0], r1[1] + Math.max(u, 0.8));
+        ctx.lineTo(r0[0], r0[1] + Math.max(u, 0.8));
         ctx.fill();
       }
-      // eye: a black block that narrows when hissing, snaps wide on noticing prey
-      const open = this.blink > 0 ? 0.25 : this.noticeT > 0 ? 1.4 : 1 - Math.min(0.6, this.jaw * 0.7);
-      const eh = Math.max(u, 2.4 * open);
-      ctx.fillRect(3.5, -3.9 - eh / 2, Math.max(u * 2, 2.6), eh);
+      // eye: a black dot at the top-back of the skull; narrows when hissing
+      ctx.fillStyle = ink;
+      const open = this.blink > 0 ? 0.35 : this.noticeT > 0 ? 1.3 : 1 - Math.min(0.5, this.jaw * 0.6);
+      const es = Math.max(u * 2, 2.2);
+      const eh = Math.max(u, es * open);
+      ctx.fillRect(-0.5, -5 + (es - eh) / 2, es, eh);
       // nostril
-      ctx.fillRect(18, -3.4, Math.max(u, 0.9), Math.max(u, 0.9));
+      ctx.fillRect(18, -3.2, Math.max(u, 0.9), Math.max(u, 0.9));
       ctx.restore();
     }
   }

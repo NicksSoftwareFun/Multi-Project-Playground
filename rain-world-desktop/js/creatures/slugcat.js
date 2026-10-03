@@ -465,7 +465,7 @@
       const hip = this.hip;
       const h = this.head;
       const col = this.color;
-      const dark = U.rgba(U.scale(col, 0.72));
+      const dark = U.rgba(U.scale(col, 0.62));
       const main = U.rgba(col);
       ctx.save();
       ctx.globalAlpha = this.alpha;
@@ -476,32 +476,33 @@
       const limbs = this.limbTargets(shoulder);
 
       // far limbs
-      this.drawLimb(ctx, hip.x - this.facing, hip.y + 2, limbs.feet[1], 5.2, 5, dark, 2.4, this.facing);
-      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[1], 4.2, 4, dark, 1.9, -this.facing);
+      this.drawLimb(ctx, hip.x - this.facing, hip.y + 2, limbs.feet[1], 5.6, 5.4, dark, 3, this.facing);
+      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[1], 4.6, 4.4, dark, 2.6, -this.facing);
 
       // tail
       const T = this.tail.pts;
       ctx.fillStyle = main;
-      U.taperPath(ctx, T, [4.2, 3.4, 2.6, 1.7, 0.6]);
+      U.taperPath(ctx, T, [5, 4.4, 3.6, 2.6, 1.2]);
       ctx.fill();
 
       // body
       const mid = { x: U.lerp(hip.x, h.x, 0.5) - this.facing * 0.5, y: U.lerp(hip.y, h.y, 0.5) };
-      U.taperPath(ctx, [{ x: hip.x, y: hip.y + 1 }, mid, h], [6.6, 6, 5.2]);
+      // a slimmer body than the head, so head, body and legs read separately
+      U.taperPath(ctx, [{ x: hip.x, y: hip.y - 1 }, mid, h], [4.8, 4.2, 3.9]);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(hip.x, hip.y + 0.5, 6.4, 0, U.TAU);
+      ctx.arc(hip.x, hip.y - 1.2, 4.4, 0, U.TAU);
       ctx.fill();
 
       // near limbs
-      this.drawLimb(ctx, hip.x + this.facing, hip.y + 2, limbs.feet[0], 5.2, 5, main, 2.6, this.facing);
+      this.drawLimb(ctx, hip.x + this.facing, hip.y + 2, limbs.feet[0], 5.6, 5.4, main, 3.2, this.facing);
 
       // head
       ctx.fillStyle = main;
       ctx.beginPath();
       ctx.arc(h.x, h.y, 6.9, 0, U.TAU);
       ctx.fill();
-      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[0], 4.2, 4, main, 2.1, -this.facing);
+      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[0], 4.6, 4.4, main, 2.8, -this.facing);
 
       if (this.item) {
         const ip = this.itemPoint();

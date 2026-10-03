@@ -9,9 +9,9 @@
 
   const GRAV = 1000;
   const COL = {
-    body: U.hex('#15151b'),
-    plate: U.hex('#25252f'),
-    rim: U.hex('#6f7f99'),
+    body: U.hex('#1e1e28'),
+    plate: U.hex('#363648'),
+    rim: U.hex('#93a6c4'),
     eye: U.hex('#a6ecff'),
     leg: U.hex('#121217'),
   };
@@ -334,7 +334,7 @@
         ctx.beginPath();
         ctx.ellipse(-1, -flip * 1.5, rx * 0.8, ry * 0.55, 0, 0, U.TAU);
         ctx.fill();
-        ctx.strokeStyle = U.rgba(COL.rim, 0.55);
+        ctx.strokeStyle = U.rgba(COL.rim);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.ellipse(0, 0, rx - 0.5, ry - 0.5, 0, flip > 0 ? Math.PI * 1.15 : Math.PI * 0.15, flip > 0 ? Math.PI * 1.85 : Math.PI * 0.85);

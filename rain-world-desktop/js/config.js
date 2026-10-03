@@ -13,7 +13,7 @@
   RW.DEFAULT_CONFIG = {
     world: {
       palette: 'industrial', // industrial | shoreline | outskirts | chimney | subterranean
-      creatureScale: 1.6, // magnifies the whole world: creatures, ledges, poles
+      creatureScale: 2, // magnifies the whole world: creatures, ledges, poles
       pixelScale: 2, // 1 = full res, 2-3 = chunkier Rain World pixels
       cellSize: 20, // navigation grid cell (px). Rain World tiles are 20px.
       seed: 0, // 0 = new background every load
@@ -74,7 +74,7 @@
         popCost: 1.5,
         params: {
           headColor: '#ff36c4',
-          bodyColor: '#160d14',
+          bodyColor: '#120b11',
           length: 1.0,
           speed: 95,
           huntSpeed: 175,
@@ -94,7 +94,7 @@
         popCost: 1.5,
         params: {
           headColor: '#41f53c',
-          bodyColor: '#0d150e',
+          bodyColor: '#0c0d10',
           length: 1.25,
           speed: 70,
           huntSpeed: 140,
@@ -114,7 +114,7 @@
         popCost: 1.2,
         params: {
           headColor: '#2d8cff',
-          bodyColor: '#0c0f17',
+          bodyColor: '#0c0d10',
           length: 0.8,
           speed: 120,
           huntSpeed: 200,

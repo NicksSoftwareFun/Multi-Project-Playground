@@ -177,8 +177,8 @@
       ctx.save();
       ctx.globalAlpha = this.alpha;
       ctx.lineCap = 'round';
-      const head = U.mix('#ffb03a', '#ffd84a', this.hue);
-      const tail = U.mix('#d2421c', '#b8321a', this.hue);
+      const head = U.mix('#e3892c', '#e9b23a', this.hue);
+      const tail = U.mix('#8f2f17', '#7a2614', this.hue);
       // legs: a travelling wave, one pair per segment
       ctx.strokeStyle = '#2a1a12';
       ctx.lineWidth = 1.1;

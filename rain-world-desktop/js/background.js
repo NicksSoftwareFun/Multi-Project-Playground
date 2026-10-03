@@ -666,8 +666,9 @@
         }
       }
       for (let pass = 0; pass < 2; pass++) {
-        ctx.strokeStyle = U.rgba(pal.rain, pass ? 0.38 : 0.16);
-        ctx.lineWidth = pass ? 1.4 : 1;
+        // opaque colours pre-mixed toward the fog read as crisp pixel streaks
+        ctx.strokeStyle = U.rgba(U.mix(pal.fog, pal.rain, pass ? 0.55 : 0.25));
+        ctx.lineWidth = this.artPx || 1;
         ctx.beginPath();
         for (const d of this.drops) {
           if ((d.z > 0.6) !== !!pass) continue;
