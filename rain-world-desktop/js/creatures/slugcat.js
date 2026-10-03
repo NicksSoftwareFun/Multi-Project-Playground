@@ -55,10 +55,19 @@
       this.crouchT = 0;
       this.lastX = x;
       this.lastY = y;
+      this.pers = U.personality(); // bravery decides fight (throw) or flight
+      this.weapon = null; // a rock or spear in the far hand
+      this.throwT = 0; // windup before a throw
+      this.throwCd = 0;
+      this.throwAt = null;
+      this.fetch = null; // weapon we're walking over to pick up
+      this.snackT = 0; // eating something skewered on a spear
+      this.handPt2 = null;
+      this.grabbedT = 0;
       this.lie = 0; // 0 standing .. 1 lying flat
       this.reachTo = null; // something the near hand is reaching for
       this.handPt = null;
-      this.diet = ['batfly'];
+      this.diet = ['batfly', 'centipede'];
       this.threats = ['lizard_*', 'daddy', 'dropwig'];
       this.bloodColor = '#3a1f22';
     }
@@ -77,6 +86,34 @@
     }
     holdPoint() {
       return this.itemPoint();
+    }
+    // A predator is a threat when it's after us, or simply too close for
+    // comfort (closer for the brave); a daddy's long reach counts.
+    threatNear(range) {
+      const hip = this.hip;
+      const calm = 110 + 70 * (1 - this.pers.bravery);
+      return this.nearestOf(this.threats, range, (c) => {
+        if (c.holding || c.lurking || !this.canSee(c.x, c.y, range)) return false;
+        const d = U.dist(c.x, c.y, hip.x, hip.y);
+        return c.prey === this || c.target === this || c.lungePrey === this || d < calm || (c.species === 'daddy' && d < 230);
+      });
+    }
+    weaponPoint() {
+      return this.handPt2 || { x: this.head.x - this.facing * 3, y: this.head.y + 6 };
+    }
+    weaponAngle() {
+      if (this.throwT > 0 && this.aimAng !== undefined) return this.aimAng;
+      return this.facing > 0 ? -0.45 : Math.PI + 0.45;
+    }
+    remove() {
+      if (this.weapon) this.weapon.drop();
+      this.weapon = null;
+      super.remove();
+    }
+    leave() {
+      if (this.weapon) this.weapon.dead = true; // taken into the den
+      this.weapon = null;
+      super.leave();
     }
     carry(dx, dy) {
       this.hip.x += dx;
@@ -128,6 +165,19 @@
       this.sleeping = false;
       this.reachTo = null;
 
+      if (this.snackT > 0) {
+        // nibbling whatever came skewered on the spear we picked up
+        this.setState('eat');
+        this.pather.clear();
+        this.snackT -= dt;
+        if (this.snackT <= 0) {
+          this.hunger = Math.max(0, this.hunger - this.snackVal);
+          this.setState('rest');
+          this.restT = U.rand(1, 3);
+        }
+        return;
+      }
+
       if (this.item) {
         this.setState('eat');
         this.pather.clear();
@@ -172,6 +222,11 @@
         const t = this.threatNear(p.vision || 260);
         if (t) {
           this.threat = t;
+          // armed and brave enough: throw at it first, then run
+          const td = U.dist(t.x, t.y, hip.x, hip.y);
+          if (this.weapon && td < 230 && Math.random() < 0.35 + 0.6 * this.pers.bravery && this.W.lineClear(hip.x, hip.y - 6, t.x, t.y)) {
+            this.startThrow(t);
+          }
           if (this.state !== 'flee' || this.stateT > 1.5) {
             const g = this.fleeGoal(this.caps, t.x, t.y, 380);
             if (g) this.pather.setGoal(g.x, g.y, true);
@@ -200,6 +255,31 @@
         return;
       }
 
+      // Prey knocked down by a rock: go and pick it up.
+      if (perceive && this.hunger > 0.3 && this.state !== 'forage') {
+        const downed = this.nearestOf(['batfly', 'centipede'], 320, (c) => c.stunT > 0.4 && c.canBeGrabbed() && (c.size || 1) <= 1);
+        if (downed) {
+          this.food = downed;
+          this.setState('forage');
+        }
+      }
+      if (this.state === 'forage' && this.food instanceof RW.Creature) {
+        const f = this.food;
+        if (f.dead || f.leaving || f.grabbedBy || !(f.stunT > 0) || this.stateT > 12) {
+          this.food = null;
+          this.setState('wander');
+        } else {
+          this.pather.interval = 0.5;
+          this.pather.setGoal(f.x, f.y - 4);
+          const fd = U.dist(hip.x, hip.y, f.x, f.y);
+          if (fd < 30) this.reachTo = f.mainPoint();
+          if (fd < 15 && this.grab(f)) {
+            this.eatT = 0;
+            this.food = null;
+          }
+          return;
+        }
+      }
       // Food: fruit on the ground, or a batfly flying past.
       if (perceive && (this.hunger > 0.35 || this.state === 'forage')) {
         const fruit = this.findFruit(this.hunger > 0.6 ? 700 : 300);
@@ -254,6 +334,51 @@
         }
       }
 
+      // Armed and hungry: knock prey out of the air, or fruit off its vine.
+      if (perceive && this.weapon && this.hunger > 0.35 && this.throwCd <= 0 && !this.item && Math.random() < 0.35) {
+        const bf = this.nearestOf(['batfly', 'centipede'], 240, (c) => !c.grabbedBy && !(c.stunT > 0) && (c.size || 1) <= 1 && U.dist(c.x, c.y, hip.x, hip.y) > 40 && this.canSee(c.x, c.y, 240));
+        if (bf) this.startThrow(bf);
+        else if (this.weapon.kind === 'rock' && !this.findFruit(500)) {
+          const pl = this.eco.plants.find((pp) => {
+            if (pp.grow < 0.8) return false;
+            const tp = pp.tip();
+            return U.dist(tp.x, tp.y, hip.x, hip.y) < 260 && this.W.lineClear(hip.x, hip.y - 8, tp.x, tp.y + 5);
+          });
+          if (pl) this.startThrow(pl);
+        }
+      }
+
+      // Pick up a rock or spear (spears preferred) when empty-handed.
+      if (this.state === 'fetch') {
+        const w = this.fetch;
+        const unreachable = this.pather.nodes && !this.pather.complete && this.pather.remaining() === 0 && this.stateT > 1.5;
+        if (!w || !w.pickable || this.weapon || this.stateT > 12 || unreachable || (w.claimedBy && w.claimedBy !== this)) {
+          if (w && unreachable) {
+            this.ignoreWeapon = w;
+            this.ignoreWeaponT = 30;
+          }
+          this.fetch = null;
+          this.setState('wander');
+        } else {
+          w.claimedBy = this;
+          this.pather.interval = 0.7;
+          this.pather.setGoal(w.x, w.y - 4);
+          const wd = U.dist(hip.x, hip.y, w.x, w.y);
+          if (wd < 30) this.reachTo = w;
+          if (wd < 15) this.pickUpWeapon(w);
+          return;
+        }
+      }
+      this.ignoreWeaponT = (this.ignoreWeaponT || 0) - dt;
+      if (!this.weapon && perceive && this.state === 'wander' && Math.random() < 0.4) {
+        const w = this.findWeapon(300);
+        if (w) {
+          this.fetch = w;
+          this.setState('fetch');
+          return;
+        }
+      }
+
       // Curious about a resting cursor.
       if (cfgE.cursorInteraction && cur.inside && cur.still > 0.8 && U.dist(cur.x, cur.y, hip.x, hip.y) < 320) {
         this.setState('curious');
@@ -291,10 +416,94 @@
       }
     }
 
+    findWeapon(range) {
+      const hip = this.hip;
+      let best = null;
+      let bs = range;
+      for (const it of this.eco.items) {
+        if (!(it instanceof RW.Weapon) || !it.pickable) continue;
+        if (it.claimedBy && it.claimedBy !== this) continue;
+        if (it === this.ignoreWeapon && this.ignoreWeaponT > 0) continue;
+        const d = U.dist(it.x, it.y, hip.x, hip.y) - (it.kind === 'spear' ? 120 : 0) - (it.skewer && this.hunger > 0.3 ? 150 : 0);
+        if (d < bs) {
+          bs = d;
+          best = it;
+        }
+      }
+      return best;
+    }
+    pickUpWeapon(w) {
+      if (w.skewer) {
+        this.snackT = 1.4;
+        this.snackVal = w.skewer === 'centipede' ? 0.5 : 0.35;
+        w.skewer = null;
+      }
+      w.pickUp(this);
+      this.weapon = w;
+      this.fetch = null;
+      if (this.state === 'fetch') this.setState('wander');
+    }
+    // Where to aim: a lizard's head for a rock (it flips them), its body
+    // for a spear (the head is armoured); a fruit's stalk; else the middle.
+    aimPoint(t) {
+      if (t.tip && !t.spine && !t.chain) {
+        const tp = t.tip();
+        return { x: tp.x, y: tp.y + 5 };
+      }
+      if (t.spine && t.species.startsWith('lizard_')) {
+        const P = t.spine.pts;
+        return this.weapon && this.weapon.kind === 'spear' ? P[3] : P[0];
+      }
+      return t.mainPoint();
+    }
+    startThrow(t) {
+      if (!this.weapon || this.throwT > 0 || this.throwCd > 0 || !t) return false;
+      const tp = this.aimPoint(t);
+      this.throwAt = t;
+      this.throwT = 0.16;
+      this.facing = Math.sign(tp.x - this.hip.x) || this.facing;
+      this.aimAng = Math.atan2(tp.y - this.hip.y, tp.x - this.hip.x);
+      return true;
+    }
+    releaseThrow() {
+      const w = this.weapon;
+      const t = this.throwAt;
+      this.throwAt = null;
+      if (!w || !t || t.dead || t.leaving) return;
+      const from = this.handPt2 || this.shoulder();
+      w.x = from.x;
+      w.y = from.y;
+      w.thrower = this;
+      this.weapon = null;
+      this.throwCd = 1;
+      if (t === this.grabbedBy) {
+        // point blank into whatever has hold of us
+        const parts = t.hitParts();
+        let k = parts.findIndex((pp) => pp.part === (w.kind === 'spear' ? 'body' : 'head'));
+        if (k < 0) k = 0;
+        w.state = 'flying';
+        w.vx = (parts[k].x - from.x) * 4;
+        w.vy = (parts[k].y - from.y) * 4;
+        w.strike(t, k, parts[k].part);
+        return;
+      }
+      let tp = this.aimPoint(t);
+      const speed = w.kind === 'spear' ? 560 : 470;
+      let tt = U.dist(from.x, from.y, tp.x, tp.y) / speed;
+      if (typeof t.vx === 'number' && typeof t.vy === 'number') {
+        tp = { x: tp.x + t.vx * tt * 0.7, y: tp.y + t.vy * tt * 0.7 }; // lead a moving target
+        tt = U.dist(from.x, from.y, tp.x, tp.y) / speed;
+      }
+      tt = Math.max(0.05, tt);
+      const g = w.kind === 'spear' ? (tt < 0.45 ? 260 : 600) : 900;
+      w.throwAt((tp.x - from.x) / tt, (tp.y - from.y) / tt - 0.5 * g * tt, this);
+    }
+
     findFruit(range) {
       let best = null;
       let bd = range * range;
       for (const it of this.eco.items) {
+        if (!(it instanceof RW.Fruit)) continue;
         if (it.dead || it.heldBy || (it.claimedBy && it.claimedBy !== this)) continue;
         if (it === this.ignoreFood && this.ignoreFoodT > 0) continue;
         const d = U.dist2(it.x, it.y, this.hip.x, this.hip.y);
@@ -338,7 +547,15 @@
       const W = this.W;
       const hip = this.hip;
 
+      this.throwCd -= dt;
+      if (this.throwT > 0) {
+        this.throwT -= dt;
+        if (this.throwT <= 0) this.releaseThrow();
+      }
       if (this.grabbedBy) {
+        // caught: a held rock or spear goes straight into the captor
+        this.grabbedT += dt;
+        if (this.weapon && this.grabbedT > 0.35 && this.throwT <= 0) this.startThrow(this.grabbedBy);
         const hp = this.grabbedBy.holdPoint();
         hip.x = hp.x;
         hip.y = hp.y;
@@ -351,7 +568,18 @@
         return;
       }
 
+      this.grabbedT = 0;
       this.think(dt);
+      // snatch up a weapon lying right underfoot
+      if (!this.weapon && !this.item && !this.holding && this.state !== 'eat') {
+        for (const it of this.eco.items) {
+          const reach = this.state === 'flee' ? 20 : 12; // grab one on the run
+          if (it instanceof RW.Weapon && it.pickable && (!it.claimedBy || it.claimedBy === this) && U.dist(it.x, it.y, hip.x, hip.y) < reach) {
+            this.pickUpWeapon(it);
+            break;
+          }
+        }
+      }
       this.pather.update(dt, hip.x, hip.y);
       const cell = W.cell;
       this.pather.advance(hip.x, hip.y, cell * 0.65);
@@ -552,9 +780,11 @@
     // Where the near hand actually is (after IK), so held things sit in it.
     updateHand() {
       const sh = this.shoulder();
-      const t = this.limbTargets(sh).hands[0];
-      const k = U.ik2(sh.x, sh.y, t.x, t.y, ARM, ARM, -this.facing);
+      const hands = this.limbTargets(sh).hands;
+      const k = U.ik2(sh.x, sh.y, hands[0].x, hands[0].y, ARM, ARM, -this.facing);
       this.handPt = { x: k.ex, y: k.ey };
+      const k2 = U.ik2(sh.x, sh.y, hands[1].x, hands[1].y, ARM, ARM, -this.facing);
+      this.handPt2 = { x: k2.ex, y: k2.ey };
     }
 
     updateTail(dt) {
@@ -733,6 +963,15 @@
             });
           }
         }
+      }
+      // the far hand carries the weapon: held ready, drawn back over the
+      // shoulder in the windup, flung forward in the follow-through
+      if (!this.grabbedBy && !this.pole && this.lie < 0.5 && this.state !== 'eat') {
+        if (this.throwT > 0) hands[1] = { x: shoulder.x - f * 5, y: shoulder.y - 8 };
+        else if (this.throwCd > 0.8) hands[1] = { x: shoulder.x + f * 9, y: shoulder.y - 1 };
+        else if (this.weapon) hands[1] = { x: shoulder.x + f * 4, y: shoulder.y + 5 };
+      } else if (this.grabbedBy && this.throwT > 0) {
+        hands[1] = { x: shoulder.x - f * 5, y: shoulder.y - 8 };
       }
       // reaching for fruit or a batfly overrides the near hand
       if (this.reachTo && !this.grabbedBy && !this.pole) {

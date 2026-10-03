@@ -112,6 +112,26 @@
       this.body.x += dx;
       this.body.y += dy;
     }
+    // --- weapons: too big to stun or kill with these, but a hit makes it
+    // flinch, drop its catch and let go of what it's gripping
+    hitParts() {
+      return [{ x: this.body.x, y: this.body.y, r: this.R || 12, part: 'body' }];
+    }
+    stun() {
+      this.flinch();
+      return false;
+    }
+    flinch() {
+      if (this.holding) this.release();
+      for (const t of this.tentacles) if (t.state === 'grip' && Math.random() < 0.5) t.release();
+    }
+    onRockHit() {
+      this.flinch();
+    }
+    onSpearHit() {
+      this.flinch();
+      return 'embed';
+    }
     shiftAll(dx, dy) {
       this.carry(dx, dy);
       for (const t of this.tentacles) t.chain.shift(dx, dy);

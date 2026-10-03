@@ -38,6 +38,43 @@
     carry(dx, dy) {
       this.chain.shift(dx, dy);
     }
+    // --- weapons
+    hitParts() {
+      const P = this.chain.pts;
+      const r = 4 * (this.size || 1);
+      const out = [];
+      for (let i = 0; i < P.length; i += 2) out.push({ x: P[i].x, y: P[i].y, r, part: i ? 'body' : 'head' });
+      return out;
+    }
+    limp(dt) {
+      const W = this.W;
+      const P = this.chain.pts;
+      const h = P[0];
+      this.vy += GRAV * dt;
+      this.vx *= Math.pow(0.3, dt);
+      h.x += this.vx * dt;
+      h.y += this.vy * dt;
+      const c = W.collideCircle(h, 3);
+      if (c) {
+        const vn = this.vx * c.nx + this.vy * c.ny;
+        if (vn < 0) {
+          this.vx -= vn * c.nx;
+          this.vy -= vn * c.ny;
+        }
+        this.vx *= 0.8;
+      }
+      this.chain.verlet(1, 0.9, 0, GRAV, dt);
+      this.chain.follow(1);
+      this.chain.collide(W, 2.5, 1);
+      this.phase += dt * 6;
+    }
+    onRockHit() {
+      this.stun(1.5);
+    }
+    onSpearHit() {
+      this.remove();
+      return 'skewer';
+    }
     onBitten(by) {
       this.setState('flee');
       const g = this.fleeGoal(this.caps, by.x, by.y, 300);

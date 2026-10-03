@@ -368,6 +368,125 @@
       }
     }
 
+    // -------------------------------------------------------------- weapons --
+    hitParts() {
+      const P = this.spine.pts;
+      const L = this.L;
+      const out = [{ x: P[0].x, y: P[0].y, r: 6 * L, part: 'head' }];
+      for (let i = 2; i < this.bodyN + 3; i++) out.push({ x: P[i].x, y: P[i].y, r: 5.5 * L, part: 'body' });
+      return out;
+    }
+    stun(t, flip) {
+      if (!super.stun(t, flip)) return false;
+      this.turn = null;
+      this.lungeT = 0;
+      this.windT = 0;
+      if (RIVALRY.includes(this.state) && this.rival) {
+        this.rival.endRivalry(8);
+        this.endRivalry(8);
+      }
+      return true;
+    }
+    // Knocked about: fall under gravity, legs flailing (in the air if flipped).
+    limp(dt) {
+      const W = this.W;
+      const P = this.spine.pts;
+      const head = P[0];
+      const L = this.L;
+      this.vy += GRAV * dt;
+      this.vx *= Math.pow(0.4, dt);
+      head.x += this.vx * dt;
+      head.y += this.vy * dt;
+      const c = W.collideCircle(head, 5 * L);
+      if (c) {
+        const vn = this.vx * c.nx + this.vy * c.ny;
+        if (vn < 0) {
+          this.vx -= vn * c.nx * 1.2;
+          this.vy -= vn * c.ny * 1.2;
+        }
+        this.vx *= 0.85;
+      }
+      head.px = head.x;
+      head.py = head.y;
+      this.spine.verlet(1, 0.9, 0, GRAV, dt);
+      this.spine.follow(1);
+      this.spine.collide(W, 3, 1);
+      this.grip = null;
+      // on its back: belly up, so the legs kick at the sky
+      const tux = 0;
+      const tuy = this.flipped ? 1 : -1;
+      const k = U.approach(8, dt);
+      this.ux += (tux - this.ux) * k;
+      this.uy += (tuy - this.uy) * k;
+      const ul = Math.hypot(this.ux, this.uy) || 1;
+      this.ux /= ul;
+      this.uy /= ul;
+      this.headAng = U.lerpAngle(this.headAng, Math.atan2(head.y - P[1].y, head.x - P[1].x), U.approach(10, dt));
+      this.jaw += (0.5 + 0.3 * Math.sin(this.age * 20) - this.jaw) * 0.2;
+      this.lash = 1;
+      for (const l of this.legs) l.leg.planted = false;
+      this.updateLegs(dt, false);
+    }
+    onRecovered() {
+      this.setState('wander');
+    }
+    // Rocks: a head hit flips it over; red lizards barely notice.
+    onRockHit(w, part) {
+      if (this.p.stunImmune) {
+        this.thrashT = 0.3;
+        this.noticeT = 0.3;
+        return;
+      }
+      this.stun(part === 'head' ? 1.3 : 0.8, part === 'head');
+      this.vx += w.vx * 0.15;
+      this.vy -= 120;
+      this.angerAt(w.thrower);
+    }
+    // Spears: glance off the armoured head; stick in and wound the body.
+    onSpearHit(w, part) {
+      if (part === 'head') {
+        this.thrashT = 0.3;
+        this.angerAt(w.thrower);
+        return 'bounce';
+      }
+      this.hp -= 0.6 / (this.p.toughness || 1);
+      if (this.holding) this.release();
+      this.vx += w.vx * 0.25;
+      this.vy += w.vy * 0.1 - 60;
+      this.thrashT = 0.5;
+      this.eco.burst(w.x, w.y, this.bloodColor || '#20141a', 4);
+      if (this.hp <= 0) {
+        this.die(16);
+        return 'drop';
+      }
+      // badly hurt or timid: retreat (maybe to a den); otherwise turn on it
+      if (this.hp < 0.45 || Math.random() > this.pers.bravery) {
+        const t = w.thrower || w;
+        const g = this.fleeGoal(this.caps, t.x, t.y, 350);
+        if (g) this.pather.setGoal(g.x, g.y, true);
+        this.setState('flee');
+        if (this.hp < 0.45 && Math.random() < 0.5) this.migrating = true;
+      } else {
+        this.angerAt(w.thrower);
+      }
+      return 'embed';
+    }
+    angerAt(c) {
+      if (!c || c.dead || !this.diet.includes(c.species)) return;
+      this.prey = c;
+      this.fullT = Math.min(this.fullT, 0);
+      if (this.state !== 'flee') this.setState('hunt');
+    }
+    // A rock clattering nearby: go and have a look.
+    hearNoise(x, y) {
+      if ((this.state !== 'wander' && this.state !== 'idle') || this.stunT > 0 || Math.random() > 0.6) return;
+      this.setState('wander');
+      this.stateT = 0;
+      this.pather.setGoal(x, y, true);
+      this.noticeT = 0.3;
+      this.idleLook = { x, y, t: 2 };
+    }
+
     // ------------------------------------------------------------ territory --
     homePos() {
       const h = this.home;

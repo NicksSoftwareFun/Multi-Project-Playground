@@ -38,6 +38,38 @@
     onUnburrowed() {
       this.perched = false;
     }
+    // --- weapons: a rock knocks it out of the air; a spear skewers it
+    hitParts() {
+      return [{ x: this.pos.x, y: this.pos.y, r: 5, part: 'body' }];
+    }
+    limp(dt) {
+      const p = this.pos;
+      this.perched = false;
+      this.vy += 700 * dt;
+      this.vx *= Math.pow(0.3, dt);
+      p.x += this.vx * dt;
+      p.y += this.vy * dt;
+      const c = this.W.collideCircle(p, 2.5);
+      if (c) {
+        const vn = this.vx * c.nx + this.vy * c.ny;
+        if (vn < 0) {
+          this.vx -= vn * c.nx * 1.3;
+          this.vy -= vn * c.ny * 1.3;
+        }
+        this.vx *= 0.7;
+      }
+      this.flap += dt * 4; // a feeble twitch
+    }
+    onRockHit() {
+      this.stun(U.rand(3.5, 5));
+    }
+    onSpearHit() {
+      this.remove();
+      return 'skewer';
+    }
+    onRecovered() {
+      this.vy = -150;
+    }
     carry(dx, dy) {
       if (this.perched) {
         this.pos.x += dx;

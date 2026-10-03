@@ -283,6 +283,16 @@
       }
       this.alpha = Math.min(1, this.alpha + dt * 1.6);
       if (this.unburrowStep(dt)) return false;
+      // Stunned (a rock, say): limp until it wears off.
+      if (this.stunT > 0 && !this.grabbedBy) {
+        this.stunT -= dt;
+        this.limp(dt);
+        if (this.stunT <= 0) {
+          this.flipped = false;
+          this.onRecovered();
+        }
+        return false;
+      }
       // No den reachable from here: slip away quietly rather than wait forever.
       if (this.state === 'leave' && this.stateT > 30) this.leave();
       // Safety net for odd geometry (e.g. a window dropped on top of us):
@@ -407,6 +417,28 @@
         if (this.age > 40 && Math.random() < perMin / 6) this.migrating = true;
       }
       return !!this.migrating;
+    }
+
+    // --- weapons ---
+    // Circles a thrown rock or spear can hit: { x, y, r, part }.
+    hitParts() {
+      const m = this.mainPoint();
+      return [{ x: m.x, y: m.y, r: 8, part: 'body' }];
+    }
+    stun(t, flip) {
+      if (this.p.stunImmune || this.dead) return false;
+      this.stunT = Math.max(this.stunT || 0, t);
+      this.flipped = !!flip;
+      if (this.holding) this.release();
+      return true;
+    }
+    limp(dt) {}
+    onRecovered() {}
+    // Killed outright: a spray, then gone.
+    die(n) {
+      const m = this.mainPoint();
+      this.eco.burst(m.x, m.y, this.bloodColor || '#2a1418', n || 12);
+      this.remove();
     }
 
     // Window dragged under us: ride along.

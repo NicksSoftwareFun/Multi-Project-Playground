@@ -217,6 +217,36 @@
       }
     }
 
+    // Keep a few rocks and spears lying about (about one in four a spear).
+    stockWeapons(all) {
+      const E = this.cfg.ecosystem;
+      const want = { rock: E.rocks === undefined ? 6 : +E.rocks, spear: E.spears === undefined ? 2 : +E.spears };
+      const have = { rock: 0, spear: 0 };
+      for (const it of this.items) if (it instanceof RW.Weapon && !it.dead) have[it.kind]++;
+      for (const kind of ['spear', 'rock']) {
+        let n = Math.min(all ? 99 : 1, want[kind] - have[kind]);
+        while (n-- > 0) this.spawnWeapon(kind);
+      }
+    }
+    spawnWeapon(kind) {
+      const W = this.world;
+      const tops = W.solids.filter((s) => s.kind !== 'edge' && s.kind !== 'icon' && s.w >= 40 && s.y > 20);
+      for (let t = 0; t < 10 && tops.length; t++) {
+        const s = U.pick(tops);
+        const x = s.x + U.rand(8, s.w - 8);
+        const y = s.y - 4;
+        if (W.isSolidPt(x, y) || W.isSolidPt(x, y - 8)) continue;
+        this.items.push(new RW.Weapon(this, kind, x, y));
+        return;
+      }
+    }
+    // A loud clatter: nearby lizards come to see what it was.
+    noise(x, y) {
+      for (const c of this.creatures) {
+        if (c.hearNoise && !c.dead && U.dist(c.x, c.y, x, y) < 280) c.hearNoise(x, y);
+      }
+    }
+
     dropFood(x, y) {
       if (this.world.isSolidPt(x, y)) return;
       const f = new RW.Fruit(this, x, y);
@@ -228,7 +258,13 @@
       this.t += dt;
       const cfg = this.cfg;
       if (!this.populated && cfg.ecosystem.startPopulated) this.populate();
+      if (!this.populated) this.stockWeapons(true);
       this.populated = true;
+      this.weaponT = (this.weaponT || 0) - dt;
+      if (this.weaponT <= 0) {
+        this.weaponT = 6;
+        this.stockWeapons(false);
+      }
 
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
@@ -276,14 +312,17 @@
         p.draw(ctx);
         dirty.push([p.x - 14, p.y - 2, p.x + 14, p.y + p.len + 14]);
       }
-      for (const it of this.items) dirty.push([it.x - 9, it.y - 9, it.x + 9, it.y + 9]);
+      for (const it of this.items) dirty.push(it.bounds ? it.bounds() : [it.x - 9, it.y - 9, it.x + 9, it.y + 9]);
       for (const c of this.creatures) if (c.alpha > 0) dirty.push(c.bounds());
       for (const p of this.particles) dirty.push([p.x - 3, p.y - 3, p.x + 3, p.y + 3]);
       for (const d of this.dens) dirty.push([d.x - 24, d.y - 18, d.x + 24, d.y + 18]);
       const order = { daddy: 0, dropwig: 2, centipede: 3, slugcat: 4, batfly: 5 };
       const sorted = this.creatures.slice().sort((a, b) => (order[a.species] ?? 1) - (order[b.species] ?? 1));
-      for (const it of this.items) it.draw(ctx);
+      // weapons stuck in creatures or in flight draw over them; the rest under
+      const over = (it) => it.state === 'embedded' || it.state === 'flying';
+      for (const it of this.items) if (!over(it)) it.draw(ctx);
       for (const c of sorted) c.draw(ctx);
+      for (const it of this.items) if (over(it)) it.draw(ctx);
       for (const p of this.particles) {
         ctx.fillStyle = U.rgba(p.color, 1 - p.t / p.life);
         ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);

@@ -38,7 +38,9 @@
       spawnPerMinute: 2.5, // new arrivals per minute while below the population cap
       startPopulated: true, // fill the screen immediately on load
       predation: true, // predators actually eat prey (off = chase, bite, release)
-      migrationPerMinute: 0.5, // chance per creature per minute to wander off into a den
+      migrationPerMinute: 0.5,
+      rocks: 6, // rocks kept lying about for slugcats to throw
+      spears: 2, // spears likewise (the wiki: about one weapon in five is a spear) // chance per creature per minute to wander off into a den
       cursorInteraction: true,
       clickDropsFood: true,
     },
@@ -196,6 +198,7 @@
           biteRange: 90, // wiki attemptBiteRadius x 0.75
           biteDamage: 4, // wiki biteDamage (lizard fights)
           toughness: 3, // wiki toughness
+          stunImmune: true, // wiki: red lizards can't be stunned or flipped by rocks
           spines: 18,
           pattern: 'dots',
         },

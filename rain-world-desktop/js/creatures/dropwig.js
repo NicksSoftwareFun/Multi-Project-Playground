@@ -166,6 +166,52 @@
       this.target = target;
     }
 
+    // --- weapons
+    hitParts() {
+      return this.spine.pts.map((p, i) => ({ x: p.x, y: p.y, r: 5, part: i ? 'body' : 'head' }));
+    }
+    limp(dt) {
+      const W = this.W;
+      const P = this.spine.pts;
+      const h = P[0];
+      this.vy += GRAV * dt;
+      this.vx *= Math.pow(0.3, dt);
+      h.x += this.vx * dt;
+      h.y += this.vy * dt;
+      const c = W.collideCircle(h, 5);
+      if (c) {
+        const vn = this.vx * c.nx + this.vy * c.ny;
+        if (vn < 0) {
+          this.vx -= vn * c.nx;
+          this.vy -= vn * c.ny;
+        }
+        this.vx *= 0.8;
+      }
+      this.spine.verlet(1, 0.9, 0, GRAV, dt);
+      this.spine.follow(1);
+      this.spine.collide(W, 3, 1);
+      this.grip = null;
+      this.updateLegs(dt, false);
+    }
+    onRecovered() {
+      this.setState('recover');
+    }
+    onRockHit() {
+      this.stun(1.1);
+      this.vy = Math.max(this.vy, 60);
+    }
+    onSpearHit() {
+      this.hp = (this.hp === undefined ? 1 : this.hp) - 0.6;
+      if (this.hp <= 0) {
+        this.die(12);
+        return 'drop';
+      }
+      if (this.holding) this.release();
+      this.setState('recover');
+      this.vy = Math.max(this.vy, 80);
+      return 'embed';
+    }
+
     letGo(target) {
       this.setState('drop');
       this.target = target;

@@ -98,6 +98,15 @@
       const sway = Math.sin(this.eco.t * 0.9 + this.phase) * 4;
       return { x: this.x + sway, y: this.y + this.len };
     }
+    // Hit by a thrown rock or spear: a ripe fruit drops.
+    knockOff() {
+      if (this.grow < 0.8) return;
+      const t = this.tip();
+      const f = new Fruit(this.eco, t.x, t.y + 5);
+      f.vy = 40;
+      this.eco.items.push(f);
+      this.grow = 0;
+    }
     update(dt) {
       if (this.eco.world.isSolidPt(this.x, this.y + 4)) return; // covered by a window
       this.grow = Math.min(1.2, this.grow + dt * this.regrowRate);
