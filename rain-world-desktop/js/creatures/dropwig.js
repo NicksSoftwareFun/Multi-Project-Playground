@@ -93,6 +93,11 @@
         }
         return;
       }
+      if (this.state === 'twitch') {
+        this.mandible = 0.5 + 0.3 * Math.sin(this.age * 50);
+        if (this.stateT > 0.22) this.letGo(this.target);
+        return;
+      }
       if (this.state === 'feed') {
         // prey wriggled free
         this.setState('recover');
@@ -131,25 +136,37 @@
         this.mandible = 0.1 + 0.1 * Math.sin(this.age * 2);
         this.checkT -= dt;
         if (this.checkT <= 0) {
-          this.checkT = 0.12;
+          this.checkT = 0.05;
           const tw = this.p.triggerWidth || 26;
-          const below = (x, y) => Math.abs(x - h.x) < tw && y > h.y + 10 && y < h.y + 480 && this.W.lineClear(h.x, h.y + 8, x, y);
+          // Lead moving prey: where will it be when we land on it?
+          const below = (x, y, vx) => {
+            const dy = y - h.y;
+            if (dy < 10 || dy > 480) return false;
+            const xp = x + (vx || 0) * Math.sqrt((2 * dy) / GRAV);
+            return Math.abs(xp - h.x) < tw * 0.6 && Math.abs(x - h.x) < tw * 4 && this.W.lineClear(h.x, h.y + 8, x, y);
+          };
           let target = null;
           for (const c of eco.creatures) {
             if (this.prey.indexOf(c.species) < 0 || !c.canBeGrabbed()) continue;
-            if (below(c.x, c.y)) {
+            if (below(c.x, c.y, c.vx)) {
               target = c;
               break;
             }
           }
           const cur = eco.cursor;
-          if (!target && eco.cfg.ecosystem.cursorInteraction && cur.inside && below(cur.x, cur.y)) target = cur;
+          if (!target && eco.cfg.ecosystem.cursorInteraction && cur.inside && below(cur.x, cur.y, cur.vx)) target = cur;
           if (target) this.drop(target);
         }
       }
     }
 
+    // A brief shiver before letting go: a tell for the attentive.
     drop(target) {
+      this.setState('twitch');
+      this.target = target;
+    }
+
+    letGo(target) {
       this.setState('drop');
       this.target = target;
       this.grip = null;
@@ -161,7 +178,7 @@
     update(dt) {
       if (!this.tick(dt)) return;
       // Ambushers go unnoticed while creeping about or waiting on the ceiling.
-      this.lurking = this.state === 'wait' || this.state === 'seek';
+      this.lurking = this.state === 'wait' || this.state === 'seek' || this.state === 'twitch';
       const W = this.W;
       const P = this.spine.pts;
       const h = P[0];
@@ -191,6 +208,11 @@
         this.mandible = 1;
         this.vy += GRAV * dt;
         const t = this.target;
+        if (t) {
+          // steer toward where the prey is heading
+          const lead = (t.x || 0) + (t.vx || 0) * 0.15;
+          this.vx = U.clamp(this.vx + U.clamp((lead - h.x) * 8, -500, 500) * dt, -170, 170);
+        }
         if (t && t.canBeGrabbed && U.dist(h.x, h.y, t.x, t.y) < 18) {
           if (this.eco.cfg.ecosystem.predation && this.grab(t)) this.target = null;
           else if (t.onBitten) {
@@ -233,7 +255,7 @@
       h.x += this.vx * dt;
       h.y += this.vy * dt;
       if (g && !leaving) {
-        const hug = this.state === 'wait' ? 5 : 9;
+        const hug = this.state === 'wait' || this.state === 'twitch' ? 5 : 9;
         const e = g.d - hug;
         h.x -= g.nx * e * 0.25;
         h.y -= g.ny * e * 0.25;

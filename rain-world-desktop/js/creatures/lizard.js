@@ -10,6 +10,7 @@
 
   const GRAV = 900;
   const LIZARDS = ['lizard_*'];
+  const REAR = [0, 0.9, 0.65, 0.35, 0.12]; // how much each front spine point lifts when rearing
 
   class Lizard extends RW.Creature {
     constructor(eco, species, x, y) {
@@ -38,6 +39,7 @@
         wallCost: 1.3,
         ceilCost: 1.8,
         poleCost: 1.4,
+        fallCost: p.climbWalls ? 4 : 1, // climbers climb down rather than drop
       };
       this.mask = { floor: true, walls: !!p.climbWalls, ceil: !!p.climbCeilings, poles: !!p.poles };
       this.maskNoPole = Object.assign({}, this.mask, { poles: false });
@@ -83,6 +85,9 @@
       this.raise = 0; // rearing up (display, stalking)
       this.raiseS = 0;
       this.lashS = 0;
+      this.windT = 0;
+      this.turn = null;
+      this.turnCd = 0;
       this.tongue = 0; // 0..1 flick progress
       this.tongueCd = U.rand(2, 8);
       this.noticeT = 0;
@@ -334,7 +339,7 @@
         if (this.gapeT > 0) {
           this.gapeT -= dt;
           this.jawTarget = 0.7;
-          this.raise = 0.9;
+          this.raise = 0.4;
         }
         if (this.idleT <= 0) this.setState('wander');
         return;
@@ -351,18 +356,61 @@
       }
     }
 
+    // Lunges have a short windup (stop, rear, gape) before the strike.
     lunge(tx, ty, prey) {
+      this.windT = 0.18;
+      this.lungeTarget = { x: tx, y: ty };
+      this.lungeCd = U.rand(1.3, 2.4);
+      this.lungePrey = prey;
+    }
+
+    launchLunge() {
       const head = this.spine.pts[0];
+      const prey = this.lungePrey;
+      const tx = prey && !prey.dead ? prey.x : this.lungeTarget.x;
+      const ty = prey && !prey.dead ? prey.y : this.lungeTarget.y;
       const dx = tx - head.x;
       const dy = ty - head.y;
       const d = Math.hypot(dx, dy) || 1;
       const sp = 380 + 120 * this.L;
-      this.vx = (dx / d) * sp;
-      this.vy = (dy / d) * sp;
-      this.lungeT = 0.24;
-      this.lungeCd = U.rand(1.1, 2.2);
-      this.lungePrey = prey;
-      this.jawTarget = 1;
+      this.lungeV = { x: (dx / d) * sp, y: (dy / d) * sp };
+      this.lungeT = 0.26;
+      // feet leave the ground for the strike
+      for (const l of this.legs) l.leg.planted = false;
+    }
+
+    // Turning round: the body swings over through the vertical instead of
+    // the head ploughing back through its own shoulders.
+    startTurn() {
+      const P = this.spine.pts;
+      const C = { x: P[3].x, y: P[3].y };
+      const tx = -this.uy;
+      const ty = this.ux;
+      const off = P.map((p) => [(p.x - C.x) * tx + (p.y - C.y) * ty, (p.x - C.x) * this.ux + (p.y - C.y) * this.uy]);
+      this.turn = { t: 0, dur: 0.42, C, tx, ty, nx: this.ux, ny: this.uy, off };
+      for (const l of this.legs) l.leg.planted = false;
+      this.vx = this.vy = 0;
+    }
+
+    stepTurn(dt) {
+      const T = this.turn;
+      const P = this.spine.pts;
+      T.t += dt;
+      const k = Math.min(1, T.t / T.dur);
+      const f = Math.cos(Math.PI * k); // 1 -> -1 mirrors the body about the pivot
+      const lift = Math.sin(Math.PI * k);
+      for (let i = 0; i < P.length; i++) {
+        const a = T.off[i][0];
+        const b = T.off[i][1] + lift * Math.min(9 * this.L, Math.abs(a) * 0.45);
+        P[i].x = P[i].px = T.C.x + T.tx * a * f + T.nx * b;
+        P[i].y = P[i].py = T.C.y + T.ty * a * f + T.ny * b;
+        this.W.collideCircle(P[i], i < this.bodyN ? 3 * this.L : 2);
+      }
+      if (k >= 1) {
+        this.turn = null;
+        this.turnCd = 1.2;
+        this.look = 0;
+      }
     }
 
     // --------------------------------------------------------- physics ----
@@ -388,6 +436,23 @@
 
       this.think(dt);
       this.pather.update(dt, head.x, head.y);
+      this.turnCd = (this.turnCd || 0) - dt;
+      if (this.turn) {
+        this.stepTurn(dt);
+        this.headAng = U.lerpAngle(this.headAng, Math.atan2(P[0].y - P[1].y, P[0].x - P[1].x), U.approach(20, dt));
+        this.updateLegs(dt, true);
+        return;
+      }
+      if (this.windT > 0) {
+        // windup: stop, rear, gape
+        this.windT -= dt;
+        this.raise = 0.8;
+        this.jawTarget = 0.9;
+        this.vx *= 0.7;
+        this.vy *= 0.7;
+        if (this.windT <= 0) this.launchLunge();
+      }
+      if (this.lungeT > 0) this.jawTarget = 1; // hold the gape through the strike
 
       // Only cling to a pole when the path is actually using it; otherwise a
       // pole base pushes the lizard sideways and it can't walk past.
@@ -404,6 +469,11 @@
 
       if (this.lungeT > 0) {
         this.lungeT -= dt;
+        if (this.lungeT > 0.19) {
+          // ease into the strike over a few frames
+          this.vx += (this.lungeV.x - this.vx) * 0.5;
+          this.vy += (this.lungeV.y - this.vy) * 0.5;
+        }
         if (this.lungeT < 0.12) this.vy += GRAV * dt;
         const prey = this.lungePrey;
         if (prey && !prey.dead && U.dist(head.x, head.y, prey.x, prey.y) < 18 * L) {
@@ -435,8 +505,19 @@
           const dx = tx - head.x;
           const dy = ty - head.y;
           const d = Math.hypot(dx, dy) || 1;
-          dvx = (dx / d) * this.speed;
-          dvy = (dy / d) * this.speed;
+          // speed surges as feet step and eases as they plant
+          const surge = this.legs.some((l) => l.leg.stepping) ? 1.12 : 0.84;
+          dvx = (dx / d) * this.speed * surge;
+          dvy = (dy / d) * this.speed * surge;
+          if (g && this.speed > 0 && this.turnCd <= 0 && this.windT <= 0) {
+            let nx = P[0].x - P[2].x;
+            let ny = P[0].y - P[2].y;
+            const nl = Math.hypot(nx, ny) || 1;
+            if ((nx / nl) * (dx / d) + (ny / nl) * (dy / d) < -0.3) {
+              this.startTurn();
+              return;
+            }
+          }
           // Deliberately stepping off a surface: don't let the hug pull us back.
           this.leavingSurface = node.type === Nav.FALL || (g && (dx / d) * g.nx + (dy / d) * g.ny > 0.6);
         }
@@ -455,7 +536,7 @@
       if (g && this.lungeT <= 0 && !this.leavingSurface) {
         // hug the surface at a fixed body height
         this.raiseS = (this.raiseS || 0) + (this.raise - (this.raiseS || 0)) * U.approach(5, dt);
-        const err = g.d - (15 + this.raiseS * 4) * L;
+        const err = g.d - (15 + this.raiseS * 12) * L;
         head.x -= g.nx * err * 0.25;
         head.y -= g.ny * err * 0.25;
         this.contactId = g.id;
@@ -479,7 +560,7 @@
         if (g && !this.leavingSurface && i < this.bodyN + 4) {
           const s = W.nearestSurface(pt.x, pt.y, 22 * L, mask);
           if (s) {
-            const e = s.d - (i < this.bodyN ? 14 - i * 0.5 + this.raiseS * Math.max(0, 3 - i) * 1.2 : 5.5 + (this.bodyN + 4 - i) * 1.4) * L;
+            const e = s.d - (i < this.bodyN ? 14 - i * 0.5 + this.raiseS * 12 * (REAR[i] || 0) : 5.5 + (this.bodyN + 4 - i) * 1.4) * L;
             pt.x -= s.nx * e * 0.3;
             pt.y -= s.ny * e * 0.3;
           }
@@ -568,7 +649,12 @@
         fx /= fl;
         fy /= fl;
         const h = P[l.at];
-        const canStep = active && !stepping[1 - l.leg.group];
+        let canStep = active && !stepping[1 - l.leg.group];
+        if (l.at === 2 && (this.raiseS || 0) > 0.6 && active) {
+          // reared up: front feet leave the ground and paw the air
+          l.leg.planted = false;
+          canStep = false;
+        }
         l.leg.update(dt, this.W, h.x, h.y, fx, fy, this.ux, this.uy, this.mask, canStep, spd);
       }
     }

@@ -205,6 +205,18 @@
         }
       }
       const support = Math.min(1, grips / 3);
+      // Stalled with lots of grips: let go of the two anchors furthest behind.
+      this.regripT = (this.regripT || 0) - dt;
+      const goalNode = this.pather.current();
+      if (goalNode && grips >= 5 && Math.hypot(this.vx, this.vy) < 8 && this.regripT <= 0) {
+        this.regripT = 0.6;
+        const hx = goalNode.x - b.x;
+        const hy = goalNode.y - b.y;
+        const behind = this.tentacles
+          .filter((t) => t.state === 'grip')
+          .sort((p, q) => (p.anchor.x - b.x) * hx + (p.anchor.y - b.y) * hy - ((q.anchor.x - b.x) * hx + (q.anchor.y - b.y) * hy));
+        for (const t of behind.slice(0, 2)) t.release();
+      }
       const node = this.pather.current();
       let dvx = 0;
       let dvy = 0;
@@ -253,8 +265,9 @@
           if (!t.target && t.timer <= 0) {
             t.timer = 0.3;
             let a = t.ang + U.rand(-0.9, 0.9);
-            const sp = Math.hypot(this.vx, this.vy);
-            if (sp > 8 && Math.random() < 0.6) a = Math.atan2(this.vy, this.vx) + U.rand(-1, 1);
+            // reach mostly toward where we're going, so grips pull us along
+            const node = this.pather.current();
+            if (node && Math.random() < 0.85) a = Math.atan2(node.y - b.y, node.x - b.x) + U.rand(-0.9, 0.9);
             const ex = b.x + Math.cos(a) * t.reach;
             const ey = b.y + Math.sin(a) * t.reach;
             const hit = W.raycast(b.x, b.y, ex, ey);
@@ -262,7 +275,10 @@
             else t.target = { x: b.x + Math.cos(a) * t.reach * 0.55, y: b.y + Math.sin(a) * t.reach * 0.55, surface: false };
           }
           if (t.target) {
-            if (this.moveTip(tip, t.target.x, t.target.y, 380, dt)) {
+            const wig = t.target.surface ? 0 : 5;
+            const wx = t.target.x + Math.sin(this.age * 5 + t.wig) * wig;
+            const wy = t.target.y + Math.cos(this.age * 4 + t.wig) * wig;
+            if (this.moveTip(tip, wx, wy, 190, dt)) {
               if (t.target.surface) {
                 t.state = 'grip';
                 t.anchor = t.target;

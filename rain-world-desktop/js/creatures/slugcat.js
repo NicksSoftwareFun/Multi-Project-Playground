@@ -49,6 +49,8 @@
       this.perceiveT = 0;
       this.threat = null;
       this.stuckT = 0;
+      this.jumpFails = 0;
+      this.crouchT = 0;
       this.lastX = x;
       this.lastY = y;
       this.diet = ['batfly'];
@@ -106,6 +108,7 @@
       const perceive = this.perceiveT <= 0;
       if (perceive) this.perceiveT = 0.3;
       this.hunger = Math.min(1, this.hunger + dt / 100);
+      this.ignoreFoodT = (this.ignoreFoodT || 0) - dt;
       this.speed = p.speed || 105;
       this.sleeping = false;
 
@@ -177,7 +180,14 @@
       }
       if (this.state === 'forage') {
         const f = this.food;
-        if (!f || f.dead || f.heldBy || (f.claimedBy && f.claimedBy !== this) || this.stateT > 20) {
+        // No route to it (fruit on a window top, across a gap we can't jump):
+        // give up and ignore that fruit for a while instead of standing still.
+        const unreachable = f && this.pather.nodes && !this.pather.complete && this.pather.remaining() === 0 && this.stateT > 1.5;
+        if (unreachable || (f && this.stateT > 20)) {
+          this.ignoreFood = f;
+          this.ignoreFoodT = 30;
+        }
+        if (!f || f.dead || f.heldBy || (f.claimedBy && f.claimedBy !== this) || this.stateT > 20 || unreachable) {
           this.food = null;
           this.setState('wander');
         } else {
@@ -249,6 +259,7 @@
       let bd = range * range;
       for (const it of this.eco.items) {
         if (it.dead || it.heldBy || (it.claimedBy && it.claimedBy !== this)) continue;
+        if (it === this.ignoreFood && this.ignoreFoodT > 0) continue;
         const d = U.dist2(it.x, it.y, this.hip.x, this.hip.y);
         if (d < bd) {
           bd = d;
@@ -278,6 +289,7 @@
       const tDown = Math.sqrt((2 * Math.max(1, ty - apexY)) / GRAV);
       this.vx = (tx - hip.x) / (tUp + tDown);
       this.vy = vy0;
+      this.jumpTarget = { x: tx, y: ty };
       this.jumping = true;
       this.grounded = false;
       this.pole = null;
@@ -310,16 +322,16 @@
 
       if (this.pole) {
         const pole = this.pole;
-        hip.x += (pole.x - hip.x) * 0.4;
+        hip.x += (pole.x - hip.x) * 0.25;
         this.vx = 0;
-        this.vy = 0;
+        let tvy = 0;
         if (node) {
           const onSamePole = Math.abs(node.x - pole.x) < cell * 0.6 && W.pole(node.cx, node.cy);
           if (node.type === Nav.JUMP) {
             this.launch(node);
           } else if (onSamePole) {
             const dy = node.y - hip.y;
-            this.vy = Math.abs(dy) > 2 ? Math.sign(dy) * (this.p.climbSpeed || 80) : 0;
+            tvy = Math.abs(dy) > 2 ? Math.sign(dy) * (this.p.climbSpeed || 80) : 0;
             this.climbPhase += Math.abs(this.vy) * dt * 0.25;
           } else {
             // Step or drop off the pole toward the next node.
@@ -330,6 +342,7 @@
           }
         }
         if (this.pole) {
+          this.vy += (tvy - this.vy) * U.approach(10, dt); // ease into and out of climbing
           hip.y = U.clamp(hip.y + this.vy * dt, pole.y1 + 2, pole.y2);
           if (W.isSolidPt(hip.x, hip.y + R)) {
             this.pole = null;
@@ -338,12 +351,24 @@
         }
       } else {
         this.vy += GRAV * dt;
+        if (this.grounded && this.crouchT > 0) {
+          this.crouchT -= dt;
+          this.vx *= 0.6;
+          if (this.crouchT <= 0 && this.pendingJump) {
+            this.launch(this.pendingJump);
+            this.pendingJump = null;
+          }
+        }
         if (this.grounded) {
           let want = 0;
           if (node) {
             const launchHere = !prev || Math.abs(prev.x - hip.x) < 9;
             if (node.type === Nav.JUMP && launchHere) {
-              this.launch(node);
+              // crouch for a moment, then spring
+              if (!(this.crouchT > 0) && !this.jumping) {
+                this.crouchT = 0.1;
+                this.pendingJump = node;
+              }
             } else {
               const tx = node.type === Nav.JUMP && prev ? prev.x : node.x;
               const dx = tx - hip.x;
@@ -352,7 +377,7 @@
               if (node.type === Nav.WALK && node.y < hip.y - cell * 0.6 && Math.abs(node.x - hip.x) < cell * 1.1) {
                 const pole = this.findPole(node.x, node.y);
                 if (pole && Math.abs(pole.x - hip.x) < 12) this.pole = pole;
-                else if (!this.jumping) {
+                else if (!pole && !this.jumping) {
                   this.vy = -330;
                   this.grounded = false;
                 }
@@ -392,7 +417,20 @@
         if (c.ny < -0.6) {
           this.grounded = true;
           this.contactId = c.id;
-          if (this.jumping) this.jumping = false;
+          if (this.jumping) {
+            this.jumping = false;
+            // landed well short of where we aimed: after two misses, give up
+            const jt = this.jumpTarget;
+            if (jt && U.dist(hip.x, hip.y, jt.x, jt.y) > W.cell * 1.5) {
+              if (++this.jumpFails >= 2) {
+                this.jumpFails = 0;
+                this.pather.clear();
+                this.stateT = 99;
+              }
+            } else {
+              this.jumpFails = 0;
+            }
+          }
           if (!wasGrounded) this.pather.timer = Math.min(this.pather.timer, 0.1);
         }
       }
@@ -426,6 +464,9 @@
       if (held) {
         tx = hip.x + Math.sin(this.age * 9) * 4;
         ty = hip.y + 9;
+      } else if (this.crouchT > 0) {
+        tx = hip.x + this.facing * 4;
+        ty = hip.y - 6;
       } else if (this.state === 'eat' || this.state === 'rest') {
         tx = hip.x + this.facing * 5;
         ty = hip.y - 7;

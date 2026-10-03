@@ -116,8 +116,11 @@
       const d = t * t;
       const px = a * x0 + b * xc + d * x1;
       const py = a * y0 + b * yc + d * y1;
-      if (W.solid(Math.floor(px / cell), Math.floor(py / cell))) return false;
-      if (W.solid(Math.floor(px / cell), Math.floor((py - cell * 0.6) / cell))) return false;
+      // the body is ~13px wide and the head rides ~11px above the hip
+      // (grid lookups: this runs for every jump candidate after a window moves)
+      const sc = (x, y) => W.solid(Math.floor(x / cell), Math.floor(y / cell));
+      if (sc(px, py) || sc(px - 6, py) || sc(px + 6, py)) return false;
+      if (sc(px, py - 11) || sc(px - 6, py - 9) || sc(px + 6, py - 9) || sc(px, py - cell * 0.6)) return false;
     }
     return true;
   }
@@ -295,7 +298,7 @@
               break;
             }
           }
-          if (land > cy) relax(land * cols + sx2, 2 + (land - sy2) * 0.3, FALL);
+          if (land > cy) relax(land * cols + sx2, (2 + (land - sy2) * 0.3) * (c.fallCost || 1), FALL);
         }
       }
 

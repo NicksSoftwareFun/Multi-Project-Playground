@@ -175,9 +175,9 @@
         // Is the foot lagging too far behind, or simply out of reach?
         const ahead = (this.foot.x - hx) * fx + (this.foot.y - hy) * fy;
         const need = d > reach * 1.02 || ahead < -reach * 0.55 || ahead > reach * 0.95;
-        if (need && canStep) {
+        if (need && (canStep || d > reach * 1.2)) {
           if (!this.tryStep(W, hx, hy, fx, fy, ux, uy, mask) && d > reach * 1.25) this.planted = false;
-        } else if (d > reach * 1.5) {
+        } else if (d > reach * 1.2) {
           this.planted = false;
         }
         return;
