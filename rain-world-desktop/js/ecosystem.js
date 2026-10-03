@@ -105,6 +105,7 @@
     classFor(species) {
       const C = RW.Creatures;
       if (species.indexOf('lizard') === 0) return C.Lizard;
+      if (species.indexOf('centipede') === 0) return C.Centipede;
       return {
         slugcat: C.Slugcat,
         daddy: C.Daddy,

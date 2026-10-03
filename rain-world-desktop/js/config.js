@@ -259,7 +259,7 @@
       daddy: {
         label: 'Daddy Long Legs',
         enabled: true,
-        weight: 1,
+        weight: 0.3,
         max: 1,
         popCost: 4,
         params: {
@@ -287,7 +287,7 @@
         enabled: true,
         weight: 3,
         max: 14,
-        popCost: 0.25,
+        popCost: 0, // batflies don't count toward max population (their own max still applies)
         params: {
           flockSize: [3, 6],
           speed: 110,
@@ -296,18 +296,52 @@
       centipede: {
         label: 'Small Centipede',
         enabled: true,
-        weight: 2,
-        max: 3,
-        popCost: 0.75,
+        weight: 5, // common: something for everyone to hunt
+        max: 6,
+        popCost: 0.5,
         params: {
           segments: [6, 9],
           speed: 55,
         },
       },
+      centipede_medium: {
+        label: 'Medium Centipede',
+        enabled: true,
+        weight: 1,
+        max: 2,
+        popCost: 1.5,
+        params: {
+          size: 1.5,
+          segments: [8, 11],
+          speed: 45,
+          huntSpeed: 85,
+          toughness: 1.5,
+          diet: ['batfly', 'centipede', 'slugcat'],
+          threats: ['daddy', 'centipede_large', 'lizard_green', 'lizard_red'],
+          colors: ['#d0662a', '#dc8a2e', '#6a2412', '#5a1e10'],
+        },
+      },
+      centipede_large: {
+        label: 'Large Centipede',
+        enabled: true,
+        weight: 0.5,
+        max: 1,
+        popCost: 3,
+        params: {
+          size: 2,
+          segments: [10, 13],
+          speed: 38,
+          huntSpeed: 75,
+          toughness: 3,
+          diet: ['slugcat', 'centipede', 'centipede_medium', 'lizard_blue', 'dropwig'],
+          threats: ['daddy'],
+          colors: ['#b8401e', '#c45a24', '#4a160c', '#3c120a'],
+        },
+      },
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v5'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v6'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

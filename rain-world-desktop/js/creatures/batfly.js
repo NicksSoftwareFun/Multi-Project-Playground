@@ -21,7 +21,7 @@
       this.wanderA = a;
       this.isFlier = true;
       this.squeezeClear = 1; // tiny: only a real crack traps a batfly
-      this.threats = ['lizard_*', 'slugcat', 'dropwig', 'daddy'];
+      this.threats = ['lizard_*', 'slugcat', 'dropwig', 'daddy', 'centipede_medium', 'centipede_large'];
       this.bloodColor = '#2a2a33';
       this.scanT = 0;
     }

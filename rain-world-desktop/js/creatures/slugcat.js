@@ -68,7 +68,7 @@
       this.reachTo = null; // something the near hand is reaching for
       this.handPt = null;
       this.diet = ['batfly', 'centipede'];
-      this.threats = ['lizard_*', 'daddy', 'dropwig'];
+      this.threats = ['lizard_*', 'daddy', 'dropwig', 'centipede_medium', 'centipede_large'];
       this.bloodColor = '#3a1f22';
     }
 
