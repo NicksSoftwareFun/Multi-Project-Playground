@@ -9,6 +9,7 @@
   const Nav = RW.Nav;
 
   const GRAV = 900;
+  const LIZARDS = ['lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white'];
 
   class Lizard extends RW.Creature {
     constructor(eco, species, x, y) {
@@ -74,6 +75,40 @@
       this.threats = ['daddy'];
       this.camo = 1;
       this.mass = 2 * L;
+      // personality state
+      this.look = 0; // head angle offset from the neck, radians
+      this.lookAt = null; // point the head is turned toward
+      this.idleLook = { x: x, y: y, t: 0 };
+      this.raise = 0; // rearing up (display, stalking)
+      this.raiseS = 0;
+      this.lashS = 0;
+      this.tongue = 0; // 0..1 flick progress
+      this.tongueCd = U.rand(2, 8);
+      this.noticeT = 0;
+      this.thrashT = 0;
+      this.lash = 0; // tail agitation
+      this.rival = null;
+      this.rivalCd = U.rand(5, 15);
+      this.blink = 0;
+      this.blinkT = U.rand(2, 6);
+      this.breathe = U.rand(0, 10);
+      // Fixed markings, Rain World style: colour flecks bleeding from the head
+      // down the neck, plus a species pattern. t = position along the spine.
+      this.specks = [];
+      const pat = p.pattern;
+      const add = (t, side, size, kind) => this.specks.push({ t, side, size, kind: kind || 'fleck' });
+      if (pat !== 'spots') for (let i = 0; i < 30; i++) add(0.04 + Math.pow(Math.random(), 2.2) * 0.2, U.rand(-0.9, 0.9), U.rand(1, 2));
+      if (pat === 'dapple') {
+        for (let i = 0; i < 14; i++) add(U.rand(0.15, 0.6), U.rand(-0.8, 0.8), 1);
+        for (let i = 0; i < 18; i++) add(1 - Math.pow(Math.random(), 1.5) * 0.2, U.rand(-0.9, 0.9), 1);
+      } else if (pat === 'dots') {
+        for (let i = 0; i < 22; i++) add(U.rand(0.12, 0.7), U.rand(-0.8, 0.8), 2);
+      } else if (pat === 'fins') {
+        for (let i = 0; i < 12; i++) add(U.rand(0.1, 0.55), U.sign(), U.rand(2.5, 4.5), 'fin');
+        for (let i = 0; i < 20; i++) add(1 - Math.pow(Math.random(), 1.4) * 0.25, U.rand(-0.9, 0.9), 1);
+      } else if (pat === 'spots') {
+        for (let i = 0; i < 26; i++) add(U.rand(0.08, 0.8), U.rand(-0.85, 0.85), U.randInt(1, 2), 'dark');
+      }
     }
 
     mainPoint() {
@@ -102,11 +137,15 @@
       this.speed = this.p.speed || 90;
       this.jawTarget = 0;
       this.pather.interval = 1.2;
+      this.lookAt = null;
+      this.raise = 0;
+      this.lash = 0.15;
 
       if (this.holding) {
         this.setState('eat');
         this.eatT += dt;
         this.jawTarget = 0.3;
+        this.lash = 0.5;
         this.speed *= 0.6;
         if (this.pather.done() || this.stateT > 6) {
           const g = this.wanderGoal(this.caps, 250);
@@ -146,12 +185,49 @@
         this.setState('wander');
       }
 
+      // Rival standoff: two lizards that meet rear up and hiss; the smaller backs off.
+      this.rivalCd -= dt;
+      if (this.state === 'display') {
+        const r = this.rival;
+        this.pather.clear();
+        this.raise = 1;
+        this.lash = 1;
+        this.lookAt = r && !r.dead ? r.spine.pts[0] : null;
+        this.jawTarget = 0.55 + 0.45 * Math.max(0, Math.sin(this.stateT * 9));
+        if (!r || r.dead || r.leaving || this.stateT > this.displayFor) {
+          const lost = r && !r.dead && r.L * (r.p.huntSpeed || 150) > this.L * (this.p.huntSpeed || 150);
+          this.rival = null;
+          this.rivalCd = U.rand(20, 40);
+          if (lost) {
+            const g = this.fleeGoal(this.caps, r.x, r.y, 300);
+            if (g) this.pather.setGoal(g.x, g.y, true);
+            this.setState('flee');
+          } else {
+            this.setState('wander');
+          }
+        }
+        return;
+      }
+      if (perceive && this.rivalCd <= 0 && this.state !== 'hunt') {
+        const r = this.nearestOf(LIZARDS, 95 * this.L, (c) => c.rivalCd <= 0 && !c.holding && !c.grabbedBy && c.state !== 'hunt' && c.state !== 'display');
+        if (r) {
+          const t = U.rand(1.6, 3.2);
+          for (const [a, b] of [[this, r], [r, this]]) {
+            a.rival = b;
+            a.displayFor = t;
+            a.setState('display');
+          }
+          return;
+        }
+      }
+
       // Hunting
       if (perceive && this.fullT <= 0) {
         const vision = this.p.vision || 300;
         if (this.giveUpT > 0) this.giveUpT -= 0.25;
         const prey = this.nearestOf(this.diet, vision, (c) => !c.grabbedBy && !(this.giveUpT > 0 && c === this.gaveUpOn) && this.canSee(c.x, c.y, vision));
         if (prey) {
+          if (this.state !== 'hunt') this.noticeT = 0.45; // freeze and stare before the charge
           this.prey = prey;
           this.setState('hunt');
         } else if (this.state === 'hunt' && this.stateT > 4) {
@@ -173,7 +249,16 @@
           this.speed = this.p.huntSpeed || 160;
           this.pather.interval = 0.45;
           this.pather.setGoal(prey.x, prey.y);
+          this.lookAt = prey.mainPoint();
+          this.lash = 0.7;
           const d = U.dist(head.x, head.y, prey.x, prey.y);
+          if (this.noticeT > 0) {
+            this.noticeT -= dt;
+            this.speed = 0;
+            this.raise = 0.6;
+            this.jawTarget = 0.15;
+            return;
+          }
           if (d < 140) this.jawTarget = 0.35;
           if (d < 75 * this.L && this.lungeCd <= 0 && this.grip && this.W.lineClear(head.x, head.y, prey.x, prey.y)) {
             this.lunge(prey.x, prey.y, prey);
@@ -191,6 +276,9 @@
           this.setState('stalk');
           this.speed = (this.p.speed || 90) * 0.75;
           this.jawTarget = 0.25;
+          this.lookAt = cur;
+          this.raise = 0.5;
+          this.lash = 0.6;
           this.pather.interval = 0.6;
           this.pather.setGoal(cur.x, cur.y);
           if (d < 70 * this.L && this.lungeCd <= 0 && this.grip) {
@@ -213,6 +301,13 @@
       if (this.state === 'idle') {
         this.pather.clear();
         this.idleT -= dt;
+        // look around at nothing in particular
+        this.idleLook.t -= dt;
+        if (this.idleLook.t <= 0) {
+          const a = U.rand(0, U.TAU);
+          this.idleLook = { x: head.x + Math.cos(a) * 80, y: head.y + Math.sin(a) * 80, t: U.rand(0.8, 2.2) };
+        }
+        this.lookAt = this.idleLook;
         if (Math.random() < dt * 0.15) this.jawTarget = 0.7; // yawn / hiss
         if (this.idleT <= 0) this.setState('wander');
         return;
@@ -284,6 +379,7 @@
           if (this.eco.cfg.ecosystem.predation && this.grab(prey)) {
             this.eatT = 0;
             this.lungeT = 0;
+            this.thrashT = 1.1; // shake the catch
           } else if (prey.onBitten) {
             prey.onBitten(this);
             this.lungeT = 0;
@@ -327,7 +423,8 @@
       head.y += this.vy * dt;
       if (g && this.lungeT <= 0 && !this.leavingSurface) {
         // hug the surface at a fixed body height
-        const err = g.d - 11 * L;
+        this.raiseS = (this.raiseS || 0) + (this.raise - (this.raiseS || 0)) * U.approach(5, dt);
+        const err = g.d - (11 + this.raiseS * 7) * L;
         head.x -= g.nx * err * 0.25;
         head.y -= g.ny * err * 0.25;
         this.contactId = g.id;
@@ -368,10 +465,51 @@
       const ul = Math.hypot(this.ux, this.uy) || 1;
       this.ux /= ul;
       this.uy /= ul;
-      let ang = Math.atan2(head.y - P[1].y, head.x - P[1].x);
-      if (this.state === 'idle') ang += Math.sin(this.age * 1.7) * 0.35;
-      this.headAng = U.lerpAngle(this.headAng, ang, U.approach(12, dt));
+      const neckAng = Math.atan2(head.y - P[1].y, head.x - P[1].x);
+      let lookTarget = 0;
+      if (this.lookAt) {
+        const want = Math.atan2(this.lookAt.y - head.y, this.lookAt.x - head.x);
+        lookTarget = U.clamp(U.angleDiff(neckAng, want), -0.85, 0.85);
+      }
+      this.look += (lookTarget - this.look) * U.approach(this.noticeT > 0 ? 30 : 7, dt);
+      let ang = neckAng + this.look;
+      if (this.thrashT > 0) {
+        this.thrashT -= dt;
+        ang += Math.sin(this.age * 38) * 0.45 * Math.min(1, this.thrashT);
+      }
+      this.headAng = U.lerpAngle(this.headAng, ang, U.approach(this.thrashT > 0 ? 40 : 12, dt));
       this.jaw += (this.jawTarget - this.jaw) * U.approach(this.jawTarget > this.jaw ? 25 : 8, dt);
+
+      // Tongue flicks while idle, stalking or sizing up a rival.
+      this.tongueCd -= dt;
+      if (this.tongue > 0) this.tongue = Math.min(1.0001, this.tongue + dt * 3.2);
+      if (this.tongue > 1) this.tongue = 0;
+      if (this.tongueCd <= 0 && this.tongue === 0 && this.jaw < 0.3 && ['idle', 'stalk', 'wander', 'display'].includes(this.state)) {
+        this.tongue = 0.001;
+        this.tongueCd = U.rand(2.5, 9);
+      }
+      this.blinkT -= dt;
+      if (this.blinkT <= 0) {
+        this.blink = 0.14;
+        this.blinkT = U.rand(2.5, 7);
+      }
+      this.blink = Math.max(0, this.blink - dt);
+
+      // Tail: lazy swish at rest, lashing when agitated.
+      this.lashS = (this.lashS || 0) + (this.lash - (this.lashS || 0)) * U.approach(3, dt);
+      const nT = P.length - this.bodyN;
+      const freq = 2 + this.lashS * 7;
+      for (let i = this.bodyN + 2; i < P.length; i++) {
+        const k = (i - this.bodyN) / nT;
+        const a = P[i - 1];
+        let tx = P[i].x - a.x;
+        let ty = P[i].y - a.y;
+        const tl = Math.hypot(tx, ty) || 1;
+        const amp = (0.25 + this.lashS * 1.4) * k * k * L;
+        const w = Math.sin(this.age * freq - i * 0.55) * amp;
+        P[i].x += (-ty / tl) * w;
+        P[i].y += (tx / tl) * w;
+      }
 
       this.updateLegs(dt, true);
       const speedNow = Math.hypot(this.vx, this.vy);
@@ -402,216 +540,256 @@
     }
 
     // ------------------------------------------------------------ drawing ----
+    // Per-point normal pointing to the lizard's back (away from the surface).
+    backNormals(P) {
+      const n = P.length;
+      const N = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const a = P[Math.max(0, i - 1)];
+        const b = P[Math.min(n - 1, i + 1)];
+        let tx = a.x - b.x;
+        let ty = a.y - b.y;
+        const tl = Math.hypot(tx, ty) || 1;
+        tx /= tl;
+        ty /= tl;
+        let nx = -ty;
+        let ny = tx;
+        if (nx * this.ux + ny * this.uy < 0) {
+          nx = -nx;
+          ny = -ny;
+        }
+        N[i] = { nx, ny, tx, ty };
+      }
+      return N;
+    }
+
     draw(ctx) {
       const P = this.spine.pts;
       const L = this.L;
+      const n = P.length;
+      const px = this.eco.artPx || 1.25; // one art pixel, in world units
+      const body = U.rgba(this.bodyColor);
+      const headCol = U.rgba(this.headColor);
       ctx.save();
       ctx.globalAlpha = this.alpha * (this.p.camouflage ? this.camo : 1);
-      const body = this.bodyColor;
-      const head = this.headColor;
-      const farCol = U.rgba(U.scale(U.mix(body, head, this.bodyTint * 0.5), 0.7));
-      const nearCol = U.rgba(U.mix(body, head, this.bodyTint * 0.6));
 
-      for (const l of this.legs) if (!l.near) this.drawLeg(ctx, l, farCol, 0.85);
+      for (const l of this.legs) if (!l.near) this.drawLeg(ctx, l, px);
 
-      // Body silhouette with head colour bleeding down the neck.
-      const n = P.length;
+      // Flat silhouette; the pixel pass gives it hard edges.
+      const breath = 1 + 0.05 * Math.sin(this.age * 2.3 + this.breathe) * (this.state === 'display' ? 2.5 : 1);
       const widths = new Array(n);
-      const prof = [4.2, 4.4, 5.6, 6.2, 6.3, 5.9, 5.1];
+      const prof = [3.9, 4, 5, 5.6, 5.7, 5.3, 4.6];
       for (let i = 0; i < n; i++) {
-        if (i < this.bodyN) widths[i] = prof[i] * L;
+        if (i < this.bodyN) widths[i] = prof[i] * L * (i >= 2 && i <= 5 ? breath : 1);
         else {
           const t = (i - this.bodyN + 1) / (n - this.bodyN);
-          widths[i] = Math.max(0.5, 4.6 * L * Math.pow(1 - t, 1.25));
+          widths[i] = Math.max(px * 0.6, 4.2 * L * Math.pow(1 - t, 1.15));
         }
       }
-      const grad = ctx.createLinearGradient(P[0].x, P[0].y, P[5].x, P[5].y);
-      grad.addColorStop(0, U.rgba(U.mix(body, head, 0.85)));
-      grad.addColorStop(0.45, U.rgba(U.mix(body, head, Math.max(this.bodyTint, 0.35))));
-      grad.addColorStop(1, U.rgba(U.mix(body, head, this.bodyTint)));
-      ctx.fillStyle = grad;
+      const N = this.backNormals(P);
+      ctx.fillStyle = body;
       U.taperPath(ctx, P, widths);
       ctx.fill();
-      // Belly shading: a darker band along the side facing the surface.
-      {
-        const bp = [];
-        const bw = [];
-        for (let i = 1; i < this.bodyN + 6 && i < n; i++) {
-          bp.push({ x: P[i].x - this.ux * widths[i] * 0.45, y: P[i].y - this.uy * widths[i] * 0.45 });
-          bw.push(widths[i] * 0.55);
+      // Neck takes the head colour solid for a short way...
+      ctx.fillStyle = headCol;
+      U.taperPath(ctx, P.slice(0, 2), widths.slice(0, 2).map((w) => w * 0.98));
+      ctx.fill();
+
+      // ...then breaks up into flecks, plus the species pattern.
+      const at = (t) => {
+        const f = U.clamp(t, 0, 1) * (n - 1);
+        const i = Math.min(n - 2, Math.floor(f));
+        const k = f - i;
+        return {
+          x: U.lerp(P[i].x, P[i + 1].x, k),
+          y: U.lerp(P[i].y, P[i + 1].y, k),
+          w: U.lerp(widths[i], widths[i + 1], k),
+          nx: N[i].nx,
+          ny: N[i].ny,
+          tx: N[i].tx,
+          ty: N[i].ty,
+        };
+      };
+      for (const sp of this.specks) {
+        const q = at(sp.t);
+        if (sp.kind === 'fin') {
+          // spiky fin sticking out of the outline
+          const sx = q.x + q.nx * q.w * sp.side * 0.7;
+          const sy = q.y + q.ny * q.w * sp.side * 0.7;
+          const len = sp.size * L * (1 + this.raiseS * 0.5);
+          const ox = q.nx * sp.side;
+          const oy = q.ny * sp.side;
+          ctx.fillStyle = headCol;
+          ctx.beginPath();
+          ctx.moveTo(sx + q.tx * px * 1.2, sy + q.ty * px * 1.2);
+          ctx.lineTo(sx - q.tx * px * 1.2, sy - q.ty * px * 1.2);
+          ctx.lineTo(sx + ox * len - q.tx * len * 0.8, sy + oy * len - q.ty * len * 0.8);
+          ctx.fill();
+          continue;
         }
-        ctx.fillStyle = U.rgba(this.bodyColor, 0.45);
-        U.taperPath(ctx, bp, bw);
-        ctx.fill();
-      }
-      // Tail fades back to the plain body colour.
-      if (this.bodyTint > 0.05) {
-        ctx.fillStyle = U.rgba(U.scale(U.mix(body, head, this.bodyTint), 0.85));
-        U.taperPath(ctx, P.slice(this.bodyN - 1), widths.slice(this.bodyN - 1));
-        ctx.fill();
-      }
-      // Dorsal spines / scales along the top edge.
-      if (this.p.spines) {
-        ctx.strokeStyle = U.rgba(U.mix(head, body, 0.25));
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        const count = this.p.spines;
-        for (let k = 0; k < count; k++) {
-          const i = 2 + Math.floor((k / count) * (this.bodyN + 3));
-          const a = P[i - 1];
-          const b = P[i + 1];
-          let tx = a.x - b.x;
-          let ty = a.y - b.y;
-          const tl = Math.hypot(tx, ty) || 1;
-          tx /= tl;
-          ty /= tl;
-          let nx = -ty;
-          let ny = tx;
-          if (nx * this.ux + ny * this.uy < 0) {
-            nx = -nx;
-            ny = -ny;
-          }
-          const w = widths[i];
-          const bx = P[i].x + nx * (w - 0.5);
-          const by = P[i].y + ny * (w - 0.5);
-          ctx.moveTo(bx, by);
-          ctx.lineTo(bx + nx * 4 * L - tx * 3 * L, by + ny * 4 * L - ty * 3 * L);
-        }
-        ctx.stroke();
+        const sz = Math.max(1, Math.round(sp.size)) * px;
+        const x = q.x + q.nx * q.w * sp.side * 0.85;
+        const y = q.y + q.ny * q.w * sp.side * 0.85;
+        ctx.fillStyle = sp.kind === 'dark' ? 'rgb(78,80,90)' : headCol;
+        ctx.fillRect(Math.round(x / px) * px - sz / 2, Math.round(y / px) * px - sz / 2, sz, sz);
       }
 
-      for (const l of this.legs) if (l.near) this.drawLeg(ctx, l, nearCol, 1);
-      this.drawHead(ctx);
+      // Dorsal spines (green lizards): solid jagged triangles.
+      if (this.p.spines) {
+        ctx.fillStyle = headCol;
+        const count = this.p.spines;
+        for (let k = 0; k < count; k++) {
+          const q = at(0.08 + (k / count) * 0.45);
+          const len = (3.5 + 2.5 * Math.sin((k / count) * Math.PI)) * L * (1 + this.raiseS * 0.5);
+          const bx = q.x + q.nx * (q.w - px);
+          const by = q.y + q.ny * (q.w - px);
+          ctx.beginPath();
+          ctx.moveTo(bx + q.tx * px * 1.5, by + q.ty * px * 1.5);
+          ctx.lineTo(bx - q.tx * px * 1.5, by - q.ty * px * 1.5);
+          ctx.lineTo(bx + q.nx * len - q.tx * len * 0.75, by + q.ny * len - q.ty * len * 0.75);
+          ctx.fill();
+        }
+      }
+
+      for (const l of this.legs) if (l.near) this.drawLeg(ctx, l, px);
+      this.drawHead(ctx, px);
       ctx.restore();
       this.drawPath(ctx, this.pather);
       this.drawDebug(ctx);
     }
 
-    drawLeg(ctx, l, col, wk) {
+    drawLeg(ctx, l, px) {
       const P = this.spine.pts;
       const h = P[l.at];
       const leg = l.leg;
       const k = leg.solve(h.x, h.y, this.ux, this.uy);
       const L = this.L;
-      ctx.strokeStyle = col;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 2.9 * L * wk;
+      const body = U.rgba(this.p.camouflage ? this.bodyColor : U.mix(this.bodyColor, this.headColor, l.near ? 0.22 : 0.12));
+      const foot = U.rgba(this.p.camouflage ? this.bodyColor : this.headColor);
+      // thick, dark, splayed
+      ctx.fillStyle = body;
+      U.taperPath(ctx, [{ x: h.x, y: h.y }, { x: k.kx, y: k.ky }], [2.8 * L, 1.9 * L]);
+      ctx.fill();
+      U.taperPath(ctx, [{ x: k.kx, y: k.ky }, { x: k.ex, y: k.ey }], [1.9 * L, 1.3 * L]);
+      ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(h.x, h.y);
-      ctx.lineTo(k.kx, k.ky);
-      ctx.stroke();
-      ctx.lineWidth = 2.1 * L * wk;
-      ctx.beginPath();
-      ctx.moveTo(k.kx, k.ky);
-      ctx.lineTo(k.ex, k.ey);
-      ctx.stroke();
-      // splayed toes along the surface
+      ctx.arc(k.kx, k.ky, 1.9 * L, 0, U.TAU);
+      ctx.fill();
+      // spiky coloured foot; toes curl while the foot is in the air
       const nx = leg.planted || leg.stepping ? leg.n.x : this.ux;
       const ny = leg.planted || leg.stepping ? leg.n.y : this.uy;
-      ctx.lineWidth = 1.3 * L;
+      const curl = leg.stepping ? 0.6 : leg.planted ? 1 : 0.5;
+      ctx.strokeStyle = foot;
+      ctx.fillStyle = foot;
+      ctx.lineCap = 'butt';
+      ctx.lineWidth = Math.max(px, 1.3 * L);
       ctx.beginPath();
-      for (const s of [-1, 0, 1]) {
-        const tx = -ny * s * 3.2 * L + nx * (s === 0 ? -1.6 : 0.6);
-        const ty = nx * s * 3.2 * L + ny * (s === 0 ? -1.6 : 0.6);
+      ctx.arc(k.ex, k.ey, Math.max(px * 0.6, 0.9 * L), 0, U.TAU);
+      ctx.fill();
+      ctx.lineWidth = Math.max(px * 0.9, 0.9 * L);
+      ctx.beginPath();
+      for (const s of [-1, -0.3, 0.4, 1]) {
+        const len = 3 * L * curl;
         ctx.moveTo(k.ex, k.ey);
-        ctx.lineTo(k.ex + tx, k.ey + ty);
+        ctx.lineTo(k.ex - ny * s * len + nx * 0.4 * L, k.ey + nx * s * len + ny * 0.4 * L);
       }
       ctx.stroke();
     }
 
-    drawHead(ctx) {
+    // Big boxy head, flat colour, black tooth marks along the mouth line and
+    // a black eye: the Rain World lizard face.
+    drawHead(ctx, px) {
       const hd = this.spine.pts[0];
-      const L = this.L;
+      const L = this.L * 1.1;
       const a = this.headAng;
-      const col = this.headColor;
+      const col = U.rgba(this.headColor);
+      const jawCol = U.rgba(U.scale(this.headColor, 0.88));
+      const ink = '#0a0608';
       ctx.save();
       ctx.translate(hd.x, hd.y);
       ctx.rotate(a);
-      // keep the skull's top facing away from whatever we're clinging to
       const topX = Math.sin(a);
       const topY = -Math.cos(a);
       if (topX * this.ux + topY * this.uy < 0) ctx.scale(1, -1);
       ctx.scale(L, L);
-      ctx.translate(-2, 0);
-      const jawA = this.jaw * 0.85;
-
-      // mouth interior
+      ctx.translate(-3, 0);
+      const u = px / L; // one art pixel in head-local units
+      const jawA = this.jaw * 0.95;
       const c = Math.cos(jawA);
       const s = Math.sin(jawA);
       const rot = (x, y) => [-4 + (x + 4) * c - (y - 0.5) * s, 0.5 + (x + 4) * s + (y - 0.5) * c];
-      if (jawA > 0.03) {
-        ctx.fillStyle = '#2e070e';
-        const lt = rot(12.5, 0.5);
+
+      if (this.tongue > 0) {
+        const ext = Math.sin(Math.PI * this.tongue) * 12;
+        ctx.strokeStyle = '#e0405f';
+        ctx.lineWidth = Math.max(u, 0.9);
+        ctx.beginPath();
+        ctx.moveTo(15, 1);
+        ctx.lineTo(19 + ext, 1 + Math.sin(this.age * 40) * 0.6);
+        ctx.lineTo(20.5 + ext, -0.3);
+        ctx.moveTo(19 + ext, 1);
+        ctx.lineTo(20.5 + ext, 2.3);
+        ctx.stroke();
+      }
+
+      // open mouth: black interior
+      if (jawA > 0.04) {
+        const lt = rot(19, 0.5);
+        ctx.fillStyle = ink;
         ctx.beginPath();
         ctx.moveTo(-4, 0.5);
-        ctx.lineTo(14, 0.5);
+        ctx.lineTo(20, 0.5);
         ctx.lineTo(lt[0], lt[1]);
         ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = '#f1ece0';
-        ctx.beginPath();
-        for (let x = 1; x <= 12; x += 2.7) {
-          ctx.moveTo(x, 0.4);
-          ctx.lineTo(x + 0.8, 2.4);
-          ctx.lineTo(x + 1.6, 0.4);
-        }
-        ctx.fill();
       }
       // lower jaw
-      ctx.fillStyle = U.rgba(U.scale(col, 0.72));
+      ctx.fillStyle = jawCol;
       ctx.beginPath();
-      const lj = [[-5, 0.5], [12.5, 0.5], [12, 2.6], [6, 4.2], [-3, 4.6]];
-      lj.forEach((pt, i) => {
+      [[-5, 0.5], [19.2, 0.5], [18.8, 2.8], [8, 3.6], [-4.5, 4.4]].forEach((pt, i) => {
         const r = rot(pt[0], pt[1]);
         if (i) ctx.lineTo(r[0], r[1]);
         else ctx.moveTo(r[0], r[1]);
       });
       ctx.closePath();
       ctx.fill();
-      if (jawA > 0.03) {
-        ctx.fillStyle = '#f1ece0';
-        ctx.beginPath();
-        for (let x = 2; x <= 11; x += 2.7) {
-          const p0 = rot(x, 0.6);
-          const p1 = rot(x + 0.7, -1.2);
-          const p2 = rot(x + 1.4, 0.6);
-          ctx.moveTo(p0[0], p0[1]);
-          ctx.lineTo(p1[0], p1[1]);
-          ctx.lineTo(p2[0], p2[1]);
-        }
-        ctx.fill();
-      }
-      // skull
-      ctx.fillStyle = U.rgba(col);
+      // upper skull: flat top, blunt snout, rounded back
+      ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.moveTo(-5, 1);
-      ctx.lineTo(-7, -2.5);
-      ctx.lineTo(-5, -6.5);
-      ctx.lineTo(1, -7.2);
-      ctx.lineTo(8, -6.2);
-      ctx.lineTo(13, -3.6);
-      ctx.lineTo(15, -0.8);
-      ctx.lineTo(14.4, 0.8);
+      ctx.moveTo(-5.5, 0.6);
+      ctx.lineTo(-7, -2.2);
+      ctx.lineTo(-5.8, -5.4);
+      ctx.lineTo(-2, -6.2);
+      ctx.lineTo(8, -5.6);
+      ctx.lineTo(16, -4.4);
+      ctx.lineTo(20, -2.4);
+      ctx.lineTo(20.2, 0.6);
       ctx.closePath();
       ctx.fill();
-      // mouth line, visible even when shut
-      ctx.strokeStyle = U.rgba(U.scale(col, 0.35));
-      ctx.lineWidth = 0.7;
-      ctx.beginPath();
-      ctx.moveTo(-3.5, 0.6);
-      ctx.lineTo(14, 0.6);
-      ctx.stroke();
-      // brow highlight + nostril
-      ctx.fillStyle = U.rgba(U.mix(col, '#ffffff', 0.35), 0.8);
-      ctx.beginPath();
-      ctx.moveTo(-3, -6.2);
-      ctx.quadraticCurveTo(3, -7.4, 9, -5.4);
-      ctx.lineTo(8.6, -4.6);
-      ctx.quadraticCurveTo(3, -6.2, -3, -5.2);
-      ctx.fill();
-      ctx.fillStyle = U.rgba(U.scale(col, 0.45));
-      ctx.fillRect(11.4, -3.6, 1.4, 1);
+
+      // tooth marks: black dashes crossing the mouth line, on both jaws
+      const toothW = Math.max(u, 0.7);
+      const step = Math.max(2.5 * u + toothW, 2.6);
+      ctx.fillStyle = ink;
+      for (let x = 5; x <= 19; x += step) {
+        ctx.fillRect(x, -0.9, toothW, Math.max(u * 1.6, 1.5)); // upper
+        const r0 = rot(x, 0.6);
+        const r1 = rot(x, 1.7);
+        const r2 = rot(x + toothW, 1.7);
+        const r3 = rot(x + toothW, 0.6);
+        ctx.beginPath();
+        ctx.moveTo(r0[0], r0[1]);
+        ctx.lineTo(r1[0], r1[1]);
+        ctx.lineTo(r2[0], r2[1]);
+        ctx.lineTo(r3[0], r3[1]);
+        ctx.fill();
+      }
+      // eye: a black block that narrows when hissing, snaps wide on noticing prey
+      const open = this.blink > 0 ? 0.25 : this.noticeT > 0 ? 1.4 : 1 - Math.min(0.6, this.jaw * 0.7);
+      const eh = Math.max(u, 2.4 * open);
+      ctx.fillRect(3.5, -3.9 - eh / 2, Math.max(u * 2, 2.6), eh);
+      // nostril
+      ctx.fillRect(18, -3.4, Math.max(u, 0.9), Math.max(u, 0.9));
       ctx.restore();
     }
   }

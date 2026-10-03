@@ -158,19 +158,36 @@
     }
     ctx.restore();
 
+    // Each silhouette layer is painted separately and snapped to hard pixel
+    // edges before compositing, so shapes read as pixel art, not vectors.
+    const layer = (fn) => {
+      const c = document.createElement('canvas');
+      c.width = canvas.width;
+      c.height = canvas.height;
+      const l = c.getContext('2d', { willReadFrequently: true });
+      l.setTransform(1 / ps, 0, 0, 1 / ps, 0, 0);
+      fn(l);
+      U.crisp(c, 128);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(c, 0, 0);
+      ctx.restore();
+    };
     // Far superstructure
-    farLayer(ctx, W, H, pal, R, rnd, 0.62);
+    layer((l) => farLayer(l, W, H, pal, R, rnd, 0.62));
     fogWash(ctx, W, H, pal, 0.35, 0.45);
     // Mid industrial layer
-    midLayer(ctx, W, H, pal, R, rnd, 0.38);
+    layer((l) => midLayer(l, W, H, pal, R, rnd, 0.38));
     fogWash(ctx, W, H, pal, 0.18, 0.35);
     // Near layer
-    nearLayer(ctx, W, H, pal, R, rnd, 0.12);
+    layer((l) => nearLayer(l, W, H, pal, R, rnd, 0.12));
 
     // Play layer: poles then ledges
-    for (const p of decor.poles) drawPole(ctx, p, pal);
-    for (const l of decor.ledges) drawLedge(ctx, l, pal);
-    for (const d of decor.dens) drawDenStatic(ctx, d, pal);
+    layer((l) => {
+      for (const p of decor.poles) drawPole(l, p, pal);
+      for (const lg of decor.ledges) drawLedge(l, lg, pal);
+      for (const d of decor.dens) drawDenStatic(l, d, pal);
+    });
 
     // Grain + vignette at native internal resolution.
     ctx.setTransform(1, 0, 0, 1, 0, 0);

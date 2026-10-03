@@ -166,6 +166,25 @@
     ctx.stroke();
   };
 
+  // Hard pixel edges, Rain World style: snap every pixel of a layer to fully
+  // opaque or fully transparent (the canvas API can't turn anti-aliasing off).
+  U.crisp = function (canvas, threshold) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const w = canvas.width;
+    const h = canvas.height;
+    if (!w || !h) return;
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = new Uint32Array(img.data.buffer);
+    const t = threshold === undefined ? 110 : threshold;
+    for (let i = 0; i < d.length; i++) {
+      const v = d[i];
+      const a = v >>> 24;
+      if (a === 0 || a === 255) continue;
+      d[i] = a < t ? 0 : v | 0xff000000;
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+
   U.deepMerge = function (target, src) {
     if (!src || typeof src !== 'object') return target;
     for (const k of Object.keys(src)) {

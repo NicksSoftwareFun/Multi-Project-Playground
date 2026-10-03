@@ -13,7 +13,8 @@
     spawn=lizard_pink@120,300;slugcat@400,300   creatures and start positions
     pal=shoreline     palette     t=3   seconds to pre-simulate before showing
     w=700&h=400       room size   zoom=2   on-screen magnification
-    res=1             render resolution multiplier (crisp close-ups)
+    res=1             art pixels per world unit (the desktop default is 0.8:
+                      creatureScale 1.6 / pixelScale 2)
     paused=1          freeze after pre-simulating (for screenshots)
 -->
 <style>
@@ -84,6 +85,11 @@
   canvas.style.width = W * zoom + 'px';
   canvas.style.height = H * zoom + 'px';
   const ctx = canvas.getContext('2d');
+  const sprite = document.createElement('canvas');
+  sprite.width = canvas.width;
+  sprite.height = canvas.height;
+  const sctx = sprite.getContext('2d', { willReadFrequently: true });
+  eco.artPx = 1 / res;
 
   for (const part of (q.get('spawn') || 'lizard_pink@200,300').split(';')) {
     const [sp, pos] = part.split('@');
@@ -106,7 +112,14 @@
     ctx.drawImage(bg, 0, 0);
     ctx.setTransform(res, 0, 0, res, 0, 0);
     weather.drawChains(ctx, decor, pal, eco.t);
-    eco.draw(ctx);
+    sctx.setTransform(1, 0, 0, 1, 0, 0);
+    sctx.clearRect(0, 0, sprite.width, sprite.height);
+    sctx.setTransform(res, 0, 0, res, 0, 0);
+    eco.draw(sctx);
+    if (q.get('smooth') !== '1') RW.U.crisp(sprite);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(sprite, 0, 0);
+    ctx.setTransform(res, 0, 0, res, 0, 0);
     weather.drawRain(ctx, pal);
   }
   function frame() {

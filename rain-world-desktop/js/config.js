@@ -13,7 +13,7 @@
   RW.DEFAULT_CONFIG = {
     world: {
       palette: 'industrial', // industrial | shoreline | outskirts | chimney | subterranean
-      creatureScale: 1.35, // magnifies the whole world: creatures, ledges, poles
+      creatureScale: 1.6, // magnifies the whole world: creatures, ledges, poles
       pixelScale: 2, // 1 = full res, 2-3 = chunkier Rain World pixels
       cellSize: 20, // navigation grid cell (px). Rain World tiles are 20px.
       seed: 0, // 0 = new background every load
@@ -73,8 +73,8 @@
         max: 2,
         popCost: 1.5,
         params: {
-          headColor: '#ff2fc0',
-          bodyColor: '#1d151d',
+          headColor: '#ff36c4',
+          bodyColor: '#160d14',
           length: 1.0,
           speed: 95,
           huntSpeed: 175,
@@ -83,6 +83,7 @@
           poles: true,
           vision: 320,
           spines: 0,
+          pattern: 'dapple',
         },
       },
       lizard_green: {
@@ -92,9 +93,8 @@
         max: 2,
         popCost: 1.5,
         params: {
-          headColor: '#3ef05a',
-          bodyColor: '#24402b',
-          bodyTint: 0.55, // how much head colour runs down the body
+          headColor: '#41f53c',
+          bodyColor: '#0d150e',
           length: 1.25,
           speed: 70,
           huntSpeed: 140,
@@ -103,6 +103,7 @@
           poles: false,
           vision: 280,
           spines: 9,
+          pattern: 'dots',
         },
       },
       lizard_blue: {
@@ -112,8 +113,8 @@
         max: 2,
         popCost: 1.2,
         params: {
-          headColor: '#2f7bff',
-          bodyColor: '#151a24',
+          headColor: '#2d8cff',
+          bodyColor: '#0c0f17',
           length: 0.8,
           speed: 120,
           huntSpeed: 200,
@@ -122,6 +123,7 @@
           poles: true,
           vision: 300,
           spines: 0,
+          pattern: 'fins',
         },
       },
       lizard_white: {
@@ -131,9 +133,8 @@
         max: 1,
         popCost: 1.5,
         params: {
-          headColor: '#f4f4f4',
-          bodyColor: '#d9dbe0',
-          bodyTint: 1,
+          headColor: '#b6bac3',
+          bodyColor: '#e9e9ec',
           length: 1.05,
           speed: 85,
           huntSpeed: 230,
@@ -142,6 +143,7 @@
           poles: true,
           vision: 340,
           spines: 0,
+          pattern: 'spots',
           camouflage: true,
         },
       },
@@ -196,7 +198,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v1';
+  const STORAGE_KEY = 'rw-desktop-config-v2'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

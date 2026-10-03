@@ -24,6 +24,8 @@
       this.fps = 60;
       this.frameMs = 0;
       this.bgCanvas = document.createElement('canvas');
+      this.spriteCanvas = document.createElement('canvas');
+      this.spriteCtx = this.spriteCanvas.getContext('2d', { willReadFrequently: true });
       this.seed = 0;
       this.init();
     }
@@ -72,6 +74,9 @@
       this.ps = U.clamp(+this.cfg.world.pixelScale || 2, 1, 4);
       this.canvas.width = Math.ceil((this.W * this.zoom) / this.ps);
       this.canvas.height = Math.ceil((this.H * this.zoom) / this.ps);
+      this.spriteCanvas.width = this.canvas.width;
+      this.spriteCanvas.height = this.canvas.height;
+      this.eco.artPx = this.ps / this.zoom; // world units per art pixel
       RW.Background.paint(this.bgCanvas, this.W, this.H, this.ps / this.zoom, this.pal, this.decor, this.seed % 100000);
     }
 
@@ -165,7 +170,16 @@
       ctx.setTransform(k, 0, 0, k, 0, 0);
       this.weather.drawFog(ctx, this.pal);
       this.weather.drawChains(ctx, this.decor, this.pal, this.eco.t);
-      this.eco.draw(ctx);
+      // Creatures go on their own layer, snapped to hard pixel edges.
+      const sc = this.spriteCtx;
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.clearRect(0, 0, this.spriteCanvas.width, this.spriteCanvas.height);
+      sc.setTransform(k, 0, 0, k, 0, 0);
+      this.eco.draw(sc);
+      U.crisp(this.spriteCanvas);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(this.spriteCanvas, 0, 0);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
       this.weather.drawRain(ctx, this.pal);
       if (cfg.rain.enabled && cfg.rain.showCycleHud) this.weather.drawHud(ctx, this.W, this.H, this.pal);
       if (cfg.debug.showGrid) this.drawGrid(ctx);
