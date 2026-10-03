@@ -48,7 +48,7 @@
   const zoom = +q.get('zoom') || 2;
   const res = +q.get('res') || 1;
   const pal = RW.PALETTES[q.get('pal') || 'shoreline'];
-  const cfg = RW.U.clone(RW.DEFAULT_CONFIG);
+  const cfg = RW.U.clone(RW.BASE_CONFIG); // compact size: a small test room at map size 1
   cfg.ecosystem.startPopulated = false;
   cfg.ecosystem.maxPopulation = 0;
   cfg.ecosystem.migrationPerMinute = 0;

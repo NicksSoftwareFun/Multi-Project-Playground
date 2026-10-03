@@ -1,27 +1,196 @@
 {
-  "mapSize": { "type": "slider", "value": 1, "min": 0.7, "max": 3, "step": 0.05, "text": "Map size (bigger = everything smaller)" },
-  "maxPopulation": { "type": "slider", "value": 12, "min": 0, "max": 60, "step": 1, "text": "Max population" },
-  "palette": { "type": "dropdown", "value": 0, "text": "Palette", "items": ["industrial", "shoreline", "outskirts", "chimney", "subterranean"] },
-  "rain": { "type": "checkbox", "value": true, "text": "Rain cycle" },
-  "drizzle": { "type": "slider", "value": 0.24, "min": 0, "max": 1, "step": 0.01, "text": "Light rain" },
-  "drips": { "type": "slider", "value": 0.7, "min": 0, "max": 2, "step": 0.05, "text": "Drips" },
-  "cycleMinutes": { "type": "slider", "value": 4, "min": 1, "max": 30, "step": 0.5, "text": "Rain cycle length (min)" },
-  "showCycleHud": { "type": "checkbox", "value": true, "text": "Show cycle timer" },
-  "predation": { "type": "checkbox", "value": true, "text": "Predators eat prey" },
-  "cursor": { "type": "checkbox", "value": true, "text": "Creatures react to cursor" },
-  "spawnLabel": { "type": "label", "value": "Spawn weights" },
-  "w_slugcat": { "type": "slider", "value": 4, "min": 0, "max": 10, "step": 0.5, "text": "Slugcat" },
-  "w_lizard_pink": { "type": "slider", "value": 3, "min": 0, "max": 10, "step": 0.5, "text": "Pink Lizard" },
-  "w_lizard_green": { "type": "slider", "value": 2, "min": 0, "max": 10, "step": 0.5, "text": "Green Lizard" },
-  "w_lizard_blue": { "type": "slider", "value": 3, "min": 0, "max": 10, "step": 0.5, "text": "Blue Lizard" },
-  "w_lizard_white": { "type": "slider", "value": 1, "min": 0, "max": 10, "step": 0.5, "text": "White Lizard" },
-  "w_lizard_red": { "type": "slider", "value": 0.5, "min": 0, "max": 10, "step": 0.5, "text": "Red Lizard" },
-  "w_lizard_yellow": { "type": "slider", "value": 1.5, "min": 0, "max": 10, "step": 0.5, "text": "Yellow Lizard" },
-  "w_lizard_cyan": { "type": "slider", "value": 1, "min": 0, "max": 10, "step": 0.5, "text": "Cyan Lizard" },
-  "w_daddy": { "type": "slider", "value": 0.3, "min": 0, "max": 10, "step": 0.5, "text": "Daddy Long Legs" },
-  "w_dropwig": { "type": "slider", "value": 2, "min": 0, "max": 10, "step": 0.5, "text": "Dropwig" },
-  "w_batfly": { "type": "slider", "value": 3, "min": 0, "max": 10, "step": 0.5, "text": "Batflies" },
-  "w_centipede": { "type": "slider", "value": 5, "min": 0, "max": 10, "step": 0.5, "text": "Small Centipede" },
-  "w_centipede_medium": { "type": "slider", "value": 1, "min": 0, "max": 10, "step": 0.5, "text": "Medium Centipede" },
-  "w_centipede_large": { "type": "slider", "value": 0.5, "min": 0, "max": 10, "step": 0.5, "text": "Large Centipede" }
+  "sizePreset": {
+    "type": "dropdown",
+    "value": 2,
+    "text": "Size preset (Custom = use map size and population below)",
+    "items": ["Custom","Compact","Normal","Large","XL"]
+  },
+  "wildlifePreset": {
+    "type": "dropdown",
+    "value": 1,
+    "text": "Wildlife preset (Custom = use the spawn weights below)",
+    "items": ["Custom","Balanced","Lizard turf wars","Slugcat hunters","Centipede hunt","Ambushers","Daddy's buffet","Peaceful"]
+  },
+  "mapSize": {
+    "type": "slider",
+    "value": 1.4,
+    "min": 0.7,
+    "max": 3,
+    "step": 0.05,
+    "text": "Map size (bigger = everything smaller)"
+  },
+  "maxPopulation": {
+    "type": "slider",
+    "value": 20,
+    "min": 0,
+    "max": 80,
+    "step": 1,
+    "text": "Max population"
+  },
+  "palette": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "Palette",
+    "items": ["industrial","shoreline","outskirts","chimney","subterranean"]
+  },
+  "rain": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Rain cycle"
+  },
+  "drizzle": {
+    "type": "slider",
+    "value": 0.24,
+    "min": 0,
+    "max": 1,
+    "step": 0.01,
+    "text": "Light rain"
+  },
+  "drips": {
+    "type": "slider",
+    "value": 0.7,
+    "min": 0,
+    "max": 2,
+    "step": 0.05,
+    "text": "Drips"
+  },
+  "cycleMinutes": {
+    "type": "slider",
+    "value": 4,
+    "min": 1,
+    "max": 30,
+    "step": 0.5,
+    "text": "Rain cycle length (min)"
+  },
+  "showCycleHud": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show cycle timer"
+  },
+  "predation": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Predators eat prey"
+  },
+  "cursor": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Creatures react to cursor"
+  },
+  "spawnLabel": {
+    "type": "label",
+    "value": "Spawn weights"
+  },
+  "w_slugcat": {
+    "type": "slider",
+    "value": 4,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Slugcat"
+  },
+  "w_lizard_pink": {
+    "type": "slider",
+    "value": 3,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Pink Lizard"
+  },
+  "w_lizard_green": {
+    "type": "slider",
+    "value": 2,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Green Lizard"
+  },
+  "w_lizard_blue": {
+    "type": "slider",
+    "value": 3,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Blue Lizard"
+  },
+  "w_lizard_white": {
+    "type": "slider",
+    "value": 1,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "White Lizard"
+  },
+  "w_lizard_red": {
+    "type": "slider",
+    "value": 0.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Red Lizard"
+  },
+  "w_lizard_yellow": {
+    "type": "slider",
+    "value": 1.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Yellow Lizard"
+  },
+  "w_lizard_cyan": {
+    "type": "slider",
+    "value": 1,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Cyan Lizard"
+  },
+  "w_daddy": {
+    "type": "slider",
+    "value": 0.3,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Daddy Long Legs"
+  },
+  "w_dropwig": {
+    "type": "slider",
+    "value": 2,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Dropwig"
+  },
+  "w_batfly": {
+    "type": "slider",
+    "value": 3,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Batflies"
+  },
+  "w_centipede": {
+    "type": "slider",
+    "value": 5,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Small Centipede"
+  },
+  "w_centipede_medium": {
+    "type": "slider",
+    "value": 1,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Medium Centipede"
+  },
+  "w_centipede_large": {
+    "type": "slider",
+    "value": 0.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.5,
+    "text": "Large Centipede"
+  }
 }

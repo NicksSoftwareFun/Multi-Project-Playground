@@ -110,6 +110,21 @@
       });
     }
 
+    // After the wildlife mix changes: whatever no longer belongs heads for a
+    // den and leaves (rather than vanishing on the spot).
+    retireUnwanted() {
+      for (const c of this.creatures) {
+        if (c.dead || c.corpse || c.leaving) continue;
+        const s = this.cfg.species[c.species];
+        if (s && s.weight > 0) continue;
+        c.migrating = true;
+        if (c.species === 'slugcat' || c.species === 'daddy') {
+          const m = c.mainPoint();
+          c.exitDen = this.nearestDen(m.x, m.y);
+        }
+      }
+    }
+
     nearestDen(x, y) {
       let best = null;
       let bd = Infinity;

@@ -36,7 +36,20 @@ Everything is plain JavaScript + `<canvas>`, with no build step and no dependenc
 ## Configuring
 
 All defaults live in [`js/config.js`](js/config.js). The panel edits them live
-and saves to `localStorage`:
+and saves to `localStorage`. Its sections open and close when you click their
+titles.
+
+- **Presets** (top of the panel, and in Lively's Customise panel):
+  - **Size**: Compact, Normal (the default), Large, XL. Sets the map size,
+    population, spawn rate, rocks and spears, and each species' cap. Bigger
+    maps get more rows of ledges and proportionally more poles, fruit plants
+    and batfly nests, so there's no empty space. Compact is the old default.
+  - **Wildlife**: Balanced (the default), Lizard turf wars, Slugcat hunters,
+    Centipede hunt, Ambushers, Daddy's buffet, Peaceful. Sets the spawn
+    weights to show off a set of behaviours; creatures that aren't in the new
+    mix walk off to a den.
+  - Changing a setting a preset governs by hand switches that preset to
+    *Custom*. In Lively, pick *Custom* to use the individual sliders.
 
 - **Spawn weights**: when the spawner adds a creature it picks a species at
   random in proportion to `weight`, among enabled species below their `max`.
@@ -50,9 +63,11 @@ and saves to `localStorage`:
   a pole is added (or a passage opened) where one isn't, and anything still
   unreachable is left out. Panel sliders: ledges, poles, ledge poles,
   passages, horizontal poles.
-- **`world.mapSize`**: how much of the world fits on screen. 1 is the default;
-  bigger shows more map with everything (creatures, ledges, poles) smaller,
-  smaller zooms in so everything is bigger.
+- **`world.mapSize`**: how much of the world fits on screen (Compact is 1,
+  Normal 1.4). Bigger shows more map with everything (creatures, ledges,
+  poles) smaller; smaller zooms in so everything is bigger. The ledge, pole
+  and fruit plant counts are densities: they scale with the map's area, and
+  the tiered layout adds a row of ledges for about every 140 px of height.
 - **Rain**: cycle length, light rain level, and whether creatures take shelter
   in dens during the downpour. The rain builds from the light rain into the
   downpour on an exponential curve and eases back off the same way. Water

@@ -39,17 +39,26 @@
   function generateDecor(W, H, cfg, rnd) {
     const R = (a, b) => a + rnd() * (b - a);
     const ledges = [];
-    const nL = cfg.world.decorLedges | 0;
+    // Counts are densities for the default world (960x540 world units, a
+    // 1080p screen at map size 1): a bigger map gets proportionally more of
+    // everything instead of the same few ledges with empty space between.
+    const area = U.clamp((W * H) / (960 * 540), 0.5, 10);
+    const nL = Math.round((cfg.world.decorLedges | 0) * area);
+    // the band the rows of ledges occupy: clear of the ceiling and the floor
+    const bandTop = Math.max(110, H * 0.12);
+    const bandBot = H - Math.max(140, H * 0.18);
     const overlaps = (a, pad) =>
       ledges.some((b) => a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y);
     if (cfg.world.layout !== 'scatter') {
       // Tiers (the default): rows of ledges at a few shared heights, with gaps
       // between neighbours that horizontal poles can bridge and vertical poles
       // linking the rows.
-      const nT = 3;
+      // about seven nav cells between rows: three on a normal screen, more as
+      // the map grows taller
+      const nT = U.clamp(Math.round((bandBot - bandTop) / 140) + 1, 3, 10);
       const perTier = Math.max(1, Math.round(nL / nT));
       for (let t = 0; t < nT && ledges.length < nL; t++) {
-        const ty = H * (0.22 + (t * 0.52) / (nT - 1)) + R(-0.025, 0.025) * H;
+        const ty = bandTop + ((bandBot - bandTop) * t) / (nT - 1) + R(-0.025, 0.025) * Math.min(H, 540);
         let x = rnd() < 0.3 ? 0 : R(20, 140);
         let placed = 0;
         while (x < W - 100 && placed < perTier + 1 && ledges.length < nL) {
@@ -67,7 +76,7 @@
         }
       }
     }
-    for (let i = ledges.length, tries = 0; i < nL && tries < 300; tries++) {
+    for (let i = ledges.length, tries = 0; i < nL && tries < 300 + nL * 40; tries++) {
       const w = Math.round(R(130, 320));
       const h = Math.round(R(22, 38));
       let x;
@@ -75,7 +84,7 @@
       if (side < 0.15) x = 0;
       else if (side < 0.3) x = W - w;
       else x = Math.round(R(W * 0.06, W * 0.94 - w));
-      const y = Math.round(R(H * 0.2, H * 0.74));
+      const y = Math.round(R(bandTop, bandBot));
       const L = { id: 'ledge-' + i, kind: 'ledge', x, y, w, h, seed: rnd() * 1000 };
       if (overlaps(L, 70)) continue;
       ledges.push(L);
@@ -148,7 +157,7 @@
       if (!blocked(x, y1, y2)) poles.push({ id: 'pole-p' + k, x, y1, y2 });
     });
 
-    const nP = cfg.world.decorPoles | 0;
+    const nP = Math.round((cfg.world.decorPoles | 0) * area);
     for (let i = 0, tries = 0; i < nP && tries < 200; tries++) {
       let x;
       let y1;
@@ -325,7 +334,7 @@
 
     // Dangle fruit plants hang from ledge undersides and the top of the screen.
     const fruitPlants = [];
-    const nF = cfg.world.fruitPlants | 0;
+    const nF = Math.round((cfg.world.fruitPlants | 0) * area);
     for (let i = 0; i < nF; i++) {
       if (ledges.length && rnd() < 0.7) {
         const l = ledges[Math.floor(rnd() * ledges.length)];
@@ -343,18 +352,19 @@
 
     // There's always a batfly nest: a woven pod hanging under a ledge with
     // room beneath it (clear of the fruit vines), else from the top edge.
+    // (an extra one for every couple of screens' worth of map)
     const nests = [];
     const roomy = ledges.filter((l) => l.w >= 60 && l.y + l.h + 60 < H * 0.85);
-    if (roomy.length) {
-      const l = roomy[Math.floor(rnd() * roomy.length)];
+    const nN = Math.max(1, Math.round(area / 2.5));
+    for (let k = 0; k < nN && roomy.length; k++) {
+      const l = roomy.splice(Math.floor(rnd() * roomy.length), 1)[0];
       // (clear of the desktop icon column on the left, where there's room)
       const x0 = Math.max(l.x + 18, Math.min(110, l.x + l.w - 18));
       let x = Math.round(R(x0, l.x + l.w - 18));
       for (const f of fruitPlants) if (f.y === l.y + l.h && Math.abs(f.x - x) < 16) x = f.x + (x < l.x + l.w / 2 ? 18 : -18);
       nests.push({ x, y: l.y + l.h });
-    } else {
-      nests.push({ x: Math.round(R(W * 0.2, W * 0.8)), y: 0 });
     }
+    if (!nests.length) nests.push({ x: Math.round(R(W * 0.2, W * 0.8)), y: 0 });
 
     const chains = [];
     const nC = 3 + Math.floor(rnd() * 4);

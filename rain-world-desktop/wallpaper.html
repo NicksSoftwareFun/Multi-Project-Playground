@@ -74,8 +74,22 @@
 
   // Lively Wallpaper "Customise" panel (see LivelyProperties.json).
   const palettes = Object.keys(RW.PALETTES);
+  // Presets: index 0 is Custom (the individual settings below rule); any
+  // other choice governs its settings, so they're reapplied after each change.
+  const sizeNames = Object.keys(RW.SIZE_PRESETS);
+  const wildNames = Object.keys(RW.WILDLIFE_PRESETS);
   window.livelyPropertyListener = function (name, val) {
-    if (name.startsWith('w_')) {
+    cfg.presets = cfg.presets || {};
+    if (name === 'sizePreset') {
+      cfg.presets.size = sizeNames[val - 1] || 'custom';
+    } else if (name === 'wildlifePreset') {
+      const was = cfg.presets.wildlife;
+      cfg.presets.wildlife = wildNames[val - 1] || 'custom';
+      if (cfg.presets.wildlife !== was && RW.WILDLIFE_PRESETS[cfg.presets.wildlife]) {
+        RW.applyWildlifePreset(cfg, cfg.presets.wildlife);
+        engine.eco.retireUnwanted();
+      }
+    } else if (name.startsWith('w_')) {
       const s = cfg.species[name.slice(2)];
       if (s) s.weight = +val;
     } else if (name === 'palette') {
@@ -99,6 +113,8 @@
     } else if (name === 'showCycleHud') {
       cfg.rain.showCycleHud = !!val;
     }
+    if (RW.WILDLIFE_PRESETS[cfg.presets.wildlife]) RW.applyWildlifePreset(cfg, cfg.presets.wildlife);
+    if (RW.SIZE_PRESETS[cfg.presets.size]) RW.applySizePreset(cfg, cfg.presets.size);
     RW.saveConfig(cfg);
     applied();
   };

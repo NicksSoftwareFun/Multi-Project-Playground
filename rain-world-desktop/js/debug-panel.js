@@ -94,29 +94,121 @@
       return h('button', { class: cls || '', onclick: fn, text });
     }
 
+    // A section whose title opens and closes it (remembered per browser).
+    section(title, ...kids) {
+      const body = h('div', { class: 'sb' }, ...kids);
+      const open = this.openSecs.has(title);
+      const caret = h('span', { class: 'caret', text: open ? '\u25be' : '\u25b8' });
+      const sec = h('div', { class: 'sec' + (open ? '' : ' collapsed') });
+      const head = h('button', { class: 'st', type: 'button', 'aria-expanded': String(open) }, caret, h('span', { text: title }));
+      head.addEventListener('click', () => {
+        const now = sec.classList.toggle('collapsed');
+        caret.textContent = now ? '\u25b8' : '\u25be';
+        head.setAttribute('aria-expanded', String(!now));
+        if (now) this.openSecs.delete(title);
+        else this.openSecs.add(title);
+        try {
+          localStorage.setItem('rw-panel-open', JSON.stringify([...this.openSecs]));
+        } catch (e) {
+          /* storage blocked: sections just start closed */
+        }
+      });
+      sec.appendChild(head);
+      sec.appendChild(body);
+      return sec;
+    }
+
+    // Size and wildlife presets: one pick sets everything they govern.
+    presetPicker(label, presets, kind, apply) {
+      const s = h('select', { 'aria-label': label + ' preset' });
+      const cur = (this.cfg.presets || {})[kind] || 'custom';
+      for (const k of Object.keys(presets).concat(['custom'])) {
+        const opt = h('option', { value: k, text: k === 'custom' ? 'Custom' : presets[k].label });
+        if (k === cur) opt.selected = true;
+        s.appendChild(opt);
+      }
+      s.addEventListener('change', () => {
+        if (s.value === 'custom') {
+          this.cfg.presets[kind] = 'custom';
+          this.save();
+          return;
+        }
+        apply(s.value);
+      });
+      return h('label', { class: 'row' }, h('span', { class: 'lbl', text: label }), s);
+    }
+    // A hand-edited value a preset governs: the preset no longer describes it.
+    custom(kind) {
+      const p = (this.cfg.presets = this.cfg.presets || {});
+      if (p[kind] === 'custom') return;
+      p[kind] = 'custom';
+      const sel = this.el.querySelector('select[aria-label="' + (kind === 'size' ? 'Size' : 'Wildlife') + ' preset"]');
+      if (sel) sel.value = 'custom';
+      if (this.noteEl && kind === 'wildlife') this.noteEl.textContent = '';
+    }
+
     build() {
-      const cfg = this.cfg;
-      const eng = this.engine;
       this.el = h('div', { class: 'rw-panel' });
       this.mount.appendChild(this.el);
       if (!this.noToggleButton) {
         this.mount.appendChild(h('button', { class: 'rw-panel-toggle', title: 'Ecosystem panel (`)', onclick: () => this.toggle(), text: '\u2261' }));
       }
+      this.openSecs = new Set();
+      try {
+        for (const t of JSON.parse(localStorage.getItem('rw-panel-open') || '[]')) this.openSecs.add(t);
+      } catch (e) {
+        /* storage blocked or corrupt: all sections start closed */
+      }
+      this.render();
+    }
+
+    // (Re)draw the panel's contents from the config, e.g. after a preset.
+    render() {
+      const cfg = this.cfg;
+      const eng = this.engine;
+      const scroll = this.el.scrollTop;
+      this.el.textContent = '';
+      this.liveEls = [];
 
       this.el.appendChild(h('div', { class: 'ph' }, h('b', { text: 'ECOSYSTEM' }), this.button('✕', () => this.toggle(false), 'x')));
+
+      // Presets first: the quick way to set everything up.
+      const W = RW.WILDLIFE_PRESETS;
+      this.noteEl = h('div', { class: 'note', text: (W[(cfg.presets || {}).wildlife] || {}).note || '' });
+      this.el.appendChild(
+        h('div', { class: 'presets' },
+          this.presetPicker('Size', RW.SIZE_PRESETS, 'size', (name) => {
+            const before = cfg.world.mapSize;
+            RW.applySizePreset(cfg, name);
+            this.save();
+            if (cfg.world.mapSize !== before) eng.regenerate(false);
+            this.render();
+          }),
+          this.presetPicker('Wildlife', W, 'wildlife', (name) => {
+            const before = cfg.world.mapSize;
+            RW.applyWildlifePreset(cfg, name);
+            this.save();
+            if (cfg.world.mapSize !== before) eng.regenerate(false);
+            eng.eco.retireUnwanted();
+            this.render();
+          }),
+          this.noteEl
+        )
+      );
       this.stats = h('div', { class: 'stats' });
       this.el.appendChild(this.stats);
 
       // Species table
-      const sp = h('div', { class: 'sec' }, h('div', { class: 'st', text: 'Spawn weights' }));
+      const sp = [];
       const head = h('div', { class: 'sp sp-h' }, h('span'), h('span', { text: 'creature' }), h('span', { text: 'weight' }), h('span', { text: 'max' }), h('span', { text: 'now' }), h('span'));
-      sp.appendChild(head);
+      sp.push(head);
       for (const key of Object.keys(cfg.species)) {
         const s = cfg.species[key];
         const en = h('input', { type: 'checkbox' });
         en.checked = s.enabled;
         en.addEventListener('change', () => {
           s.enabled = en.checked;
+          this.custom('wildlife');
           this.save();
         });
         const wv = h('span', { class: 'val', text: String(s.weight) });
@@ -124,11 +216,13 @@
         w.addEventListener('input', () => {
           s.weight = +w.value;
           wv.textContent = w.value;
+          this.custom('wildlife');
           this.save();
         });
         const mx = h('input', { type: 'number', min: 0, max: 60, value: s.max, class: 'num' });
         mx.addEventListener('change', () => {
           s.max = Math.max(0, +mx.value | 0);
+          this.custom('size');
           this.save();
         });
         const now = h('span', { class: 'now', text: '0' });
@@ -138,19 +232,19 @@
           if (!c) this.flash('no open den');
         }, 'add');
         add.title = 'Spawn one now (ignores caps)';
-        sp.appendChild(h('div', { class: 'sp' }, en, h('span', { class: 'nm', text: s.label || key }), h('span', { class: 'wcell' }, w, wv), mx, now, add));
+        sp.push(h('div', { class: 'sp' }, en, h('span', { class: 'nm', text: s.label || key }), h('span', { class: 'wcell' }, w, wv), mx, now, add));
       }
-      this.el.appendChild(sp);
+      this.el.appendChild(this.section('Spawn weights', ...sp));
 
       const E = cfg.ecosystem;
+      const sized = () => this.custom('size');
       this.el.appendChild(
-        h('div', { class: 'sec' },
-          h('div', { class: 'st', text: 'Population' }),
-          this.slider('max population', E, 'maxPopulation', 0, 80, 1),
-          this.slider('spawns /min', E, 'spawnPerMinute', 0.5, 30, 0.5),
+        this.section('Population',
+          this.slider('max population', E, 'maxPopulation', 0, 80, 1, sized),
+          this.slider('spawns /min', E, 'spawnPerMinute', 0.5, 30, 0.5, sized),
           this.slider('migration /min', E, 'migrationPerMinute', 0, 1, 0.05),
-          this.slider('rocks', E, 'rocks', 0, 20, 1),
-          this.slider('spears', E, 'spears', 0, 10, 1),
+          this.slider('rocks', E, 'rocks', 0, 40, 1, sized),
+          this.slider('spears', E, 'spears', 0, 20, 1, sized),
           this.toggleCtl('predators eat prey', E, 'predation'),
           this.toggleCtl('creatures react to cursor', E, 'cursorInteraction'),
           this.toggleCtl('click wallpaper drops fruit', E, 'clickDropsFood'),
@@ -168,8 +262,7 @@
 
       const R = cfg.rain;
       this.el.appendChild(
-        h('div', { class: 'sec' },
-          h('div', { class: 'st', text: 'Rain cycle' }),
+        this.section('Rain cycle',
           this.toggleCtl('rain', R, 'enabled'),
           this.slider('cycle (min)', R, 'cycleMinutes', 1, 30, 0.5),
           this.slider('light rain', R, 'drizzle', 0, 1, 0.01),
@@ -193,11 +286,11 @@
 
       const Wc = cfg.world;
       this.el.appendChild(
-        h('div', { class: 'sec' },
-          h('div', { class: 'st', text: 'World' }),
+        this.section('World',
           this.select('palette', Wc, 'palette', Object.keys(RW.PALETTES), () => eng.applyPalette()),
           this.select('pixel scale', Wc, 'pixelScale', [1, 2, 3], () => eng.applyPalette()),
           this.slider('map size', Wc, 'mapSize', 0.7, 3, 0.05, () => {
+            this.custom('size');
             // rebuild once the slider settles, not on every pixel of the drag
             clearTimeout(this.mapT);
             this.mapT = setTimeout(() => eng.regenerate(false), 250);
@@ -217,8 +310,7 @@
 
       const D = cfg.debug;
       this.el.appendChild(
-        h('div', { class: 'sec' },
-          h('div', { class: 'st', text: 'Debug' }),
+        this.section('Debug',
           this.toggleCtl('nav grid', D, 'showGrid'),
           this.toggleCtl('paths', D, 'showPaths'),
           this.toggleCtl('AI state labels', D, 'showLabels'),
@@ -229,8 +321,7 @@
       // Advanced: raw JSON
       const ta = h('textarea', { spellcheck: 'false' });
       this.el.appendChild(
-        h('div', { class: 'sec' },
-          h('div', { class: 'st', text: 'Config JSON (all creature parameters)' }),
+        this.section('Config JSON (all creature parameters)',
           ta,
           h('div', { class: 'btns' },
             this.button('Load current', () => (ta.value = JSON.stringify(cfg, null, 2))),
@@ -262,6 +353,7 @@
       );
       this.msg = h('div', { class: 'msg' });
       this.el.appendChild(this.msg);
+      this.el.scrollTop = scroll;
       this.refreshLive();
     }
 
