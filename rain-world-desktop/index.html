@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rain World Desktop</title>
+<link rel="stylesheet" href="css/desktop.css">
+</head>
+<body>
+<!--
+  Browser prototype: a live wallpaper of Rain World-style creatures behind a
+  mock Windows desktop. The windows, icons and taskbar are real geometry —
+  drag them around. Press ` (backtick) for the ecosystem panel.
+
+  ?nodesktop=1   wallpaper only (no mock windows/icons/taskbar)
+-->
+<canvas id="wallpaper"></canvas>
+<div id="desktop"></div>
+<div id="ui"></div>
+
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/background.js"></script>
+<script src="js/items.js"></script>
+<script src="js/creatures/base.js"></script>
+<script src="js/creatures/lizard.js"></script>
+<script src="js/creatures/slugcat.js"></script>
+<script src="js/creatures/daddy.js"></script>
+<script src="js/creatures/dropwig.js"></script>
+<script src="js/creatures/batfly.js"></script>
+<script src="js/creatures/centipede.js"></script>
+<script src="js/ecosystem.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/geometry/mock-desktop.js"></script>
+<script src="js/debug-panel.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const cfg = RW.loadConfig();
+  if (q.get('seed')) cfg.world.seed = +q.get('seed');
+  if (q.get('palette')) cfg.world.palette = q.get('palette');
+
+  const desktopRoot = document.getElementById('desktop');
+  let provider;
+  if (q.get('nodesktop') === '1') {
+    provider = { poll: () => ({ rects: [], cursor: { x: -9999, y: -9999, inside: false }, clicks: [] }) };
+  } else {
+    provider = new RW.MockDesktop(desktopRoot);
+  }
+  const engine = new RW.Engine(document.getElementById('wallpaper'), cfg, provider);
+  const panel = new RW.Panel(engine, document.getElementById('ui'));
+  if (q.get('panel') === '1') panel.toggle(true);
+
+  let rz;
+  window.addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => engine.resize(), 250);
+  });
+  document.addEventListener('visibilitychange', () => (document.hidden ? engine.stop() : engine.start()));
+
+  // Test hook: ?paused=1 lets automation step the simulation deterministically.
+  window.RW_APP = { engine, panel, provider, step: (n) => engine.step(n) };
+  if (q.get('paused') !== '1') engine.start();
+  else engine.render();
+})();
+</script>
+</body>
+</html>

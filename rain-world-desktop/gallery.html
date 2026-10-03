@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creature Gallery</title>
+<!--
+  Art/behaviour test arena. Spawns chosen creatures into a small fixed room
+  and runs the simulation, so each creature can be inspected up close.
+
+  Query params:
+    spawn=lizard_pink@120,300;slugcat@400,300   creatures and start positions
+    pal=shoreline     palette     t=3   seconds to pre-simulate before showing
+    w=700&h=400       room size   zoom=2   on-screen magnification
+    res=1             render resolution multiplier (crisp close-ups)
+    paused=1          freeze after pre-simulating (for screenshots)
+-->
+<style>
+  html, body { margin: 0; background: #0b0d0d; color: #ccc; font: 12px monospace; }
+  canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/background.js"></script>
+<script src="js/items.js"></script>
+<script src="js/creatures/base.js"></script>
+<script src="js/creatures/lizard.js"></script>
+<script src="js/creatures/slugcat.js"></script>
+<script src="js/creatures/daddy.js"></script>
+<script src="js/creatures/dropwig.js"></script>
+<script src="js/creatures/batfly.js"></script>
+<script src="js/creatures/centipede.js"></script>
+<script src="js/ecosystem.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const W = +q.get('w') || 700;
+  const H = +q.get('h') || 400;
+  const zoom = +q.get('zoom') || 2;
+  const res = +q.get('res') || 1;
+  const pal = RW.PALETTES[q.get('pal') || 'shoreline'];
+  const cfg = RW.U.clone(RW.DEFAULT_CONFIG);
+  cfg.ecosystem.startPopulated = false;
+  cfg.ecosystem.maxPopulation = 0;
+  cfg.ecosystem.migrationPerMinute = 0;
+  cfg.rain.drizzle = 0.12;
+  cfg.debug.showPaths = q.get('paths') === '1';
+  cfg.debug.showLabels = q.get('labels') === '1';
+
+  const world = new RW.World(20);
+  world.resize(W, H);
+  const ledges = [
+    { id: 'floor', kind: 'ledge', x: 0, y: H - 60, w: W, h: 60, seed: 3 },
+    { id: 'shelf', kind: 'ledge', x: W * 0.55, y: H * 0.38, w: W * 0.3, h: 34, seed: 5 },
+    { id: 'block', kind: 'ledge', x: W * 0.22, y: H - 140, w: 70, h: 80, seed: 9 },
+  ];
+  const poles = [{ id: 'pole', x: Math.round(W * 0.08), y1: Math.round(H * 0.25), y2: H - 60 }];
+  world.setStatic(ledges, poles);
+  world.rebuild();
+
+  const decor = {
+    ledges, poles, dens: [], chains: [],
+    fruitPlants: [{ x: W * 0.7, y: H * 0.38 + 34, len: 30 }],
+    grass: [{ x: W * 0.62, y: H * 0.38, h: 30, phase: 1 }],
+  };
+  const eco = new RW.Ecosystem(cfg, world);
+  eco.palette = pal;
+  eco.setDecor(decor);
+  const weather = new RW.Background.Weather();
+  weather.reset(W, H);
+  eco.weather = weather;
+
+  const bg = RW.Background.paint(document.createElement('canvas'), W, H, 1 / res, pal, decor, 4);
+  const canvas = document.getElementById('c');
+  canvas.width = W * res;
+  canvas.height = H * res;
+  canvas.style.width = W * zoom + 'px';
+  canvas.style.height = H * zoom + 'px';
+  const ctx = canvas.getContext('2d');
+
+  for (const part of (q.get('spawn') || 'lizard_pink@200,300').split(';')) {
+    const [sp, pos] = part.split('@');
+    const [x, y] = (pos || '').split(',').map(Number);
+    const c = eco.spawn(sp, x || W / 2, y || H / 2);
+    if (!c) console.warn('could not spawn', sp);
+  }
+  for (const c of eco.creatures) c.alpha = 1;
+
+  const dt = 1 / 60;
+  const pre = +q.get('t') || 0;
+  for (let i = 0; i < pre * 60; i++) {
+    weather.update(dt, cfg, W, H, world);
+    eco.update(dt);
+  }
+  const paused = q.get('paused') === '1';
+
+  function render() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(bg, 0, 0);
+    ctx.setTransform(res, 0, 0, res, 0, 0);
+    weather.drawChains(ctx, decor, pal, eco.t);
+    eco.draw(ctx);
+    weather.drawRain(ctx, pal);
+  }
+  function frame() {
+    if (!paused) {
+      weather.update(dt, cfg, W, H, world);
+      eco.update(dt);
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+  render();
+  window.RW_GALLERY = { eco, world, step: (n) => { for (let i = 0; i < n; i++) eco.update(dt); render(); } };
+  frame();
+})();
+</script>
+</body>
+</html>
