@@ -28,7 +28,7 @@
       cycleMinutes: 7, // length of one rain cycle
       downpourFraction: 0.12, // final part of the cycle that is a downpour
       shelterDuringDownpour: true, // creatures retreat into dens when the rain hits
-      drizzle: 0.18, // light rain outside the downpour (0-1)
+      drizzle: 0.24, // light rain outside the downpour (0-1)
       drips: 0.7, // water dripping from window/icon/ledge undersides (0 = none)
       curtains: true, // faint drifting sheets of rain
       showCycleHud: true,

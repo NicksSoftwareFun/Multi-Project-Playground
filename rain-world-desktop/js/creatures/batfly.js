@@ -188,14 +188,12 @@
       for (const s of [-1, 1]) {
         const tipX = s * 5.5;
         const tipY = -1 - w * 4;
-        ctx.fillStyle = '#3a414b';
+        ctx.fillStyle = '#7d8792';
         ctx.beginPath();
         ctx.moveTo(0, -0.5);
         ctx.lineTo(tipX, tipY);
         ctx.lineTo(s * 2.5, 1.2);
         ctx.fill();
-        ctx.fillStyle = '#8b96a3';
-        ctx.fillRect(tipX - 0.6, tipY - 0.6, 1.2, 1.2);
       }
       ctx.fillStyle = '#17171d';
       ctx.beginPath();

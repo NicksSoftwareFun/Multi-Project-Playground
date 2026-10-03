@@ -9,8 +9,8 @@
 
   const GRAV = 1000;
   const COL = {
-    body: U.hex('#1e1e28'),
-    plate: U.hex('#363648'),
+    body: U.hex('#2c2c3a'),
+    plate: U.hex('#565a74'),
     rim: U.hex('#93a6c4'),
     eye: U.hex('#a6ecff'),
     leg: U.hex('#121217'),
@@ -403,8 +403,7 @@
       ctx.moveTo(k.kx, k.ky);
       ctx.lineTo(k.kx + this.ux * 3.5, k.ky + this.uy * 3.5);
       ctx.stroke();
-      ctx.fillStyle = U.rgba(COL.rim, 0.7);
-      ctx.fillRect(k.ex - 0.8, k.ey - 0.8, 1.6, 1.6);
+
     }
   }
 

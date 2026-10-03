@@ -212,7 +212,7 @@
         const b = P[Math.min(n - 1, i + 1)];
         const ang = Math.atan2(a.y - b.y, a.x - b.x);
         const t = i / (n - 1);
-        const col = U.mix(head, tail, t);
+        const col = i === 0 ? U.scale(tail, 0.85) : U.mix(head, tail, t);
         const sz = i === 0 ? 4.6 : 4.2 - t * 1.2;
         ctx.save();
         ctx.translate(P[i].x, P[i].y);
@@ -225,8 +225,16 @@
         ctx.beginPath();
         ctx.ellipse(0.5, 0, sz * 0.85, sz * 0.7, 0, 0, U.TAU);
         ctx.fill();
-        ctx.fillStyle = U.rgba(U.mix(col, '#fff3c0', 0.35), 0.8);
+        ctx.fillStyle = U.rgba(U.mix(col, '#fff3c0', 0.35));
         ctx.fillRect(-0.5, -sz * 0.45, sz * 0.8, 1);
+        // dark seam between plates
+        ctx.fillStyle = 'rgb(30,14,10)';
+        ctx.fillRect(-sz * 0.95, -sz * 0.7, 1, sz * 1.4);
+        if (i === 0) {
+          ctx.fillStyle = '#f2d36b';
+          ctx.fillRect(sz * 0.4, -1.8, 1, 1);
+          ctx.fillRect(sz * 0.4, 0.8, 1, 1);
+        }
         ctx.restore();
       }
       // antennae and tail prongs

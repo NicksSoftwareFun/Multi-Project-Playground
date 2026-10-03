@@ -162,7 +162,7 @@
       // Trickles: a thin broken stream with a little mist at the bottom.
       for (const tr of this.trickles) {
         if (tr.land == null) continue;
-        ctx.strokeStyle = waterCol(0.28);
+        ctx.strokeStyle = waterCol(0.18);
         ctx.lineWidth = 1.8;
         ctx.beginPath();
         for (let y = tr.y; y < tr.land; y += 6) {
@@ -172,7 +172,7 @@
         }
         ctx.lineTo(tr.x, tr.land);
         ctx.stroke();
-        ctx.strokeStyle = waterCol(0.65);
+        ctx.strokeStyle = waterCol(0.4);
         ctx.lineWidth = 1.1;
         ctx.beginPath();
         const seg = 7;

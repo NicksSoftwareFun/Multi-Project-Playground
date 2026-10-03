@@ -50,9 +50,9 @@ html, body {
   position: absolute;
   display: flex;
   flex-direction: column;
-  background: #f3f3f3;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
+  background: #202020;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
   overflow: hidden;
   min-width: 200px;
@@ -64,32 +64,32 @@ html, body {
   align-items: center;
   gap: 8px;
   padding-left: 12px;
-  background: #e9eef3;
+  background: #1c1c1c;
   font-size: 12px;
-  color: #1b1b1b;
+  color: #d6d6d6;
   cursor: default;
 }
 .win-ico svg { width: 16px; height: 16px; display: block; }
 .win-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win-ctrls { display: flex; height: 100%; }
-.win-c { width: 46px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #222; }
-.win-c:hover { background: rgba(0, 0, 0, 0.08); }
+.win-c { width: 46px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #cfcfcf; }
+.win-c:hover { background: rgba(255, 255, 255, 0.08); }
 .win-x:hover { background: #c42b1c; color: #fff; }
-.win-body { flex: 1; display: flex; overflow: hidden; background: #fff; font-size: 12px; color: #222; }
+.win-body { flex: 1; display: flex; overflow: hidden; background: #191919; font-size: 12px; color: #d0d0d0; }
 .win-resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
 
-.ex-side { width: 150px; flex: none; background: #f7f9fb; border-right: 1px solid #e5e5e5; padding: 8px 0; }
+.ex-side { width: 150px; flex: none; background: #1d1d1d; border-right: 1px solid #2c2c2c; padding: 8px 0; }
 .ex-side div { padding: 5px 14px; }
-.ex-side .sel { background: #dde8f3; }
+.ex-side .sel { background: #2d2d2d; }
 .ex-main { flex: 1; padding: 6px 10px; overflow: hidden; }
 .ex-head, .ex-row { display: flex; justify-content: space-between; padding: 5px 4px; }
-.ex-head { color: #666; border-bottom: 1px solid #eee; }
+.ex-head { color: #8a8a8a; border-bottom: 1px solid #2c2c2c; }
 .ex-row i svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 8px; }
-.ex-row:hover { background: #eef4fa; }
-.np { margin: 0; padding: 10px 12px; font: 13px/1.45 Consolas, "Cascadia Mono", monospace; color: #111; white-space: pre-wrap; }
+.ex-row:hover { background: #262626; }
+.np { margin: 0; padding: 10px 12px; font: 13px/1.45 Consolas, "Cascadia Mono", monospace; color: #d8d8d8; white-space: pre-wrap; }
 .tm { flex: 1; padding: 4px 0; }
 .tm-row { display: flex; justify-content: space-between; padding: 5px 14px; }
-.tm-h { color: #666; border-bottom: 1px solid #eee; }
+.tm-h { color: #8a8a8a; border-bottom: 1px solid #2c2c2c; }
 
 /* ---- taskbar ---- */
 .taskbar {

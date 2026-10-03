@@ -460,7 +460,7 @@
       T[0].y = this.hip.y + 2;
       T[0].px = T[0].x;
       T[0].py = T[0].y;
-      this.tail.verlet(1, 0.86, -this.facing * 120, 700, dt);
+      this.tail.verlet(1, 0.86, -this.facing * 520, 420, dt); // tail streams out behind
       this.tail.follow(1);
       this.tail.collide(this.W, 1.5, 1);
     }
@@ -470,7 +470,7 @@
       const hip = this.hip;
       const h = this.head;
       const col = this.color;
-      const dark = U.rgba(U.scale(col, 0.62));
+      const dark = U.rgba(U.scale(col, 0.45)); // far limbs: clearly shaded so they separate
       const main = U.rgba(col);
       ctx.save();
       ctx.globalAlpha = this.alpha;
@@ -562,7 +562,7 @@
         const gy = hip.y + R + 0.5;
         for (const k of [0, Math.PI]) {
           feet.push({
-            x: hip.x + Math.sin(ph + k) * 5 * moving + f * 1,
+            x: hip.x + Math.sin(ph + k) * 5 * moving + f * 1 + (k ? -2 : 2) * (1 - moving),
             y: gy - Math.max(0, Math.cos(ph + k)) * 3 * moving,
           });
         }

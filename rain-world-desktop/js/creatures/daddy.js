@@ -78,6 +78,8 @@
         const a = U.rand(0, U.TAU);
         this.spots.push({ a, d: Math.sqrt(Math.random()) * this.R * 0.9, r: U.rand(1.2, 3.2), ph: U.rand(0, 10) });
       }
+      this.flecks = [];
+      for (let i = 0; i < 40; i++) this.flecks.push({ a: U.rand(0, U.TAU), d: U.rand(0.85, 1.25), s: U.randInt(1, 3), ph: U.rand(0, 10) });
       const reachCells = Math.max(3, Math.floor(this.reach / eco.world.cell));
       this.caps = { fly: true, surfacePenalty: Math.floor(reachCells * 0.45) };
       this.pather = new RW.Pather(this, this.caps);
@@ -443,8 +445,16 @@
         ctx.arc(b.x + bl.ox - r * 0.22, b.y + bl.oy - r * 0.25, r * 0.55, 0, U.TAU);
         ctx.fill();
       }
-      // Eye-spots: hard pixel dots that pulse between dim and bright.
       const px = this.eco.artPx || 1;
+      // ragged rot flecks around the knot's edge
+      ctx.fillStyle = U.rgba(this.colBody);
+      for (const f of this.flecks) {
+        const a = f.a + Math.sin(t * 0.7 + f.ph) * 0.05;
+        const d = this.R * f.d;
+        const sz = f.s * px;
+        ctx.fillRect(Math.round((b.x + Math.cos(a) * d) / px) * px, Math.round((b.y + Math.sin(a) * d) / px) * px, sz, sz);
+      }
+      // Eye-spots: hard pixel dots that pulse between dim and bright.
       for (const s of this.spots) {
         const pulse = Math.sin(t * 2.4 + s.ph);
         const x = b.x + Math.cos(s.a) * s.d;

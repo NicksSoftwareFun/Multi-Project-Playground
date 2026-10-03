@@ -262,7 +262,7 @@
   function midLayer(ctx, W, H, pal, R, rnd, d) {
     const col = U.rgba(U.mix(pal.mid, pal.fog, d));
     const colHi = U.rgba(U.mix(U.mix(pal.mid, pal.fog, d), pal.light, 0.12));
-    const rust = U.rgba(U.mix(pal.rust, pal.fog, d + 0.15));
+    const rust = U.rgba(U.mix(pal.rust, pal.fog, d + 0.4));
     // Ground-up blocks
     let x = R(-40, 0);
     while (x < W) {
@@ -680,7 +680,7 @@
       }
       for (let pass = 0; pass < 2; pass++) {
         // opaque colours pre-mixed toward the fog read as crisp pixel streaks
-        ctx.strokeStyle = U.rgba(U.mix(pal.fog, pal.rain, pass ? 0.55 : 0.25));
+        ctx.strokeStyle = U.rgba(U.mix(pal.fog, pal.rain, pass ? 0.7 : 0.35));
         ctx.lineWidth = this.artPx || 1;
         ctx.beginPath();
         for (const d of this.drops) {
@@ -717,10 +717,9 @@
       for (let i = 0; i < pips; i++) {
         const a = -Math.PI / 2 + (i / pips) * U.TAU;
         const on = i < left;
-        ctx.fillStyle = U.rgba(on ? pal.light : pal.dark, on ? 0.5 : 0.35);
-        ctx.beginPath();
-        ctx.arc(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18, 2.2, 0, U.TAU);
-        ctx.fill();
+        // opaque square pips: crisp like the rest of the pixel art
+        ctx.fillStyle = U.rgba(on ? U.mix(pal.fog, pal.light, 0.6) : U.mix(pal.fog, pal.dark, 0.5));
+        ctx.fillRect(Math.round(cx + Math.cos(a) * 18) - 2, Math.round(cy + Math.sin(a) * 18) - 2, 4, 4);
       }
     }
   }

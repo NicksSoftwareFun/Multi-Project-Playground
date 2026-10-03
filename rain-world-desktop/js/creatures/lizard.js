@@ -96,6 +96,9 @@
       // Fixed markings, Rain World style: colour flecks bleeding from the head
       // down the neck, plus a species pattern. t = position along the spine.
       this.spineSet = [];
+      if (!p.spines && (p.pattern === 'dapple' || p.pattern === 'spots')) {
+        for (let t = 0.1; t < 0.5; t += U.rand(0.06, 0.1)) this.spineSet.push({ t, len: U.rand(2, 3.5), lean: 0.5 });
+      }
       if (p.spines) {
         let t = 0.06;
         for (let k = 0; k < p.spines && t < 0.62; k++) {
@@ -107,7 +110,7 @@
       this.specks = [];
       const pat = p.pattern;
       const add = (t, side, size, kind) => this.specks.push({ t, side, size, kind: kind || 'fleck' });
-      if (pat !== 'spots') for (let i = 0; i < 30; i++) add(0.04 + Math.pow(Math.random(), 2.2) * 0.2, U.rand(-0.9, 0.9), U.rand(1, 2));
+      if (pat !== 'spots') for (let i = 0; i < 44; i++) add(0.06 + Math.pow(Math.random(), 1.7) * 0.26, U.rand(-0.95, 0.95), U.rand(1, 2.4));
       if (pat === 'dapple') {
         for (let i = 0; i < 14; i++) add(U.rand(0.15, 0.6), U.rand(-0.8, 0.8), 1);
         for (let i = 0; i < 18; i++) add(1 - Math.pow(Math.random(), 1.5) * 0.2, U.rand(-0.9, 0.9), 1);
@@ -321,7 +324,17 @@
           this.idleLook = { x: head.x + Math.cos(a) * 80, y: head.y + Math.sin(a) * 80, t: U.rand(0.8, 2.2) };
         }
         this.lookAt = this.idleLook;
-        if (Math.random() < dt * 0.15) this.jawTarget = 0.7; // yawn / hiss
+        // every few seconds: rear up and gape
+        this.gapeCd = (this.gapeCd === undefined ? U.rand(2, 5) : this.gapeCd) - dt;
+        if (this.gapeCd <= 0) {
+          this.gapeT = U.rand(0.8, 1.4);
+          this.gapeCd = U.rand(4, 8);
+        }
+        if (this.gapeT > 0) {
+          this.gapeT -= dt;
+          this.jawTarget = 0.7;
+          this.raise = 0.9;
+        }
         if (this.idleT <= 0) this.setState('wander');
         return;
       }
@@ -595,7 +608,7 @@
       // Flat silhouette; the pixel pass gives it hard edges.
       const breath = 1 + 0.05 * Math.sin(this.age * 2.3 + this.breathe) * (this.state === 'display' ? 2.5 : 1);
       const widths = new Array(n);
-      const prof = [4.6, 5.6, 6.6, 6.4, 6, 5.3, 4.6];
+      const prof = [4.4, 6.2, 7.6, 7.4, 6.8, 5.8, 4.8];
       for (let i = 0; i < n; i++) {
         if (i < this.bodyN) widths[i] = prof[i] * L * (i >= 2 && i <= 5 ? breath : 1);
         else {
@@ -653,7 +666,7 @@
 
       // Dorsal spines (green lizards): wide-based jagged pixel spikes,
       // irregular in height, spacing and lean.
-      if (this.p.spines) {
+      if (this.spineSet.length) {
         ctx.fillStyle = headCol;
         for (const sp of this.spineSet) {
           const q = at(sp.t);
@@ -687,12 +700,12 @@
       const body = U.rgba(base);
       const foot = U.rgba(this.p.camouflage ? U.scale(this.bodyColor, 0.85) : this.headColor);
       ctx.fillStyle = body;
-      U.taperPath(ctx, [{ x: h.x, y: h.y }, { x: k.kx, y: k.ky }], [3.2 * L, 2.2 * L]);
+      U.taperPath(ctx, [{ x: h.x, y: h.y }, { x: k.kx, y: k.ky }], [3.9 * L, 2.8 * L]);
       ctx.fill();
-      U.taperPath(ctx, [{ x: k.kx, y: k.ky }, { x: k.ex, y: k.ey }], [2.2 * L, 1.5 * L]);
+      U.taperPath(ctx, [{ x: k.kx, y: k.ky }, { x: k.ex, y: k.ey }], [2.8 * L, 2 * L]);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(k.kx, k.ky, 2.2 * L, 0, U.TAU);
+      ctx.arc(k.kx, k.ky, 2.8 * L, 0, U.TAU);
       ctx.fill();
       // three chunky toes, splayed forward along the surface; curled in the air
       const nx = leg.planted || leg.stepping ? leg.n.x : this.ux;
@@ -704,16 +717,25 @@
       const sx = -ny * Math.sign(d || 1);
       const sy = nx * Math.sign(d || 1);
       const curl = leg.stepping ? 0.55 : leg.planted ? 1 : 0.5;
-      ctx.strokeStyle = foot;
-      ctx.lineCap = 'butt';
-      ctx.lineWidth = Math.max(px * 1.6, 1.6 * L);
+      // four splayed toes, each a pointed wedge
+      ctx.fillStyle = foot;
       ctx.beginPath();
-      for (const s of [-0.35, 0.25, 0.9]) {
-        const len = 3.6 * L * curl;
-        ctx.moveTo(k.ex - sx * L, k.ey - sy * L);
-        ctx.lineTo(k.ex + sx * s * len + nx * (s < 0 ? 0.6 : -0.2) * L, k.ey + sy * s * len + ny * (s < 0 ? 0.6 : -0.2) * L);
+      ctx.arc(k.ex, k.ey, Math.max(px, 1.6 * L), 0, U.TAU);
+      ctx.fill();
+      const half = Math.max(px * 0.8, 0.9 * L);
+      for (const s of [-0.6, 0.1, 0.7, 1.3]) {
+        const len = 4.2 * L * curl;
+        const tx = k.ex + sx * s * len + nx * (s < 0 ? 1 : 0.3) * L;
+        const ty = k.ey + sy * s * len + ny * (s < 0 ? 1 : 0.3) * L;
+        const dx = tx - k.ex;
+        const dy = ty - k.ey;
+        const dl = Math.hypot(dx, dy) || 1;
+        ctx.beginPath();
+        ctx.moveTo(k.ex - (dy / dl) * half, k.ey + (dx / dl) * half);
+        ctx.lineTo(k.ex + (dy / dl) * half, k.ey - (dx / dl) * half);
+        ctx.lineTo(tx, ty);
+        ctx.fill();
       }
-      ctx.stroke();
     }
 
     // Big boxy head, flat colour, black tooth marks along the mouth line and
@@ -788,15 +810,21 @@
       ctx.lineTo(19.6, 0.6);
       ctx.closePath();
       ctx.fill();
+      // a short horn at the back of the skull
+      ctx.beginPath();
+      ctx.moveTo(-5.2, -6.2);
+      ctx.lineTo(-2.4, -7.3);
+      ctx.lineTo(-7.6, -9.4 - this.raiseS * 1.2);
+      ctx.fill();
 
       // tooth marks: small irregular black ticks on the upper jaw along the
       // mouth line (gap at the snout tip); lower ones only show when it gapes
-      const toothW = Math.max(u, 0.7);
-      const step = Math.max(3 * u, 2.6);
+      const toothW = Math.max(u * 1.5, 1);
+      const step = Math.max(2.6 * u, 2.4);
       ctx.fillStyle = ink;
       let k = 0;
-      for (let x = 4 + step; x <= 17.5 - step; x += step, k++) {
-        const th = Math.max(u * 2, 1.7) * (k % 3 === 1 ? 0.7 : 1);
+      for (let x = 3; x <= 18.5; x += step, k++) {
+        const th = Math.max(u * 2, 1.8) * [1, 0.65, 1.2, 0.8][k % 4];
         ctx.fillRect(x, 0.6 - th, toothW, th);
         if (jawA > 0.15) {
           const r0 = rot(x + 0.5, 0.6);
@@ -805,7 +833,7 @@
         }
       }
       // dark line under the jaw
-      ctx.fillStyle = 'rgba(10,6,8,0.9)';
+      ctx.fillStyle = ink;
       {
         const r0 = rot(-4, 4.3);
         const r1 = rot(17, 2.9);
@@ -822,6 +850,11 @@
       const es = Math.max(u * 2, 2.2);
       const eh = Math.max(u, es * open);
       ctx.fillRect(-0.5, -5 + (es - eh) / 2, es, eh);
+      if (open > 0.5) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillRect(-0.5, -5 + (es - eh) / 2, Math.max(u, 0.6), Math.max(u, 0.6));
+        ctx.fillStyle = ink;
+      }
       // nostril
       ctx.fillRect(18, -3.2, Math.max(u, 0.9), Math.max(u, 0.9));
       ctx.restore();
