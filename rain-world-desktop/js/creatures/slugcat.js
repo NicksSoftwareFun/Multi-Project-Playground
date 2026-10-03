@@ -23,7 +23,7 @@
       this.head = { x, y: y - 11 };
       this.vx = 0;
       this.vy = 0;
-      this.tail = new RW.Chain(x, y, 5, [4.5, 4.2, 3.8, 3.4, 3], -1, 0.3);
+      this.tail = new RW.Chain(x, y, 5, [5.2, 4.9, 4.4, 3.9, 3.4], -1, 0.3);
       this.caps = {
         walls: false,
         ceil: false,
@@ -97,6 +97,40 @@
         const d = U.dist(c.x, c.y, hip.x, hip.y);
         return c.prey === this || c.target === this || c.lungePrey === this || d < calm || (c.species === 'daddy' && d < 230);
       });
+    }
+    // Running away: head for high ground if there's a route, ideally one the
+    // pursuer can't follow (up a pole, onto a ledge); else just get clear.
+    fleeGoal(caps, fx, fy, dist) {
+      return this.escapeUp(fx, fy) || super.fleeGoal(caps, fx, fy, dist);
+    }
+    escapeUp(fx, fy) {
+      const W = this.W;
+      const m = this.hip;
+      const list = Nav.validCells(W, this.caps).stand;
+      const n = list.length / 2;
+      if (!n) return null;
+      const cands = [];
+      for (let k = 0; k < 12; k++) {
+        const i = Math.floor(Math.random() * n) * 2;
+        const x = W.centerX(list[i]);
+        const y = W.centerY(list[i + 1]);
+        const dThreat = U.dist(x, y, fx, fy);
+        const dMe = U.dist(x, y, m.x, m.y);
+        if (y > m.y - 30 || dThreat < 120 || dMe > 450) continue;
+        cands.push({ x, y, sc: (m.y - y) / 100 + dThreat / 300 - dMe / 400 + Math.random() * 0.3 });
+      }
+      cands.sort((a, b) => b.sc - a.sc);
+      const t = this.threat;
+      let fallback = null;
+      for (const c of cands.slice(0, 3)) {
+        const r = Nav.findPath(W, m.x, m.y, c.x, c.y, this.caps, 4000);
+        if (!r || !r.complete) continue;
+        if (!t || !t.caps) return c;
+        const rt = Nav.findPath(W, t.x, t.y, c.x, c.y, t.caps, 3000);
+        if (!rt || !rt.complete) return c; // somewhere it can't follow
+        if (!fallback) fallback = c;
+      }
+      return fallback;
     }
     weaponPoint() {
       return this.handPt2 || { x: this.head.x - this.facing * 3, y: this.head.y + 6 };
@@ -443,7 +477,13 @@
         return;
       }
       if (this.state !== 'wander') this.setState('wander');
-      if (this.pather.done() || !this.pather.goal || this.stateT > 16 || this.stuckT > 3) {
+      const footing = this.grounded || !!this.pole;
+      if (this.stuckT > 3 && footing) {
+        // wedged: replan right away
+        this.goalCd = 0;
+        this.stateT = 99;
+      }
+      if (this.readyForGoal(dt, 16, footing)) {
         if (this.pather.goal && Math.random() < 0.3 && this.grounded) {
           this.setState('rest');
           this.restT = U.rand(3, 12);
@@ -651,7 +691,9 @@
         if (this.pole) {
           this.vy += (tvy - this.vy) * U.approach(10, dt); // ease into and out of climbing
           hip.y = U.clamp(hip.y + this.vy * dt, pole.y1 + 2, pole.y2);
-          if (W.isSolidPt(hip.x, hip.y + R)) {
+          // reached the ground at the foot of the pole (but not while
+          // setting off upward from it: the climb eases in from a standstill)
+          if (tvy >= 0 && W.isSolidPt(hip.x, hip.y + R)) {
             this.pole = null;
             this.grounded = true;
           }
@@ -777,27 +819,27 @@
         tx = hip.x + Math.sin(this.age * 9) * 4;
         ty = hip.y + 9;
       } else if (this.crouchT > 0) {
-        tx = hip.x + this.facing * 4;
-        ty = hip.y - 6;
+        tx = hip.x + this.facing * 6;
+        ty = hip.y - 10;
       } else if (this.state === 'eat' || this.state === 'rest') {
-        tx = hip.x + this.facing * 5;
-        ty = hip.y - 7;
+        tx = hip.x + this.facing * 7;
+        ty = hip.y - 11;
       } else if (this.pole) {
         tx = hip.x;
-        ty = hip.y - 11.5;
+        ty = hip.y - 18.5;
       } else if (!this.grounded) {
         const sp = Math.hypot(this.vx, this.vy) || 1;
-        tx = hip.x + (this.vx / sp) * 6 + this.facing * 2;
-        ty = hip.y - 10;
+        tx = hip.x + (this.vx / sp) * 10 + this.facing * 2;
+        ty = hip.y - 16;
       } else {
         const lean = U.clamp(this.vx / 160, -1, 1);
-        tx = hip.x + this.facing * 2 + lean * 5;
-        ty = hip.y - 11 + Math.abs(lean) * 1.5 + Math.sin(this.walkPhase * 2) * Math.abs(lean) * 0.8;
+        tx = hip.x + this.facing * 2 + lean * 6;
+        ty = hip.y - 18 + Math.abs(lean) * 2.5 + Math.sin(this.walkPhase * 2) * Math.abs(lean) * 0.8;
       }
       if (this.state === 'eat') ty += Math.sin(this.age * 14) * 0.8;
       if (this.lie > 0) {
         // chin down on the floor in front of the body
-        tx = U.lerp(tx, hip.x + this.facing * 10, this.lie);
+        tx = U.lerp(tx, hip.x + this.facing * 16, this.lie);
         ty = U.lerp(ty, hip.y + 1.5, this.lie);
       }
       const k = U.approach(held ? 6 : 22, dt);
@@ -806,7 +848,8 @@
       const dx = h.x - hip.x;
       const dy = h.y - hip.y;
       const d = Math.hypot(dx, dy) || 1;
-      const L = U.lerp(this.state === 'eat' || this.state === 'rest' ? 8.5 : 11, 10, this.lie);
+      // a long body: the head sits well clear of the hips
+      const L = U.lerp(this.state === 'eat' || this.state === 'rest' ? 13 : 18, 16, this.lie);
       h.x = hip.x + (dx / d) * L;
       h.y = hip.y + (dy / d) * L;
       this.W.collideCircle(h, 5.5);

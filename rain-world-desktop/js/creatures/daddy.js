@@ -183,7 +183,7 @@
       }
 
       if (this.state !== 'wander') this.setState('wander');
-      if (this.pather.done() || !this.pather.goal || this.stateT > 25) {
+      if (this.readyForGoal(dt, 25)) {
         const W = this.W;
         const rc = this.caps.surfacePenalty;
         const g = this.wanderGoal(this.caps, 450, (cx, cy) => W.surfDist(cx, cy) <= rc && W.surfDist(cx, cy) >= 4);

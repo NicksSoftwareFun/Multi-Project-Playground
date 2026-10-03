@@ -432,9 +432,53 @@
       }
       return best;
     }
+    // Time to pick somewhere new? Not mid-fall or from somewhere no route can
+    // start (an empty route reads as "arrived"), and at most about once a
+    // second, so a failed plan doesn't churn a new goal every frame.
+    readyForGoal(dt, timeout, footing) {
+      this.goalCd = (this.goalCd || 0) - dt;
+      if (this.goalCd > 0 || footing === false) return false;
+      const p = this.pather;
+      if (!(p.done() || !p.goal || this.stateT > timeout)) return false;
+      this.goalCd = 0.8;
+      return true;
+    }
     wanderGoal(caps, radius, filter) {
+      if (!filter && Math.random() < 0.6) {
+        const g = this.exploreGoal(caps);
+        if (g) return g;
+      }
       const m = this.mainPoint();
       return Nav.randomValid(this.W, caps, m.x, m.y, radius, filter);
+    }
+    // Somewhere anywhere on the map, favouring high ground (window tops,
+    // ledges, perches) so creatures don't all pool on the floor; only a
+    // place we can actually get to.
+    exploreGoal(caps) {
+      const W = this.W;
+      const vc = Nav.validCells(W, caps);
+      const list = vc.stand.length && Math.random() < 0.8 ? vc.stand : vc.all;
+      const n = list.length / 2;
+      if (!n) return null;
+      const m = this.mainPoint();
+      // a handful of random candidates, the best by height and freshness
+      const cands = [];
+      for (let k = 0; k < 14; k++) {
+        const i = Math.floor(Math.random() * n) * 2;
+        const x = W.centerX(list[i]);
+        const y = W.centerY(list[i + 1]);
+        const d = U.dist(m.x, m.y, x, y);
+        if (d < 80) continue;
+        // height only counts where you can stand (not clinging to the top edge)
+        const hw = list === vc.stand ? 1.2 : 0.2;
+        cands.push({ x, y, sc: (1 - y / W.h) * hw + Math.random() * 0.6 - d / 3000 });
+      }
+      cands.sort((a, b) => b.sc - a.sc);
+      for (const c of cands.slice(0, 5)) {
+        const r = Nav.findPath(W, m.x, m.y, c.x, c.y, caps, 5000);
+        if (r && r.complete) return c;
+      }
+      return null;
     }
     // Shelter / migration: head for the nearest den and vanish into it.
     wantsToLeave(dt) {

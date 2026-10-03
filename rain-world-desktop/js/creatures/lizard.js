@@ -415,7 +415,7 @@
         if (this.idleT <= 0) this.setState('wander');
         return;
       }
-      if (this.pather.done() || !this.pather.goal || this.stateT > 14) {
+      if (this.readyForGoal(dt, 35, !!this.grip)) { // slow walkers need time for a long climb
         // low-energy lizards stop to rest more often and for longer; a
         // low-energy white lizard lies still long enough to vanish (lurk)
         if (this.pather.goal && Math.random() < 0.2 + 0.35 * (1 - pe.energy) + (this.atHome() ? 0.2 : 0)) {
@@ -577,7 +577,8 @@
           if (c !== this && c.home && c.home.sid === sol.id && isLizard(c) && !c.dead && !c.corpse) owner = c;
         }
         const claim = owner ? (this.pers.dominance - owner.pers.dominance) * 0.8 - 0.25 : 0.3;
-        const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400;
+        // up high is a better lookout than the floor
+        const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400 + (1 - y / W.h) * 0.5;
         cands.push({ sc, sid: sol.id, ox, x, y });
       }
       // best-scoring spot we can actually walk to (checking only a few)

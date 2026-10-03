@@ -192,7 +192,7 @@
         return;
       }
       this.setState('wander');
-      if (this.pather.done() || !this.pather.goal || this.stateT > 20) {
+      if (this.readyForGoal(dt, 20)) {
         if (this.pather.goal && Math.random() < 0.4) {
           this.setState('idle');
           this.idleT = U.rand(2, 6);

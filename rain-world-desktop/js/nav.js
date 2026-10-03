@@ -342,5 +342,24 @@
     return [c.fly ? 1 : 0, c.walls ? 1 : 0, c.ceil ? 1 : 0, c.poles ? 1 : 0, c.fall ? 1 : 0, c.jumpX | 0, c.jumpUp | 0].join('');
   }
 
-  RW.Nav = { WALK, FALL, JUMP, findPath, nearestValid, randomValid, valid, standable, capsKey };
+  // Every cell a creature with these caps can be in (and the standable ones),
+  // cached per world version: used to pick destinations anywhere on the map.
+  function validCells(W, c) {
+    const key = c.key || capsKey(c);
+    const cache = (W._validCells = W._validCells || {});
+    const hit = cache[key];
+    if (hit && hit.version === W.version) return hit;
+    const all = [];
+    const stand = [];
+    for (let cy = 0; cy < W.rows; cy++) {
+      for (let cx = 0; cx < W.cols; cx++) {
+        if (!valid(W, cx, cy, c)) continue;
+        all.push(cx, cy);
+        if (W.solid(cx, cy + 1)) stand.push(cx, cy);
+      }
+    }
+    return (cache[key] = { version: W.version, all, stand });
+  }
+
+  RW.Nav = { WALK, FALL, JUMP, findPath, nearestValid, randomValid, valid, standable, capsKey, validCells };
 })();
