@@ -60,6 +60,7 @@
       this.eco = new RW.Ecosystem(cfg, this.world);
       this.weather = this.weather || new RW.Background.Weather();
       this.weather.reset(this.W, this.H);
+      this.weather.decor = this.decor;
       this.eco.weather = this.weather;
       this.eco.setDecor(this.decor);
       this.applyPalette();

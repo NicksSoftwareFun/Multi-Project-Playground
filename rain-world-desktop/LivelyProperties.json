@@ -3,6 +3,8 @@
   "maxPopulation": { "type": "slider", "value": 22, "min": 0, "max": 60, "step": 1, "text": "Max population" },
   "palette": { "type": "dropdown", "value": 0, "text": "Palette", "items": ["industrial", "shoreline", "outskirts", "chimney", "subterranean"] },
   "rain": { "type": "checkbox", "value": true, "text": "Rain cycle" },
+  "drizzle": { "type": "slider", "value": 0.18, "min": 0, "max": 1, "step": 0.01, "text": "Light rain" },
+  "drips": { "type": "slider", "value": 0.7, "min": 0, "max": 2, "step": 0.05, "text": "Drips" },
   "cycleMinutes": { "type": "slider", "value": 7, "min": 1, "max": 30, "step": 0.5, "text": "Rain cycle length (min)" },
   "showCycleHud": { "type": "checkbox", "value": true, "text": "Show cycle timer" },
   "predation": { "type": "checkbox", "value": true, "text": "Predators eat prey" },

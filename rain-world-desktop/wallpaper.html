@@ -23,6 +23,7 @@
 <script src="js/world.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/background.js"></script>
+<script src="js/drips.js"></script>
 <script src="js/items.js"></script>
 <script src="js/creatures/base.js"></script>
 <script src="js/creatures/lizard.js"></script>
@@ -90,6 +91,10 @@
       cfg.ecosystem.predation = !!val;
     } else if (name === 'cursor') {
       cfg.ecosystem.cursorInteraction = !!val;
+    } else if (name === 'drips') {
+      cfg.rain.drips = +val;
+    } else if (name === 'drizzle') {
+      cfg.rain.drizzle = +val;
     } else if (name === 'showCycleHud') {
       cfg.rain.showCycleHud = !!val;
     }

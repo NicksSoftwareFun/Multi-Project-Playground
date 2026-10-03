@@ -521,6 +521,10 @@
       this.intensity = 0.2;
       this.phase = 0;
       this.flash = 0;
+      this.drips = null;
+      this.decor = null;
+      this.world = null;
+      this.curtains = [];
     }
 
     reset(W, H) {
@@ -528,6 +532,10 @@
       for (let i = 0; i < 6; i++) {
         this.fog.push({ x: U.rand(0, W), y: U.rand(H * 0.2, H), r: U.rand(150, 400), v: U.rand(4, 14) * U.sign(), a: U.rand(0.05, 0.12) });
       }
+      // Broad, faint sheets of rain drifting across the scene.
+      this.curtains = [];
+      for (let i = 0; i < 4; i++) this.curtains.push({ x: U.rand(-W * 0.3, W), w: U.rand(W * 0.12, W * 0.35), v: U.rand(8, 22), a: U.rand(0.5, 1) });
+      this.drips = RW.Drips ? new RW.Drips() : null;
     }
 
     // Rain cycle: drizzle for most of it, building to a downpour at the end.
@@ -543,6 +551,18 @@
       if (!rc.enabled) target = 0;
       this.intensity = target;
       this.downpour = rc.enabled && this.phase > 1 - dp;
+
+      // Drips: present from the start of the cycle, building as it goes on.
+      if (this.drips && world) {
+        const amount = rc.enabled ? (rc.drips ?? 0.7) * (0.6 + 0.6 * this.phase + this.intensity * 1.2) : 0;
+        this.drips.update(dt, world, this.decor, amount, 60 + this.intensity * 220, this.t);
+        this.world = world;
+      }
+      for (const c of this.curtains) {
+        c.x += (c.v + this.intensity * 60) * dt;
+        if (c.x > W + 200) c.x = -c.w - 200;
+      }
+      this.curtainsOn = rc.enabled && rc.curtains !== false;
 
       const want = Math.floor(this.intensity * 520);
       while (this.drops.length < want) this.drops.push(this.newDrop(W, H, true));
@@ -610,6 +630,24 @@
     drawRain(ctx, pal) {
       ctx.lineCap = 'butt';
       const slant = 0.12 + this.intensity * 0.18;
+      if (this.curtainsOn && this.world) {
+        const H = this.world.h;
+        const a = 0.035 * (0.6 + this.intensity * 2.5);
+        for (const c of this.curtains) {
+          const g = ctx.createLinearGradient(c.x, 0, c.x + c.w, 0);
+          g.addColorStop(0, U.rgba(pal.rain, 0));
+          g.addColorStop(0.5, U.rgba(pal.rain, a * c.a));
+          g.addColorStop(1, U.rgba(pal.rain, 0));
+          ctx.fillStyle = g;
+          const lean = H * slant;
+          ctx.beginPath();
+          ctx.moveTo(c.x + lean, 0);
+          ctx.lineTo(c.x + c.w + lean, 0);
+          ctx.lineTo(c.x + c.w, H);
+          ctx.lineTo(c.x, H);
+          ctx.fill();
+        }
+      }
       for (let pass = 0; pass < 2; pass++) {
         ctx.strokeStyle = U.rgba(pal.rain, pass ? 0.38 : 0.16);
         ctx.lineWidth = pass ? 1.4 : 1;
@@ -632,6 +670,7 @@
         ctx.lineTo(s.x + r * 0.4, s.y);
       }
       ctx.stroke();
+      if (this.drips && this.world) this.drips.draw(ctx, pal, this.world);
       if (this.downpour) {
         ctx.fillStyle = U.rgba(pal.fog, 0.18);
         ctx.fillRect(0, 0, 1e5, 1e5);

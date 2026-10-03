@@ -28,6 +28,7 @@
 <script src="js/world.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/background.js"></script>
+<script src="js/drips.js"></script>
 <script src="js/items.js"></script>
 <script src="js/creatures/base.js"></script>
 <script src="js/creatures/lizard.js"></script>
@@ -49,7 +50,6 @@
   cfg.ecosystem.startPopulated = false;
   cfg.ecosystem.maxPopulation = 0;
   cfg.ecosystem.migrationPerMinute = 0;
-  cfg.rain.drizzle = 0.12;
   cfg.debug.showPaths = q.get('paths') === '1';
   cfg.debug.showLabels = q.get('labels') === '1';
 
@@ -74,6 +74,7 @@
   eco.setDecor(decor);
   const weather = new RW.Background.Weather();
   weather.reset(W, H);
+  weather.decor = decor;
   eco.weather = weather;
 
   const bg = RW.Background.paint(document.createElement('canvas'), W, H, 1 / res, pal, decor, 4);
