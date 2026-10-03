@@ -42,6 +42,14 @@ and saves to `localStorage`:
   random in proportion to `weight`, among enabled species below their `max`.
 - **`ecosystem.maxPopulation`**: the total the spawner keeps the screen near.
   Each species has a `popCost` (a batfly counts 0, a Daddy Long Legs 4).
+- **Level layout**: ledges (some split by a passage with a pole running up
+  through it), vertical poles (from the floor, beside ledges, and standing on
+  ledges up to higher ones) and horizontal poles (bridges between level
+  ledges, perches off vertical poles). Every ledge and beam is checked to be
+  reachable from the floor by a creature that can only walk and climb poles;
+  a pole is added (or a passage opened) where one isn't, and anything still
+  unreachable is left out. Panel sliders: ledges, poles, ledge poles,
+  passages, horizontal poles.
 - **`world.mapSize`**: how much of the world fits on screen. 1 is the default;
   bigger shows more map with everything (creatures, ledges, poles) smaller,
   smaller zooms in so everything is bigger.

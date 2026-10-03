@@ -20,6 +20,8 @@
       decorLedges: 6, // wallpaper ledges creatures can use
       decorPoles: 7, // climbable poles in the wallpaper
       ledgePoles: 0.6, // chance a ledge gets a pole standing on it (linking up to a higher ledge if there is one)
+      passages: 0.4, // chance a wide ledge has a gap with a pole running up through it
+      beams: 0.5, // horizontal poles: bridges between level ledges, perches off vertical poles
       fruitPlants: 5,
       timeScale: 1,
       maxFps: 60, // 30 halves drawing cost; the simulation is unaffected
@@ -344,7 +346,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v10'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v11'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

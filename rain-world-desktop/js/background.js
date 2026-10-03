@@ -57,18 +57,70 @@
       i++;
     }
 
-    const poles = [];
+    const cell = Math.min(40, Math.max(12, +cfg.world.cellSize || 20));
     // A pole beside a ledge's end sits in the middle of the grid column right
     // next to the ledge's first/last solid column (see World.rebuild: a rect
     // fills a cell it covers by over 30%), so the pole is unbroken and a
     // walker at its top can step straight across onto the ledge.
-    const cell = Math.min(40, Math.max(12, +cfg.world.cellSize || 20));
     const beside = (l, side) => {
       const t = cell * 0.3;
       const col = side < 0 ? Math.floor((l.x + t) / cell) - 1 : Math.ceil((l.x + l.w - t) / cell);
       return (col + 0.5) * cell;
     };
-    const blocked = (x, y1, y2) => ledges.some((l) => x > l.x - 6 && x < l.x + l.w + 6 && y2 > l.y && y1 < l.y + l.h);
+
+    // Passages: a wide ledge split by a gap with a pole running up through it.
+    const passages = [];
+    const pPass = cfg.world.passages === undefined ? 0.4 : +cfg.world.passages;
+    for (let i = ledges.length - 1; i >= 0; i--) {
+      const l = ledges[i];
+      if (l.w < 220 || rnd() >= pPass) continue;
+      const gapCells = 3;
+      const c0 = Math.floor(R(l.x + 60, l.x + l.w - 60 - gapCells * cell) / cell);
+      const gx0 = c0 * cell;
+      const gx1 = (c0 + gapCells) * cell;
+      if (gx0 - l.x < 50 || l.x + l.w - gx1 < 50) continue;
+      const left = Object.assign({}, l, { id: l.id + 'a', w: gx0 - l.x, split: l.id });
+      const right = Object.assign({}, l, { id: l.id + 'b', x: gx1, w: l.x + l.w - gx1, split: l.id, seed: l.seed + 7 });
+      ledges.splice(i, 1, left, right);
+      passages.push({ x: (gx0 + gx1) / 2, y: l.y, h: l.h });
+    }
+
+    // Horizontal poles ("beams"): thin rebar to walk along or hang from.
+    const beams = [];
+    const solidsNow = () => ledges.concat(beams);
+    const hits = (r, pad, skip) =>
+      solidsNow().some((q) => !(skip && skip.includes(q)) && r.x < q.x + q.w + pad && r.x + r.w + pad > q.x && r.y < q.y + q.h + pad && r.y + r.h + pad > q.y);
+    const pBeam = cfg.world.beams === undefined ? 0.5 : +cfg.world.beams;
+    // bridges between two ledges at the same height
+    for (const a of ledges.slice()) {
+      for (const b of ledges.slice()) {
+        if (a === b || (a.split && a.split === b.split)) continue;
+        const gap = b.x - (a.x + a.w);
+        if (gap < 40 || gap > 260 || Math.abs(a.y - b.y) > 10 || rnd() >= pBeam) continue;
+        const beam = { id: 'beam-' + beams.length, kind: 'beam', x: a.x + a.w, y: Math.min(a.y, b.y), w: gap, h: 4, seed: rnd() * 1000 };
+        if (hits(beam, 16, [a, b])) continue;
+        beams.push(beam);
+      }
+    }
+
+    const poles = [];
+    const blocked = (x, y1, y2) => solidsNow().some((l) => x > l.x - 6 && x < l.x + l.w + 6 && y2 > l.y && y1 < l.y + l.h);
+    const crowded = (x, y1, y2) => poles.some((p) => Math.abs(p.x - x) < 30 && p.y1 < y2 && p.y2 > y1);
+    // top of the first solid under (x, y), else just below the screen
+    const groundBelow = (x, y) => {
+      let g = H + 5;
+      for (const q of solidsNow()) if (x > q.x - 6 && x < q.x + q.w + 6 && q.y >= y && q.y < g) g = q.y;
+      return g;
+    };
+
+    // a pole up through every passage
+    passages.forEach((ps, k) => {
+      const x = Math.round(ps.x);
+      const y1 = Math.max(12, Math.round(ps.y - R(50, 120)));
+      const y2 = groundBelow(x, ps.y + ps.h + 1);
+      if (!blocked(x, y1, y2)) poles.push({ id: 'pole-p' + k, x, y1, y2 });
+    });
+
     const nP = cfg.world.decorPoles | 0;
     for (let i = 0, tries = 0; i < nP && tries < 200; tries++) {
       let x;
@@ -84,20 +136,18 @@
       }
       x = Math.round(x);
       if (x < 8 || x > W - 8) continue;
-      if (blocked(x, y1, y2)) continue;
-      if (poles.some((p) => Math.abs(p.x - x) < 40)) continue;
+      if (blocked(x, y1, y2) || crowded(x, y1, y2)) continue;
       poles.push({ id: 'pole-' + i, x, y1: Math.round(y1), y2 });
       i++;
     }
 
     // Poles standing on ledges. Where a higher ledge sits above, the pole
     // rises beside its end to just over its top, linking the two; otherwise
-    // it's a free-standing lookout pole to climb and hop from.
+    // it's a free-standing lookout pole.
     const pLedge = cfg.world.ledgePoles === undefined ? 0.6 : +cfg.world.ledgePoles;
     ledges.forEach((l, li) => {
       if (l.w < 60 || rnd() >= pLedge) return;
       const inside = (x) => x > l.x + 10 && x < l.x + l.w - 10;
-      // ledges above this one with an end over our top
       const links = [];
       for (const u of ledges) {
         if (u === l || u.y >= l.y - 40) continue;
@@ -108,11 +158,124 @@
       for (const c of cands) {
         const x = Math.round(c.x);
         const y1 = Math.max(12, Math.round(c.y1));
-        if (blocked(x, y1, l.y) || poles.some((p) => Math.abs(p.x - x) < 30 && p.y1 < l.y && p.y2 > y1)) continue;
+        if (blocked(x, y1, l.y) || crowded(x, y1, l.y)) continue;
         poles.push({ id: 'pole-l' + li, x, y1, y2: l.y });
         break;
       }
     });
+
+    // Beams sticking out sideways from a vertical pole: perches reached by
+    // climbing the pole and stepping across.
+    for (const p of poles.slice()) {
+      if (rnd() >= pBeam * 0.6 || p.y2 - p.y1 < 120) continue;
+      const y = Math.round(R(p.y1 + 30, Math.min(p.y2 - 70, H * 0.8)));
+      const w = Math.round(R(70, 170));
+      const pc = Math.floor(p.x / cell);
+      const right = rnd() < 0.5;
+      const x = right ? (pc + 1) * cell - 5 : pc * cell + 5 - w;
+      const beam = { id: 'beam-' + beams.length, kind: 'beam', x, y, w, h: 4, seed: rnd() * 1000 };
+      if (x < 4 || x + w > W - 4 || hits(beam, 24)) continue;
+      if (poles.some((q) => q !== p && q.x > x - 8 && q.x < x + w + 8 && q.y1 < y + 4 && q.y2 > y)) continue; // never cut a pole
+      beams.push(beam);
+    }
+
+    // Nothing unreachable: check every ledge and beam with the least mobile
+    // climber (poles, no jumping or wall climbing), adding a pole beside any
+    // that can't be reached and removing the ones that still can't.
+    const checkCaps = { walls: false, ceil: false, poles: true, fall: true, jumpX: 0, jumpUp: 0, key: 'decor-check' };
+    const build = () => {
+      const tw = new RW.World(cell);
+      tw.resize(W, H);
+      tw.setStatic(solidsNow(), poles);
+      tw.setDynamic([]);
+      tw.rebuild();
+      tw.version = -1 - Math.floor(rnd() * 1e9); // its own cache generation
+      return tw;
+    };
+    const fx0 = W / 2;
+    const fy0 = H - 10;
+    const reachable = (tw, q) => {
+      for (const x of [q.x + 12, q.x + q.w / 2, q.x + q.w - 12]) {
+        const r = RW.Nav.findPath(tw, fx0, fy0, x, q.y - 8, checkCaps, 9000);
+        if (r && r.complete) return true;
+      }
+      return false;
+    };
+    let removed = 0;
+    for (let round = 0; round < 4 && RW.World && RW.Nav; round++) {
+      const surfaces = solidsNow().sort((a, b) => b.y - a.y); // lowest first
+      let tw = build();
+      const lost = [];
+      for (const q of surfaces) {
+        if (reachable(tw, q)) continue;
+        let ok = false;
+        for (const side of rnd() < 0.5 ? [-1, 1] : [1, -1]) {
+          const x = Math.round(beside(q, side));
+          if (x < 8 || x > W - 8) continue;
+          const y1 = Math.max(12, Math.round(q.y - R(25, 45)));
+          const y2 = groundBelow(x, q.y + q.h + 1);
+          if (blocked(x, y1, y2)) continue;
+          // a pole already in this column: stretch it to cover the climb;
+          // otherwise add one (poles in neighbouring columns are fine)
+          const same = poles.find((pp) => Math.floor(pp.x / cell) === Math.floor(x / cell));
+          let undo;
+          if (same) {
+            const nb = { y1: Math.min(same.y1, y1), y2: Math.max(same.y2, y2) };
+            if (blocked(same.x, nb.y1, nb.y2)) continue;
+            const was = { y1: same.y1, y2: same.y2 };
+            Object.assign(same, nb);
+            undo = () => Object.assign(same, was);
+          } else {
+            if (poles.some((pp) => Math.abs(pp.x - x) < cell * 0.9 && pp.y1 < y2 && pp.y2 > y1)) continue;
+            poles.push({ id: 'pole-r' + poles.length, x, y1, y2 });
+            undo = () => poles.pop();
+          }
+          tw = build();
+          if (reachable(tw, q)) {
+            ok = true;
+            break;
+          }
+          undo();
+          tw = build();
+        }
+        if (!ok && q.kind === 'ledge' && q.w >= 160 && ledges.includes(q)) {
+          // no room beside it: open a passage through it with a pole up the middle
+          const gapCells = 3;
+          const c0 = Math.floor((q.x + q.w / 2) / cell) - 1;
+          const gx0 = c0 * cell;
+          const gx1 = (c0 + gapCells) * cell;
+          const x = Math.round((gx0 + gx1) / 2);
+          const y1 = Math.max(12, Math.round(q.y - R(50, 110)));
+          if (gx0 - q.x >= 40 && q.x + q.w - gx1 >= 40) {
+            const left = Object.assign({}, q, { id: q.id + 'a', w: gx0 - q.x, split: q.id });
+            const right = Object.assign({}, q, { id: q.id + 'b', x: gx1, w: q.x + q.w - gx1, split: q.id, seed: q.seed + 7 });
+            const at = ledges.indexOf(q);
+            ledges.splice(at, 1, left, right);
+            const y2 = groundBelow(x, q.y + q.h + 1);
+            if (!blocked(x, y1, y2) && !crowded(x, y1, y2)) {
+              poles.push({ id: 'pole-r' + poles.length, x, y1, y2 });
+              tw = build();
+              if (reachable(tw, left) && reachable(tw, right)) ok = true;
+              else poles.pop();
+            }
+            if (!ok) ledges.splice(ledges.indexOf(left), 2, q);
+            tw = build();
+          }
+        }
+        if (!ok) lost.push(q);
+      }
+      for (const q of lost) {
+        const arr = q.kind === 'beam' ? beams : ledges;
+        arr.splice(arr.indexOf(q), 1);
+        // and any pole that only stood on it
+        for (let i = poles.length - 1; i >= 0; i--) {
+          const p = poles[i];
+          if (p.y2 === q.y && p.x > q.x - cell && p.x < q.x + q.w + cell) poles.splice(i, 1);
+        }
+      }
+      removed += lost.length;
+      if (!lost.length) break; // removing things can strand others: go again
+    }
 
     // Dens ("shortcut" pipe mouths) in the screen walls and on ledges.
     const dens = [];
@@ -151,7 +314,7 @@
       chains.push({ x: R(W * 0.05, W * 0.95), len: R(60, H * 0.35), phase: rnd() * 10, depth: R(0.25, 0.6) });
     }
 
-    return { ledges, poles, dens, fruitPlants, grass, chains };
+    return { ledges, beams, poles, dens, fruitPlants, grass, chains, removed };
   }
 
   // ---- static painting ----------------------------------------------------
@@ -219,6 +382,7 @@
     // Play layer: poles then ledges
     layer((l) => {
       for (const p of decor.poles) drawPole(l, p, pal);
+      for (const b of decor.beams || []) drawBeam(l, b, pal);
       for (const lg of decor.ledges) drawLedge(l, lg, pal);
       for (const d of decor.dens) drawDenStatic(l, d, pal);
     });
@@ -493,6 +657,20 @@
     ctx.fillStyle = U.rgba(c);
     ctx.fillRect(p.x - 2, p.y1 - 3, 7, 3);
     for (let y = p.y1 + 40; y < p.y2; y += 110) ctx.fillRect(p.x - 4, y, 8, 4);
+  }
+
+  // A horizontal pole: the same scavenged rebar, lying flat, clamped at
+  // intervals, ends bent down.
+  function drawBeam(ctx, b, pal) {
+    const c = U.mix(pal.dark, pal.near, 0.5);
+    ctx.fillStyle = U.rgba(c);
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = U.rgba(U.mix(c, pal.light, 0.25), 0.7);
+    ctx.fillRect(b.x, b.y, b.w, 1);
+    ctx.fillStyle = U.rgba(c);
+    ctx.fillRect(b.x, b.y, 3, b.h + 4);
+    ctx.fillRect(b.x + b.w - 3, b.y, 3, b.h + 4);
+    for (let x = b.x + 30; x < b.x + b.w - 10; x += 55) ctx.fillRect(x, b.y - 2, 4, b.h + 4);
   }
 
   function drawLedge(ctx, l, pal) {

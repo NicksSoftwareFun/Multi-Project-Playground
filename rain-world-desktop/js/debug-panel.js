@@ -207,6 +207,8 @@
           this.slider('ledges', Wc, 'decorLedges', 0, 14, 1),
           this.slider('poles', Wc, 'decorPoles', 0, 16, 1),
           this.slider('ledge poles', Wc, 'ledgePoles', 0, 1, 0.05),
+          this.slider('passages', Wc, 'passages', 0, 1, 0.05),
+          this.slider('horizontal poles', Wc, 'beams', 0, 1, 0.05),
           this.slider('fruit plants', Wc, 'fruitPlants', 0, 14, 1),
           h('div', { class: 'btns' }, this.button('New background', () => eng.regenerate(true)), this.button('Rebuild decor', () => eng.regenerate(false)))
         )

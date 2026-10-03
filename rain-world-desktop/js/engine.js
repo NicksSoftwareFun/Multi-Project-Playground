@@ -128,7 +128,7 @@
       if (!keepSeed || !this.seed) this.seed = cfg.world.seed || Math.floor(Math.random() * 1e9);
       const rnd = U.mulberry32(this.seed);
       this.decor = RW.Background.generateDecor(this.W, this.H, cfg, rnd);
-      this.world.setStatic(this.decor.ledges, this.decor.poles);
+      this.world.setStatic(this.decor.ledges.concat(this.decor.beams || []), this.decor.poles);
       const g = this.poll();
       this.world.setDynamic(g.rects);
       this.world.rebuild();

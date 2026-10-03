@@ -49,7 +49,7 @@
   if (editing) panel.toggle(true);
 
   // Settings that need the world rebuilt rather than just read live.
-  const rebuildKey = () => JSON.stringify([cfg.world.palette, cfg.world.pixelScale, cfg.world.mapSize, cfg.world.decorLedges, cfg.world.decorPoles, cfg.world.ledgePoles, cfg.world.fruitPlants]);
+  const rebuildKey = () => JSON.stringify([cfg.world.palette, cfg.world.pixelScale, cfg.world.mapSize, cfg.world.decorLedges, cfg.world.decorPoles, cfg.world.ledgePoles, cfg.world.passages, cfg.world.beams, cfg.world.fruitPlants]);
   let lastKey = rebuildKey();
   let rebuildT = null;
   function applied() {
