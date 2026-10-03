@@ -1,6 +1,6 @@
 > **Moved.** Rain World Desktop now lives in its own repository:
-> <https://github.com/NicksSoftwareFun/rain-world-desktop> (playable at
-> <https://nickssoftwarefun.github.io/rain-world-desktop/>). This copy is
+> <https://github.com/NicksSoftwareFun/Rain-World-Desktop> (playable at
+> <https://nickssoftwarefun.github.io/Rain-World-Desktop/>). This copy is
 > frozen at the point of the move; make changes there.
 
 # Rain World Desktop
@@ -15,7 +15,7 @@ Everything is plain JavaScript + `<canvas>`, with no build step and no dependenc
 ## Try it
 
 - **Browser prototype**: open `index.html` (or the hosted copy at
-  <https://nickssoftwarefun.github.io/rain-world-desktop/>). It shows a mock
+  <https://nickssoftwarefun.github.io/Rain-World-Desktop/>). It shows a mock
   Windows desktop with draggable, resizable windows and icons over the
   wallpaper. They are real geometry: drag a window and creatures standing on
   it ride along. **It's a preview only**: as a wallpaper it would only ever

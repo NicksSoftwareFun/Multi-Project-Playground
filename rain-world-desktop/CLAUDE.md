@@ -1,6 +1,6 @@
 > **Moved.** Rain World Desktop now lives in its own repository:
-> <https://github.com/NicksSoftwareFun/rain-world-desktop> (playable at
-> <https://nickssoftwarefun.github.io/rain-world-desktop/>). This copy is
+> <https://github.com/NicksSoftwareFun/Rain-World-Desktop> (playable at
+> <https://nickssoftwarefun.github.io/Rain-World-Desktop/>). This copy is
 > frozen at the point of the move; make changes there.
 
 # Rain World Desktop: notes for Claude sessions
@@ -67,9 +67,9 @@ they apply).
 
 ## GitHub Pages mirror
 
-This folder is mirrored to its own repo, `NicksSoftwareFun/rain-world-desktop`,
+This folder is mirrored to its own repo, `NicksSoftwareFun/Rain-World-Desktop`,
 whose `main` branch GitHub Pages publishes at
-https://nickssoftwarefun.github.io/rain-world-desktop/ (the prototype;
+https://nickssoftwarefun.github.io/Rain-World-Desktop/ (the prototype;
 `gallery.html` and `wallpaper.html` too). Pages can't live in
 Multi-Project-Playground: that repo's one Pages site is the weather radar app.
 
