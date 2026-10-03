@@ -728,7 +728,10 @@
       const onPoleTarget = W.pole(node.cx, node.cy) && !W.solid(node.cx, node.cy + 1);
       const tx = node.x;
       const ty = onPoleTarget ? node.y : node.y + W.cell / 2 - R - 1;
-      const apexY = Math.min(hip.y, ty) - W.cell * 1.3;
+      // a long leap from lying flat is a low, flat pounce; a hop arcs higher
+      this.longLeap = !!this.longJump;
+      this.longJump = false;
+      const apexY = Math.min(hip.y, ty) - W.cell * (this.longLeap ? 0.6 : 1.3);
       const vy0 = -Math.sqrt(2 * GRAV * Math.max(4, hip.y - apexY));
       const tUp = -vy0 / GRAV;
       const tDown = Math.sqrt((2 * Math.max(1, ty - apexY)) / GRAV);
@@ -843,8 +846,16 @@
       } else {
         this.vy += GRAV * dt;
         if (this.grounded && this.crouchT > 0) {
+          const pj = this.pendingJump;
+          if (pj && !(node && node.cx === pj.cx && node.cy === pj.cy)) {
+            // the plan changed mid-windup: get up instead of leaping
+            this.crouchT = 0;
+            this.pendingJump = null;
+            this.longJump = false;
+          }
           this.crouchT -= dt;
           this.vx *= 0.6;
+          if (this.longJump && this.lie > 0.7) hip.x += Math.sin(this.age * 42) * 0.45; // a rump wiggle before the pounce
           if (this.crouchT <= 0 && this.pendingJump) {
             this.launch(this.pendingJump);
             this.pendingJump = null;
@@ -857,8 +868,13 @@
             if (node.type === Nav.JUMP && launchHere) {
               // crouch for a moment, then spring
               if (!(this.crouchT > 0) && !this.jumping) {
-                this.crouchT = 0.1;
+                // a long, flat leap across a gap: lie down, wind up, then
+                // pounce; anything shorter is a quick crouch and spring
+                const long = Math.abs(node.x - hip.x) >= W.cell * 4 && node.y > hip.y - W.cell * 1.5;
+                this.longJump = long;
+                this.crouchT = long ? 0.6 : 0.1;
                 this.pendingJump = node;
+                this.facing = Math.sign(node.x - hip.x) || this.facing;
               }
             } else {
               const tx = node.type === Nav.JUMP && prev ? prev.x : node.x;
@@ -933,8 +949,11 @@
       this.lastX = hip.x;
       this.lastY = hip.y;
 
-      const lieT = this.state === 'rest' && this.grounded && this.stateT > 1 ? 1 : 0;
-      this.lie += (lieT - this.lie) * U.approach(lieT > this.lie ? 2.5 : 9, dt);
+      if (!this.jumping) this.longLeap = false;
+      const windup = this.longJump && this.crouchT > 0;
+      // flat for a rest or a long-jump windup; half stretched out mid-pounce
+      const lieT = windup || (this.state === 'rest' && this.grounded && this.stateT > 1) ? 1 : this.longLeap ? 0.6 : 0;
+      this.lie += (lieT - this.lie) * U.approach(lieT > this.lie ? (windup ? 14 : 2.5) : 9, dt);
       this.updateHead(dt, false);
       this.updateTail(dt);
       this.updateHand();
