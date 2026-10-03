@@ -1199,8 +1199,10 @@
       this.updateLegs(dt, true);
       const speedNow = Math.hypot(this.vx, this.vy);
       if (this.p.camouflage) {
-        // fades to see-through when still, never fully invisible
-        const visible = this.lungeT > 0 || this.holding ? 1 : U.clamp(speedNow / 140, 0.35, 1);
+        // only while stalking or hunting: fades see-through when still (never
+        // fully invisible); otherwise in plain sight
+        const sneaking = this.state === 'hunt' || this.state === 'stalk';
+        const visible = !sneaking || this.lungeT > 0 || this.holding ? 1 : U.clamp(speedNow / 140, 0.35, 1);
         this.camo += (visible - this.camo) * U.approach(visible > this.camo ? 6 : 0.7, dt);
         this.lurking = this.camo < 0.4;
       }

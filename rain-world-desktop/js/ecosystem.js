@@ -314,6 +314,16 @@
         this.stockWeapons(false);
       }
 
+      // Never long without a slugcat: after 15s with none alive, one comes
+      // out of a pipe regardless of the population cap.
+      if (this.creatures.some((c) => c.species === 'slugcat' && !c.dead && !c.corpse && !c.leaving)) this.noSlugT = 0;
+      else this.noSlugT = (this.noSlugT || 0) + dt;
+      const sc = cfg.species.slugcat;
+      if (this.noSlugT > 15 && sc && sc.enabled !== false && !this.shouldShelter()) {
+        this.noSlugT = 0;
+        this.spawn('slugcat');
+      }
+
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
         this.spawnT = 60 / Math.max(0.1, +cfg.ecosystem.spawnPerMinute || 0.1);
