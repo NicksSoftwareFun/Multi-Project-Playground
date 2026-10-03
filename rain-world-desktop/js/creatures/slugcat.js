@@ -52,7 +52,7 @@
       this.lastX = x;
       this.lastY = y;
       this.diet = ['batfly'];
-      this.threats = ['lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white', 'daddy', 'dropwig'];
+      this.threats = ['lizard_*', 'daddy', 'dropwig'];
       this.bloodColor = '#3a1f22';
     }
 

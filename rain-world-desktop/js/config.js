@@ -85,6 +85,7 @@
           vision: 320,
           spines: 0,
           pattern: 'dapple',
+          tailTip: true,
         },
       },
       lizard_green: {
@@ -125,6 +126,7 @@
           vision: 300,
           spines: 0,
           pattern: 'fins',
+          tailTip: true,
         },
       },
       lizard_white: {
@@ -146,6 +148,67 @@
           spines: 0,
           pattern: 'spots',
           camouflage: true,
+        },
+      },
+      lizard_red: {
+        label: 'Red Lizard',
+        enabled: true,
+        weight: 0.5,
+        max: 1,
+        popCost: 2,
+        params: {
+          headColor: '#ff1e2a',
+          bodyColor: '#0c0608',
+          length: 1.35,
+          speed: 65,
+          huntSpeed: 160,
+          climbWalls: false,
+          climbCeilings: false,
+          poles: true,
+          vision: 360,
+          spines: 18,
+          pattern: 'dots',
+        },
+      },
+      lizard_yellow: {
+        label: 'Yellow Lizard',
+        enabled: true,
+        weight: 1.5,
+        max: 2,
+        popCost: 1.2,
+        params: {
+          headColor: '#ffbf1c',
+          bodyColor: '#120d06',
+          length: 0.95,
+          speed: 105,
+          huntSpeed: 175,
+          climbWalls: true,
+          climbCeilings: false,
+          poles: true,
+          vision: 300,
+          spines: 0,
+          pattern: 'dapple',
+          tailTip: true,
+        },
+      },
+      lizard_cyan: {
+        label: 'Cyan Lizard',
+        enabled: true,
+        weight: 1,
+        max: 1,
+        popCost: 1.2,
+        params: {
+          headColor: '#18d8e8',
+          bodyColor: '#0a0d10',
+          length: 0.95,
+          speed: 120,
+          huntSpeed: 210,
+          climbWalls: true,
+          climbCeilings: true,
+          poles: true,
+          vision: 320,
+          spines: 0,
+          pattern: 'rings',
         },
       },
       daddy: {
@@ -199,7 +262,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v2'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v3'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

@@ -20,7 +20,7 @@
       this.perchT = 0;
       this.wanderA = a;
       this.isFlier = true;
-      this.threats = ['lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white', 'slugcat', 'dropwig', 'daddy'];
+      this.threats = ['lizard_*', 'slugcat', 'dropwig', 'daddy'];
       this.bloodColor = '#2a2a33';
       this.scanT = 0;
     }

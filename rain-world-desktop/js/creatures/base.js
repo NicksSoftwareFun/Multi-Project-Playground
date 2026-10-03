@@ -356,7 +356,7 @@
       let bd = range * range;
       for (const c of this.eco.creatures) {
         if (c === this || c.dead || c.leaving || c.alpha < 0.6) continue;
-        if (species.indexOf(c.species) < 0) continue;
+        if (!species.some((s) => (s.endsWith('*') ? c.species.startsWith(s.slice(0, -1)) : s === c.species))) continue;
         if (filter && !filter(c)) continue;
         const d = U.dist2(m.x, m.y, c.x, c.y);
         if (d < bd) {

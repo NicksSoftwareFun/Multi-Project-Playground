@@ -87,7 +87,7 @@
       this.speed = p.speed || 42;
       this.fullT = U.rand(5, 20);
       this.huntT = 0;
-      this.diet = ['slugcat', 'lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white', 'dropwig', 'centipede', 'batfly'];
+      this.diet = ['slugcat', 'lizard_*', 'dropwig', 'centipede', 'batfly'];
       this.isFlier = true;
       this.mass = 6;
       this.bloodColor = '#151830';

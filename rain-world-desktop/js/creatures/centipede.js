@@ -24,7 +24,7 @@
       this.uy = -1;
       this.phase = 0;
       this.hue = U.rand(0, 1);
-      this.threats = ['lizard_pink', 'lizard_green', 'lizard_blue', 'lizard_white', 'daddy', 'dropwig'];
+      this.threats = ['lizard_*', 'daddy', 'dropwig'];
       this.bloodColor = '#5a2a12';
       this.perceiveT = 0;
       this.idleT = 0;
