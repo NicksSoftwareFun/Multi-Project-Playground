@@ -1,0 +1,14 @@
+{
+  "AppVersion": "1.0.0.0",
+  "Title": "Rain World Desktop",
+  "Thumbnail": null,
+  "Preview": null,
+  "Desc": "A living Rain World-style ecosystem on your desktop. Creatures climb your windows, icons and taskbar. Run windows/start-helper.cmd so they can see your desktop.",
+  "Author": "NicksSoftwareFun",
+  "License": "",
+  "Contact": "",
+  "Type": 1,
+  "FileName": "wallpaper.html",
+  "Arguments": null,
+  "IsAbsolutePath": false
+}

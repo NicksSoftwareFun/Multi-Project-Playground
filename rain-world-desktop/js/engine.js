@@ -39,6 +39,7 @@
         rects: g.rects.map((r) => ({ id: r.id, kind: r.kind, x: r.x / z, y: r.y / z, w: r.w / z, h: r.h / z })),
         cursor: g.cursor ? s(g.cursor) : null,
         clicks: (g.clicks || []).map(s),
+        paused: g.paused,
       };
     }
 
@@ -138,6 +139,7 @@
 
     tick(dt) {
       const g = this.poll();
+      if (g.paused) return; // wallpaper hidden behind a fullscreen app
       const moves = this.world.setDynamic(g.rects);
       if (this.world.rebuild()) {
         // nothing else to do: paths notice the version bump themselves

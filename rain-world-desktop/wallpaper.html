@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Rain World Desktop Wallpaper</title>
+<link rel="stylesheet" href="css/desktop.css">
+</head>
+<body>
+<!--
+  The live-wallpaper build. Geometry (your real windows, desktop icons,
+  taskbar and cursor) comes from windows/rw-helper.ps1. See windows/README.md.
+
+  ?panel=1   open the ecosystem panel (use this in a normal browser tab to
+             tune the wallpaper; settings sync to it through the helper)
+-->
+<canvas id="wallpaper"></canvas>
+<div id="ui"></div>
+
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/background.js"></script>
+<script src="js/items.js"></script>
+<script src="js/creatures/base.js"></script>
+<script src="js/creatures/lizard.js"></script>
+<script src="js/creatures/slugcat.js"></script>
+<script src="js/creatures/daddy.js"></script>
+<script src="js/creatures/dropwig.js"></script>
+<script src="js/creatures/batfly.js"></script>
+<script src="js/creatures/centipede.js"></script>
+<script src="js/ecosystem.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/geometry/remote.js"></script>
+<script src="js/debug-panel.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const U = RW.U;
+  const cfg = RW.loadConfig();
+  const provider = new RW.RemoteGeometry();
+  const engine = new RW.Engine(document.getElementById('wallpaper'), cfg, provider);
+  const editing = q.get('panel') === '1';
+  const panel = new RW.Panel(engine, document.getElementById('ui'), { noToggleButton: !editing });
+  if (editing) panel.toggle(true);
+
+  // Settings that need the world rebuilt rather than just read live.
+  const rebuildKey = () => JSON.stringify([cfg.world.palette, cfg.world.pixelScale, cfg.world.creatureScale, cfg.world.decorLedges, cfg.world.decorPoles, cfg.world.fruitPlants]);
+  let lastKey = rebuildKey();
+  let rebuildT = null;
+  function applied() {
+    const k = rebuildKey();
+    if (k === lastKey) return;
+    lastKey = k;
+    clearTimeout(rebuildT);
+    rebuildT = setTimeout(() => engine.regenerate(false), 300);
+  }
+
+  // Settings shared through the helper (edited from any browser tab).
+  const sync = new RW.ConfigSync(cfg, (remote) => {
+    U.deepMerge(cfg, remote);
+    RW.saveConfig(cfg);
+    applied();
+  });
+  sync.start(3000);
+  panel.onSave = (c) => {
+    sync.save(c);
+    applied();
+  };
+
+  // Lively Wallpaper "Customise" panel (see LivelyProperties.json).
+  const palettes = Object.keys(RW.PALETTES);
+  window.livelyPropertyListener = function (name, val) {
+    if (name.startsWith('w_')) {
+      const s = cfg.species[name.slice(2)];
+      if (s) s.weight = +val;
+    } else if (name === 'palette') {
+      cfg.world.palette = palettes[val] || palettes[0];
+    } else if (name === 'creatureScale') {
+      cfg.world.creatureScale = +val;
+    } else if (name === 'maxPopulation') {
+      cfg.ecosystem.maxPopulation = +val;
+    } else if (name === 'rain') {
+      cfg.rain.enabled = !!val;
+    } else if (name === 'cycleMinutes') {
+      cfg.rain.cycleMinutes = +val;
+    } else if (name === 'predation') {
+      cfg.ecosystem.predation = !!val;
+    } else if (name === 'cursor') {
+      cfg.ecosystem.cursorInteraction = !!val;
+    } else if (name === 'showCycleHud') {
+      cfg.rain.showCycleHud = !!val;
+    }
+    RW.saveConfig(cfg);
+    applied();
+  };
+
+  let rz;
+  window.addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => engine.resize(), 250);
+  });
+  window.RW_APP = { engine, panel, provider, step: (n) => engine.step(n) };
+  engine.start();
+})();
+</script>
+</body>
+</html>

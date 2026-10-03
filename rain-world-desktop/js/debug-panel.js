@@ -18,12 +18,14 @@
   }
 
   class Panel {
-    constructor(engine, mount) {
+    constructor(engine, mount, opts) {
+      opts = opts || {};
       this.engine = engine;
       this.mount = mount;
       this.cfg = engine.cfg;
       this.open = false;
       this.liveEls = [];
+      this.noToggleButton = !!opts.noToggleButton;
       this.build();
       setInterval(() => this.refreshLive(), 400);
       window.addEventListener('keydown', (e) => {
@@ -38,6 +40,7 @@
 
     save() {
       RW.saveConfig(this.cfg);
+      if (this.onSave) this.onSave(this.cfg);
     }
 
     // ---- controls ----------------------------------------------------------
@@ -84,8 +87,10 @@
       const cfg = this.cfg;
       const eng = this.engine;
       this.el = h('div', { class: 'rw-panel' });
-      const toggleBtn = h('button', { class: 'rw-panel-toggle', title: 'Ecosystem panel (`)', onclick: () => this.toggle(), text: '≡' });
-      this.mount.append(toggleBtn, this.el);
+      this.mount.appendChild(this.el);
+      if (!this.noToggleButton) {
+        this.mount.appendChild(h('button', { class: 'rw-panel-toggle', title: 'Ecosystem panel (`)', onclick: () => this.toggle(), text: '\u2261' }));
+      }
 
       this.el.appendChild(h('div', { class: 'ph' }, h('b', { text: 'ECOSYSTEM' }), this.button('✕', () => this.toggle(false), 'x')));
       this.stats = h('div', { class: 'stats' });
@@ -248,7 +253,8 @@
       this.stats.textContent =
         `population ${eco.population().toFixed(1)} / ${this.cfg.ecosystem.maxPopulation}   ` +
         `born ${eco.stats.born}  eaten ${eco.stats.eaten}  left ${eco.stats.left}\n` +
-        (w.downpour ? 'DOWNPOUR — creatures sheltering' : `rain in ~${left.toFixed(1)} min`);
+        (w.downpour ? 'DOWNPOUR — creatures sheltering' : `rain in ~${left.toFixed(1)} min`) +
+        (this.engine.provider.status ? '\n' + this.engine.provider.status() : '');
     }
   }
 
