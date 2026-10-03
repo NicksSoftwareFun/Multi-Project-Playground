@@ -604,6 +604,15 @@
       this.home = best || (cands[0] ? { sid: cands[0].sid, ox: cands[0].ox } : null);
       this.homeAwayT = 0;
     }
+    // The pole a body point is hanging on (not standing at the foot of).
+    poleUnder(pt) {
+      const W = this.W;
+      const cx = W.cellX(pt.x);
+      const cy = W.cellY(pt.y);
+      if (W.solid(cx, cy + 1)) return null;
+      for (const p of W.poles) if (Math.abs(p.x - pt.x) < 16 * this.L && pt.y > p.y1 && pt.y < p.y2) return p;
+      return null;
+    }
     // Roaming follows the same taste: greens low, climbers up high.
     heightBias() {
       return this.species === 'lizard_green' ? -0.4 : 1.6;
@@ -892,7 +901,12 @@
       const tx = -this.uy;
       const ty = this.ux;
       const off = P.map((p) => [(p.x - C.x) * tx + (p.y - C.y) * ty, (p.x - C.x) * this.ux + (p.y - C.y) * this.uy]);
-      this.turn = { t: 0, dur: 0.42, C, tx, ty, nx: this.ux, ny: this.uy, off };
+      // on a pole there's no "over": the body swings round the pole instead
+      const W = this.W;
+      const cx = W.cellX(C.x);
+      const cy = W.cellY(C.y);
+      const pole = W.pole(cx, cy) && !W.solid(cx, cy + 1);
+      this.turn = { t: 0, dur: pole ? 0.55 : 0.42, C, tx, ty, nx: this.ux, ny: this.uy, off, pole, dir: Math.random() < 0.5 ? 1 : -1 };
       for (const l of this.legs) l.leg.planted = false;
       this.vx = this.vy = 0;
     }
@@ -904,11 +918,23 @@
       const k = Math.min(1, T.t / T.dur);
       const f = Math.cos(Math.PI * k); // 1 -> -1 mirrors the body about the pivot
       const lift = Math.sin(Math.PI * k);
+      const th = Math.PI * U.smooth(k) * T.dir;
+      const cs = Math.cos(th);
+      const sn = Math.sin(th);
       for (let i = 0; i < P.length; i++) {
-        const a = T.off[i][0];
-        const b = T.off[i][1] + lift * Math.min(9 * this.L, Math.abs(a) * 0.45);
-        P[i].x = P[i].px = T.C.x + T.tx * a * f + T.nx * b;
-        P[i].y = P[i].py = T.C.y + T.ty * a * f + T.ny * b;
+        let a = T.off[i][0];
+        let b = T.off[i][1];
+        if (T.pole) {
+          // swing round in the plane, full length all the way
+          const ra = a * cs - b * sn;
+          b = a * sn + b * cs;
+          a = ra;
+        } else {
+          a *= f;
+          b += lift * Math.min(9 * this.L, Math.abs(T.off[i][0]) * 0.45);
+        }
+        P[i].x = P[i].px = T.C.x + T.tx * a + T.nx * b;
+        P[i].y = P[i].py = T.C.y + T.ty * a + T.ny * b;
         this.W.collideCircle(P[i], i < this.bodyN ? 3 * this.L : 2);
       }
       if (k >= 1) {
@@ -1154,6 +1180,9 @@
       // Body and tail
       this.spine.verlet(this.bodyN, 0.88, 0, g ? 150 : 700, dt);
       this.spine.follow(1);
+      // no hairpins: the body and tail bend round, never double back flat
+      this.spine.limitBend(0.8, 2, this.bodyN + 2, 0.5);
+      this.spine.limitBend(0.75, this.bodyN + 2, P.length, 0.5);
       for (let i = 1; i < P.length; i++) {
         const pt = P[i];
         if (g && !this.leavingSurface && i < this.bodyN + 4) {
@@ -1165,6 +1194,17 @@
           }
         }
         W.collideCircle(pt, i < this.bodyN ? 4 * L : 2.5);
+      }
+      // On a pole the body hangs straight down one side of it (the side the
+      // neck is on) instead of coiling round it.
+      const pole = this.lungeT <= 0 && !this.leavingSurface && this.poleUnder(P[2]) && this.poleUnder(P[Math.min(this.bodyN, P.length - 1)]);
+      if (pole) {
+        const side = Math.sign(P[1].x - pole.x) || 1;
+        const tx = pole.x + side * 6 * L;
+        for (let i = 2; i < this.bodyN + 3; i++) {
+          const pt = P[i];
+          if (pt.y > pole.y1 && pt.y < pole.y2) pt.x += (tx - pt.x) * 0.2;
+        }
       }
       // A little backbone stiffness: the body resists folding into a heap.
       if (g && !this.leavingSurface) {

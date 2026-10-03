@@ -102,6 +102,28 @@
         b.y = a.y + (dy / d) * L;
       }
     }
+    // Joints bend at most `max` radians: past that the next point swings
+    // back by `k` of the excess, so a body arcs round instead of folding flat
+    // on itself (points from..to-1).
+    limitBend(max, from, to, k) {
+      const P = this.pts;
+      const end = Math.min(to || P.length, P.length);
+      for (let i = Math.max(2, from || 2); i < end; i++) {
+        const a = P[i - 2];
+        const b = P[i - 1];
+        const c = P[i];
+        const a1 = Math.atan2(b.y - a.y, b.x - a.x);
+        const a2 = Math.atan2(c.y - b.y, c.x - b.x);
+        let d = a2 - a1;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) <= max) continue;
+        const na = a2 - (d - Math.sign(d) * max) * k;
+        const L = Math.hypot(c.x - b.x, c.y - b.y);
+        c.x = b.x + Math.cos(na) * L;
+        c.y = b.y + Math.sin(na) * L;
+      }
+    }
     verlet(from, damp, gx, gy, dt) {
       const P = this.pts;
       for (let i = from; i < P.length; i++) {

@@ -276,6 +276,8 @@
       }
       this.chain.verlet(1, 0.8, 0, g ? 0 : GRAV, dt);
       this.chain.follow(1);
+      // a segmented body curls round a turn; it never folds back on itself
+      this.chain.limitBend(0.7, 2, P.length, 0.6);
       for (let i = 1; i < P.length; i++) {
         const s = W.nearestSurface(P[i].x, P[i].y, 18 * S, mask);
         if (s) {

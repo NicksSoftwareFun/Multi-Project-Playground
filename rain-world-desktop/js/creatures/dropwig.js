@@ -243,6 +243,12 @@
       this.think(dt);
       const falling = this.state === 'drop' || this.state === 'recover';
       let g = falling ? null : W.nearestSurface(h.x, h.y, 22, this.mask);
+      if (!g && !falling) {
+        // long legs: crossing a corner (wall to ceiling, round a ledge lip)
+        // it keeps hold of anything within a stride instead of dropping off
+        const pn = this.pather.current();
+        if (!(pn && pn.type === Nav.FALL)) g = W.nearestSurface(h.x, h.y, 44, this.mask);
+      }
       if (this.dropT > 0) {
         this.dropT -= dt;
         g = null;
