@@ -76,6 +76,11 @@
       this.head.y += dy;
       this.tail.shift(dx, dy);
     }
+    onUnburrowed() {
+      super.onUnburrowed();
+      this.pole = null;
+      this.jumping = false;
+    }
     onGrabbed() {
       this.pole = null;
       this.jumping = false;

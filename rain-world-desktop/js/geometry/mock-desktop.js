@@ -91,6 +91,9 @@
 
     addWindow(id, title, body, x, y, w, h) {
       const icon = id === 'explorer' ? ICONS.folder : id === 'notepad' ? ICONS.xlsx.replace('#1d7a46', '#3b6ea8') : ICONS.pc;
+      // keep windows on screen at narrow widths
+      w = Math.min(w, window.innerWidth - 16);
+      x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
       const win = el('div', 'win rw-solid');
       win.dataset.solidId = 'win-' + id;
       win.dataset.kind = 'window';

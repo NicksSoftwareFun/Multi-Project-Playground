@@ -112,6 +112,16 @@
       this.body.x += dx;
       this.body.y += dy;
     }
+    shiftAll(dx, dy) {
+      this.carry(dx, dy);
+      for (const t of this.tentacles) t.chain.shift(dx, dy);
+    }
+    // Dug out of a window: let go of grips inside it so they don't haul the
+    // body straight back in.
+    onUnburrowed() {
+      super.onUnburrowed();
+      for (const t of this.tentacles) if (t.state === 'grip') t.release();
+    }
 
     think(dt) {
       const eco = this.eco;

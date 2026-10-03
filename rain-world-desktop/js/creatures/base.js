@@ -282,6 +282,7 @@
         return false;
       }
       this.alpha = Math.min(1, this.alpha + dt * 1.6);
+      if (this.unburrowStep(dt)) return false;
       // No den reachable from here: slip away quietly rather than wait forever.
       if (this.state === 'leave' && this.stateT > 30) this.leave();
       // Safety net for odd geometry (e.g. a window dropped on top of us):
@@ -410,6 +411,123 @@
 
     // Window dragged under us: ride along.
     carry(dx, dy) {}
+    // Move the whole body rigidly (used to dig out of solids).
+    shiftAll(dx, dy) {
+      this.carry(dx, dy);
+    }
+    onUnburrowed() {
+      this.contactId = null;
+      if ('vx' in this) this.vx = this.vy = 0;
+      if (this.pather) {
+        // keep the goal, but plan a fresh route from where we came out
+        this.pather.nodes = null;
+        this.pather.timer = 0;
+      }
+    }
+
+    // --- unburrowing ---
+    // A window dropped on a creature, or one dragged to pin it against the
+    // taskbar or a screen edge, can leave it inside a solid, squeezed in a
+    // crack thinner than its body, or pushed off the screen. Collision alone
+    // can't fix that (it pushes points out to the nearest edge, which may be
+    // more solid), so once trapped for a moment the creature wriggles its way
+    // to the nearest open cell, ignoring collisions, then carries on.
+    trapped() {
+      const W = this.W;
+      const m = this.mainPoint();
+      if (!isFinite(m.x) || !isFinite(m.y)) return false;
+      if (m.x < -2 || m.y < -2 || m.x > W.w + 2 || m.y > W.h + 2) return true;
+      if (W.isSolidPt(m.x, m.y)) return true;
+      const c = this.squeezeClear || 3;
+      return (
+        (W.isSolidPt(m.x, m.y - c) && W.isSolidPt(m.x, m.y + c)) ||
+        (W.isSolidPt(m.x - c, m.y) && W.isSolidPt(m.x + c, m.y))
+      );
+    }
+    // Nearest open nav cell (not solid, on screen, with open neighbours so it
+    // isn't another crack) to (x, y).
+    findExit(x, y) {
+      const W = this.W;
+      const cx0 = U.clamp(W.cellX(x), 0, W.cols - 1);
+      const cy0 = U.clamp(W.cellY(y), 0, W.rows - 1);
+      const open = (cx, cy) => W.inBounds(cx, cy) && !W.solid(cx, cy);
+      const maxR = Math.max(W.cols, W.rows);
+      for (let r = 0; r <= maxR; r++) {
+        let best = null;
+        let bd = Infinity;
+        for (let cy = cy0 - r; cy <= cy0 + r; cy++) {
+          for (let cx = cx0 - r; cx <= cx0 + r; cx++) {
+            if (Math.max(Math.abs(cx - cx0), Math.abs(cy - cy0)) !== r || !open(cx, cy)) continue;
+            let n = 0;
+            if (open(cx - 1, cy)) n++;
+            if (open(cx + 1, cy)) n++;
+            if (open(cx, cy - 1)) n++;
+            if (open(cx, cy + 1)) n++;
+            if (n < 2) continue;
+            const px = W.centerX(cx);
+            const py = W.centerY(cy);
+            if (W.isSolidPt(px, py)) continue;
+            const d = (px - x) * (px - x) + (py - y) * (py - y);
+            if (d < bd) {
+              bd = d;
+              best = { x: px, y: py };
+            }
+          }
+        }
+        if (best) return best;
+      }
+      return null;
+    }
+    // Returns true while digging out (the creature's own logic is skipped).
+    unburrowStep(dt) {
+      const ub = this.unburrow;
+      if (!ub) {
+        if (this.grabbedBy || this.alpha < 0.5) {
+          this.trappedT = 0;
+          return false;
+        }
+        this.trapCheckT = (this.trapCheckT || 0) - dt;
+        if (this.trapCheckT > 0) return false;
+        this.trapCheckT = 0.1;
+        if (!this.trapped()) {
+          this.trappedT = 0;
+          return false;
+        }
+        this.trappedT = (this.trappedT || 0) + 0.1;
+        if (this.trappedT < 0.35) return false;
+        this.trappedT = 0;
+        const m = this.mainPoint();
+        const exit = this.findExit(m.x, m.y);
+        if (!exit) {
+          this.leave();
+          return true;
+        }
+        if (this.holding) this.release();
+        this.unburrow = { tx: exit.x, ty: exit.y, t: 0, phase: Math.random() * 6 };
+        this.label = 'unburrow';
+        return true;
+      }
+      ub.t += dt;
+      const m = this.mainPoint();
+      const dx = ub.tx - m.x;
+      const dy = ub.ty - m.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 1.5 || ub.t > 4) {
+        this.unburrow = null;
+        this.label = '';
+        if (this.eco.burst) this.eco.burst(m.x, m.y, '#1a1612', 5);
+        this.onUnburrowed();
+        return false;
+      }
+      // digging: slow start, side-to-side wriggle across the direction of travel
+      const speed = 60 + 220 * Math.min(1, ub.t * 2.5);
+      const step = Math.min(d, speed * dt);
+      const wig = Math.sin(ub.t * 28 + ub.phase) * 2.2 * Math.min(1, d / 20);
+      const ux = dx / d;
+      const uy = dy / d;
+      this.shiftAll(ux * step - uy * wig * dt * 28, uy * step + ux * wig * dt * 28);
+      return true;
+    }
 
     // Screen area this creature may draw into, [x0, y0, x1, y1] in world
     // units (used to limit the per-frame pixel pass).

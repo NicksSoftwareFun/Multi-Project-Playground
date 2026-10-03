@@ -20,6 +20,7 @@
       this.perchT = 0;
       this.wanderA = a;
       this.isFlier = true;
+      this.squeezeClear = 1; // tiny: only a real crack traps a batfly
       this.threats = ['lizard_*', 'slugcat', 'dropwig', 'daddy'];
       this.bloodColor = '#2a2a33';
       this.scanT = 0;
@@ -29,6 +30,13 @@
     }
     bounds() {
       return [this.pos.x - 10, this.pos.y - 10, this.pos.x + 10, this.pos.y + 10];
+    }
+    shiftAll(dx, dy) {
+      this.pos.x += dx;
+      this.pos.y += dy;
+    }
+    onUnburrowed() {
+      this.perched = false;
     }
     carry(dx, dy) {
       if (this.perched) {

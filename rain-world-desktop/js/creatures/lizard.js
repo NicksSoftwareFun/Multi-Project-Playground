@@ -895,16 +895,20 @@
         ctx.stroke();
       }
 
-      // open mouth: black interior
+      // open mouth: punch the gape out of whatever is already on the sprite
+      // layer (the neck under the head) so the wallpaper shows between the jaws
       if (jawA > 0.04) {
-        const lt = rot(16, 0.5);
-        ctx.fillStyle = ink;
+        const lt = rot(16.4, 0.5);
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.moveTo(-4, 0.5);
         ctx.lineTo(16.4, 0.5);
         ctx.lineTo(lt[0], lt[1]);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
       // lower jaw
       ctx.fillStyle = jawCol;

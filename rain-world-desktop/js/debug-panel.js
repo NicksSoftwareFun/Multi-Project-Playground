@@ -224,11 +224,14 @@
                 this.flash('bad JSON: ' + e.message);
               }
             }),
-            this.button('Download', () => {
-              const a = h('a', { download: 'rain-world-desktop-config.json' });
-              a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
-              a.click();
-            }),
+            // Hosts that can't save files (e.g. a shared artifact page) set RW.noFileDownloads.
+            RW.noFileDownloads
+              ? null
+              : this.button('Download', () => {
+                  const a = h('a', { download: 'rain-world-desktop-config.json' });
+                  a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
+                  a.click();
+                }),
             this.button('Reset defaults', () => {
               RW.clearSavedConfig();
               location.reload();
