@@ -585,11 +585,17 @@
       while (this.drops.length < want) this.drops.push(this.newDrop(W, H, true));
       if (this.drops.length > want) this.drops.length = want;
       const wind = 60 + this.intensity * 220;
+      this.slant = 0.12 + this.intensity * 0.18;
+      if (world) this.updateShelter(world, H);
       for (const d of this.drops) {
         d.y += d.v * dt;
         d.x += wind * d.z * dt;
-        if (d.z > 0.6 && world && world.isSolidPt(d.x, d.y) && !world.isSolidPt(d.x, d.y - 12)) {
-          if (this.splashes.length < 160) this.splashes.push({ x: d.x, y: d.y, t: 0 });
+        // Rain stops at the first thing above in its slanted path: it hits
+        // the top of a ledge or window (near drops splash there) and the
+        // sheltered space beneath only gets the drips from the underside.
+        const hy = world ? this.shelterAt(d.x, d.y) : Infinity;
+        if (d.y >= hy) {
+          if (d.z > 0.6 && hy < H && this.splashes.length < 160) this.splashes.push({ x: d.x - this.slant * (d.y - hy), y: hy, t: 0 });
           Object.assign(d, this.newDrop(W, H, false));
         } else if (d.y > H + 20 || d.x > W + 40) {
           Object.assign(d, this.newDrop(W, H, false));
@@ -602,6 +608,41 @@
         if (f.x > W + f.r) f.x = -f.r;
         if (f.x < -f.r) f.x = W + f.r;
       }
+    }
+
+    // Rain shadow: rain falls along parallel slanted lines x = x0 + slant*y.
+    // For each line (every few pixels of x0) record where it first meets a
+    // solid (ledges, windows, icons, the taskbar; not the screen borders).
+    // Cheap enough (columns x rects) to redo whenever things move.
+    updateShelter(world, H) {
+      const slant = this.slant;
+      const sh = this.shelter;
+      if (sh && sh.version === world.version && Math.abs(sh.slant - slant) < 0.01 && sh.H === H) return;
+      const step = 3;
+      const x0min = -slant * H - 20;
+      const n = Math.ceil((world.w - x0min) / step) + 2;
+      const hits = new Float32Array(n);
+      const solids = world.solids.filter((q) => q.kind !== 'edge');
+      for (let i = 0; i < n; i++) {
+        const x0 = x0min + i * step;
+        let hit = Infinity;
+        for (const q of solids) {
+          // y range where this rain line is within the rect's x span
+          const yA = (q.x - x0) / slant;
+          const yB = (q.x + q.w - x0) / slant;
+          const entry = Math.max(q.y, yA);
+          const exit = Math.min(q.y + q.h, yB);
+          if (entry <= exit && entry < hit) hit = entry;
+        }
+        hits[i] = hit;
+      }
+      this.shelter = { version: world.version, slant, H, step, x0min, hits };
+    }
+    shelterAt(x, y) {
+      const sh = this.shelter;
+      if (!sh) return Infinity;
+      const i = Math.round((x - sh.slant * y - sh.x0min) / sh.step);
+      return i < 0 || i >= sh.hits.length ? Infinity : sh.hits[i];
     }
 
     newDrop(W, H, anywhere) {
@@ -659,22 +700,30 @@
 
     drawRain(ctx, pal) {
       ctx.lineCap = 'butt';
-      const slant = 0.12 + this.intensity * 0.18;
+      const slant = this.slant || 0.12 + this.intensity * 0.18;
       if (this.curtainsOn && this.world) {
         const H = this.world.h;
+        const sh = this.shelter;
         const a = 0.035 * (0.6 + this.intensity * 2.5);
         for (const c of this.curtains) {
-          const g = ctx.createLinearGradient(c.x, 0, c.x + c.w, 0);
+          // the sheet is a run of slanted strips, each stopping where its
+          // rain meets a ledge or window
+          const g = ctx.createLinearGradient(c.x, 0, c.x + c.w + slant * H * 0.5, 0);
           g.addColorStop(0, U.rgba(pal.rain, 0));
           g.addColorStop(0.5, U.rgba(pal.rain, a * c.a));
           g.addColorStop(1, U.rgba(pal.rain, 0));
           ctx.fillStyle = g;
-          const lean = H * slant;
           ctx.beginPath();
-          ctx.moveTo(c.x + lean, 0);
-          ctx.lineTo(c.x + c.w + lean, 0);
-          ctx.lineTo(c.x + c.w, H);
-          ctx.lineTo(c.x, H);
+          const st = sh ? sh.step * 2 : 6;
+          for (let x0 = c.x; x0 < c.x + c.w; x0 += st) {
+            const i = sh ? Math.round((x0 - sh.x0min) / sh.step) : -1;
+            const hit = Math.min(H, i >= 0 && i < sh.hits.length ? sh.hits[i] : H);
+            ctx.moveTo(x0, 0);
+            ctx.lineTo(x0 + st, 0);
+            ctx.lineTo(x0 + st + slant * hit, hit);
+            ctx.lineTo(x0 + slant * hit, hit);
+            ctx.closePath();
+          }
           ctx.fill();
         }
       }

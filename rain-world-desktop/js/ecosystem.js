@@ -108,7 +108,7 @@
       for (const c of this.creatures) {
         if (c.dead || c.corpse) continue;
         const s = this.cfg.species[c.species];
-        p += s ? s.popCost || 1 : 1;
+        p += s && s.popCost !== undefined ? +s.popCost : 1; // 0 is a real cost (batflies)
       }
       return p;
     }
@@ -188,7 +188,7 @@
         const s = cfg.species[k];
         if (!s.enabled || !(s.weight > 0)) continue;
         if (this.count(k) >= (s.max || 0)) continue;
-        if (pop + (s.popCost || 1) > cfg.ecosystem.maxPopulation + 0.01) continue;
+        if (pop + (s.popCost !== undefined ? +s.popCost : 1) > cfg.ecosystem.maxPopulation + 0.01) continue;
         entries.push([k, s.weight]);
       }
       return U.weighted(entries);

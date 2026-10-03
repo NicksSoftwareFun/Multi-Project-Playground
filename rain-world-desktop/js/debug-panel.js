@@ -79,6 +79,17 @@
       });
       return h('label', { class: 'row' }, h('span', { class: 'lbl', text: label }), s);
     }
+    census() {
+      const n = {};
+      for (const c of this.engine.eco.creatures) {
+        if (c.dead || c.corpse) continue;
+        const k = c.species.startsWith('lizard') ? 'lizards' : c.species.startsWith('centipede') ? 'centipedes' : c.species === 'daddy' ? 'daddy' : c.species === 'batfly' ? 'batflies (free)' : c.species + 's';
+        n[k] = (n[k] || 0) + 1;
+      }
+      return Object.entries(n)
+        .map(([k, v]) => `${k} ${v}`)
+        .join('  ');
+    }
     button(text, fn, cls) {
       return h('button', { class: cls || '', onclick: fn, text });
     }
@@ -264,6 +275,8 @@
       const left = Math.max(0, (1 - w.phase) * this.cfg.rain.cycleMinutes);
       this.stats.textContent =
         `population ${eco.population().toFixed(1)} / ${this.cfg.ecosystem.maxPopulation}   ` +
+        // what's alive, by kind (lizards 1.2-2 each, centipedes by size; batflies free)
+        '\n' + this.census() + '\n' +
         `born ${eco.stats.born}  eaten ${eco.stats.eaten}  left ${eco.stats.left}\n` +
         (w.downpour ? 'DOWNPOUR — creatures sheltering' : `rain in ~${left.toFixed(1)} min`) +
         (this.engine.provider.status ? '\n' + this.engine.provider.status() : '');
