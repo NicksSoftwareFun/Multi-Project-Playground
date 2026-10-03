@@ -19,6 +19,7 @@
       seed: 0, // 0 = new background every load
       decorLedges: 6, // wallpaper ledges creatures can use
       decorPoles: 7, // climbable poles in the wallpaper
+      ledgePoles: 0.6, // chance a ledge gets a pole standing on it (linking up to a higher ledge if there is one)
       fruitPlants: 5,
       timeScale: 1,
       maxFps: 60, // 30 halves drawing cost; the simulation is unaffected
@@ -343,7 +344,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v8'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v9'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

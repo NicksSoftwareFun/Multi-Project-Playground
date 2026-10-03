@@ -58,6 +58,16 @@
     }
 
     const poles = [];
+    // A pole beside a ledge's end sits in the middle of the grid column right
+    // next to the ledge's first/last solid column (see World.rebuild: a rect
+    // fills a cell it covers by over 30%), so the pole is unbroken and a
+    // walker at its top can step straight across onto the ledge.
+    const cell = Math.min(40, Math.max(12, +cfg.world.cellSize || 20));
+    const beside = (l, side) => {
+      const t = cell * 0.3;
+      const col = side < 0 ? Math.floor((l.x + t) / cell) - 1 : Math.ceil((l.x + l.w - t) / cell);
+      return (col + 0.5) * cell;
+    };
     const blocked = (x, y1, y2) => ledges.some((l) => x > l.x - 6 && x < l.x + l.w + 6 && y2 > l.y && y1 < l.y + l.h);
     const nP = cfg.world.decorPoles | 0;
     for (let i = 0, tries = 0; i < nP && tries < 200; tries++) {
@@ -66,7 +76,7 @@
       const y2 = H + 5;
       if (ledges.length && rnd() < 0.65) {
         const l = ledges[Math.floor(rnd() * ledges.length)];
-        x = rnd() < 0.5 ? l.x - 14 : l.x + l.w + 14;
+        x = beside(l, rnd() < 0.5 ? -1 : 1);
         y1 = l.y - R(30, 90);
       } else {
         x = R(W * 0.04, W * 0.96);
@@ -79,6 +89,30 @@
       poles.push({ id: 'pole-' + i, x, y1: Math.round(y1), y2 });
       i++;
     }
+
+    // Poles standing on ledges. Where a higher ledge sits above, the pole
+    // rises beside its end to just over its top, linking the two; otherwise
+    // it's a free-standing lookout pole to climb and hop from.
+    const pLedge = cfg.world.ledgePoles === undefined ? 0.6 : +cfg.world.ledgePoles;
+    ledges.forEach((l, li) => {
+      if (l.w < 60 || rnd() >= pLedge) return;
+      const inside = (x) => x > l.x + 10 && x < l.x + l.w - 10;
+      // ledges above this one with an end over our top
+      const links = [];
+      for (const u of ledges) {
+        if (u === l || u.y >= l.y - 40) continue;
+        for (const x of [beside(u, -1), beside(u, 1)]) if (inside(x)) links.push({ x, y1: u.y - R(28, 48) });
+      }
+      links.sort((a, b) => b.y1 - a.y1); // the nearest ledge up first
+      const cands = links.length ? links : [{ x: R(l.x + 16, l.x + l.w - 16), y1: l.y - R(80, 150) }];
+      for (const c of cands) {
+        const x = Math.round(c.x);
+        const y1 = Math.max(12, Math.round(c.y1));
+        if (blocked(x, y1, l.y) || poles.some((p) => Math.abs(p.x - x) < 30 && p.y1 < l.y && p.y2 > y1)) continue;
+        poles.push({ id: 'pole-l' + li, x, y1, y2: l.y });
+        break;
+      }
+    });
 
     // Dens ("shortcut" pipe mouths) in the screen walls and on ledges.
     const dens = [];
