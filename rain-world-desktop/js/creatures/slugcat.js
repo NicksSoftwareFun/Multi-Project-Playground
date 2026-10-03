@@ -61,7 +61,9 @@
       this.lastX = x;
       this.lastY = y;
       this.pers = U.personality(); // bravery decides fight (throw) or flight
-      this.weapon = null; // a rock or spear in the far hand
+      this.weapon = null; // a rock or spear in the far hand (the throwing hand)
+      this.offhand = null; // a second weapon, of the other kind, in the near hand
+      this.armed = false; // starting weapons handed out yet?
       this.throwT = 0; // windup before a throw
       this.throwCd = 0;
       this.throwAt = null;
@@ -137,21 +139,51 @@
       }
       return fallback;
     }
-    weaponPoint() {
+    weaponPoint(w) {
+      if (w && w === this.offhand) {
+        // near hand; tucked against the shoulder while that hand holds food
+        if (this.item || this.holding || !this.handPt) return this.shoulder();
+        return this.handPt;
+      }
       return this.handPt2 || { x: this.head.x - this.facing * 3, y: this.head.y + 6 };
     }
-    weaponAngle() {
-      if (this.throwT > 0 && this.aimAng !== undefined) return this.aimAng;
-      return this.facing > 0 ? -0.45 : Math.PI + 0.45;
+    weaponAngle(w) {
+      if (w !== this.offhand && this.throwT > 0 && this.aimAng !== undefined) return this.aimAng;
+      const tilt = w === this.offhand ? 0.25 : 0.45;
+      return this.facing > 0 ? -tilt : Math.PI + tilt;
+    }
+    // Two hands, but never two of the same thing.
+    hasKind(kind) {
+      return (this.weapon && this.weapon.kind === kind) || (this.offhand && this.offhand.kind === kind);
+    }
+    canTake(w) {
+      if (!w.pickable) return false;
+      if (!this.weapon) return true;
+      return !this.offhand && w.kind !== this.weapon.kind;
+    }
+    dropWeapons() {
+      for (const w of [this.weapon, this.offhand]) if (w) w.drop();
+      this.weapon = this.offhand = null;
+    }
+    // Some slugcats come out of the pipe already armed: a spear, a rock, or
+    // one of each.
+    armUp() {
+      this.armed = true;
+      const lo = this.p.loadout || { spear: 0.3, rock: 0.25, both: 0.15 };
+      const r = Math.random();
+      const kinds = r < lo.spear ? ['spear'] : r < lo.spear + lo.rock ? ['rock'] : r < lo.spear + lo.rock + lo.both ? ['spear', 'rock'] : [];
+      for (const kind of kinds) {
+        const w = new RW.Weapon(this.eco, kind, this.hip.x, this.hip.y);
+        this.eco.items.push(w);
+        this.pickUpWeapon(w);
+      }
     }
     remove() {
-      if (this.weapon) this.weapon.drop();
-      this.weapon = null;
+      this.dropWeapons();
       super.remove();
     }
     kill() {
-      if (this.weapon) this.weapon.drop();
-      this.weapon = null;
+      this.dropWeapons();
       if (this.item) {
         this.item.heldBy = null;
         this.item = null;
@@ -185,8 +217,8 @@
       this.updateHand();
     }
     leave() {
-      if (this.weapon) this.weapon.dead = true; // taken into the den
-      this.weapon = null;
+      for (const w of [this.weapon, this.offhand]) if (w) w.dead = true; // taken into the den
+      this.weapon = this.offhand = null;
       super.leave();
     }
     carry(dx, dy) {
@@ -292,7 +324,7 @@
           const t = this.threatNear(p.vision || 260);
           if (t) {
             this.threat = t;
-            if (this.weapon && Math.random() < 0.35 + 0.6 * this.pers.bravery) this.startThrow(t);
+            if ((this.weapon || this.offhand) && Math.random() < 0.35 + 0.6 * this.pers.bravery) this.startThrow(t);
             const g = this.fleeGoal(this.caps, t.x, t.y, 380);
             if (g) this.pather.setGoal(g.x, g.y, true);
             this.setState('flee');
@@ -433,7 +465,7 @@
       if (perceive && this.weapon && this.hunger > 0.35 && this.throwCd <= 0 && !this.item && Math.random() < 0.35) {
         const bf = this.nearestOf(['batfly', 'centipede'], 240, (c) => !c.grabbedBy && !(c.stunT > 0) && (c.size || 1) <= 1 && U.dist(c.x, c.y, hip.x, hip.y) > 40 && this.canSee(c.x, c.y, 240));
         if (bf) this.startThrow(bf);
-        else if (this.weapon.kind === 'rock' && !this.findFruit(500)) {
+        else if (this.hasKind('rock') && !this.findFruit(500)) {
           const pl = this.eco.plants.find((pp) => {
             if (pp.grow < 0.8) return false;
             const tp = pp.tip();
@@ -447,7 +479,7 @@
       if (this.state === 'fetch') {
         const w = this.fetch;
         const unreachable = this.pather.nodes && !this.pather.complete && this.pather.remaining() === 0 && this.stateT > 1.5;
-        if (!w || !w.pickable || this.weapon || this.stateT > 12 || unreachable || (w.claimedBy && w.claimedBy !== this)) {
+        if (!w || !this.canTake(w) || this.stateT > 12 || unreachable || (w.claimedBy && w.claimedBy !== this)) {
           if (w && unreachable) {
             this.ignoreWeapon = w;
             this.ignoreWeaponT = 30;
@@ -465,7 +497,7 @@
         }
       }
       this.ignoreWeaponT = (this.ignoreWeaponT || 0) - dt;
-      if (!this.weapon && perceive && this.state === 'wander' && Math.random() < 0.4) {
+      if (!(this.weapon && this.offhand) && perceive && this.state === 'wander' && Math.random() < 0.4) {
         const w = this.findWeapon(300);
         if (w) {
           this.fetch = w;
@@ -538,7 +570,7 @@
       let best = null;
       let bs = range;
       for (const it of this.eco.items) {
-        if (!(it instanceof RW.Weapon) || !it.pickable) continue;
+        if (!(it instanceof RW.Weapon) || !this.canTake(it)) continue;
         if (it.claimedBy && it.claimedBy !== this) continue;
         if (it === this.ignoreWeapon && this.ignoreWeaponT > 0) continue;
         const d = U.dist(it.x, it.y, hip.x, hip.y) - (it.kind === 'spear' ? 120 : 0) - (it.skewer && this.hunger > 0.3 ? 150 : 0);
@@ -556,7 +588,8 @@
         w.skewer = null;
       }
       w.pickUp(this);
-      this.weapon = w;
+      if (!this.weapon) this.weapon = w;
+      else this.offhand = w;
       this.fetch = null;
       if (this.state === 'fetch') this.setState('wander');
     }
@@ -573,8 +606,26 @@
       }
       return t.mainPoint();
     }
+    // Which of our weapons suits this target: a spear into a captor (it lets
+    // go) or a red lizard (rocks don't faze them) or anything big; a rock to
+    // flip other lizards, to down small prey for the taking, and for fruit.
+    pickWeaponFor(t) {
+      if (t === this.grabbedBy) return 'spear';
+      if (t.tip && !t.spine && !t.chain) return 'rock';
+      if (t.species && t.species.startsWith('lizard_')) return t.p && t.p.stunImmune ? 'spear' : 'rock';
+      if (t.species === 'batfly' || (t.species === 'centipede' && (t.size || 1) <= 1)) return 'rock';
+      return 'spear';
+    }
     startThrow(t) {
-      if (!this.weapon || this.throwT > 0 || this.throwCd > 0 || !t) return false;
+      if (!(this.weapon || this.offhand) || this.throwT > 0 || this.throwCd > 0 || !t) return false;
+      // bring the right weapon to the throwing hand
+      const want = this.pickWeaponFor(t);
+      if (this.offhand && (!this.weapon || (this.offhand.kind === want && this.weapon.kind !== want))) {
+        const w = this.weapon;
+        this.weapon = this.offhand;
+        this.offhand = w;
+      }
+      if (want === 'rock' && t.tip && !t.spine && !t.chain && this.weapon.kind !== 'rock') return false; // fruit: rocks only
       const tp = this.aimPoint(t);
       this.throwAt = t;
       this.throwT = 0.16;
@@ -591,7 +642,8 @@
       w.x = from.x;
       w.y = from.y;
       w.thrower = this;
-      this.weapon = null;
+      this.weapon = this.offhand; // the other hand's weapon is next
+      this.offhand = null;
       this.throwCd = 1;
       if (t === this.grabbedBy) {
         // point blank into whatever has hold of us
@@ -672,7 +724,7 @@
       if (this.grabbedBy) {
         // caught: a held rock or spear goes straight into the captor
         this.grabbedT += dt;
-        if (this.weapon && this.grabbedT > 0.35 && this.throwT <= 0) this.startThrow(this.grabbedBy);
+        if ((this.weapon || this.offhand) && this.grabbedT > 0.35 && this.throwT <= 0 && !this.grabbedBy.isHand) this.startThrow(this.grabbedBy);
         const hp = this.grabbedBy.holdPoint();
         hip.x = hp.x;
         hip.y = hp.y;
@@ -688,10 +740,11 @@
       this.grabbedT = 0;
       this.think(dt);
       // snatch up a weapon lying right underfoot
-      if (!this.weapon && !this.item && !this.holding && this.state !== 'eat') {
+      if (!this.armed) this.armUp();
+      if (!(this.weapon && this.offhand) && !this.item && !this.holding && this.state !== 'eat') {
         for (const it of this.eco.items) {
           const reach = this.state === 'flee' ? 20 : 12; // grab one on the run
-          if (it instanceof RW.Weapon && it.pickable && (!it.claimedBy || it.claimedBy === this) && U.dist(it.x, it.y, hip.x, hip.y) < reach) {
+          if (it instanceof RW.Weapon && this.canTake(it) && (!it.claimedBy || it.claimedBy === this) && U.dist(it.x, it.y, hip.x, hip.y) < reach) {
             this.pickUpWeapon(it);
             break;
           }
@@ -853,7 +906,8 @@
       let tx;
       let ty;
       if (held) {
-        tx = hip.x + Math.sin(this.age * 9) * 4;
+        // dangling: a predator's catch wriggles, the player's just hangs
+        tx = hip.x + (this.grabbedBy && this.grabbedBy.isHand ? 0 : Math.sin(this.age * 9) * 4);
         ty = hip.y + 9;
       } else if (this.crouchT > 0) {
         tx = hip.x + this.facing * 6;
@@ -999,7 +1053,7 @@
       const ex = h.x + lx * 2.6;
       const ey = h.y + 0.9;
       ctx.fillStyle = '#0b0b10';
-      const closed = this.blink > 0 || this.sleeping || (this.grabbedBy && Math.sin(this.age * 7) > 0);
+      const closed = this.blink > 0 || this.sleeping || (this.grabbedBy && !this.grabbedBy.isHand && Math.sin(this.age * 7) > 0);
       for (const s of [-1, 1]) {
         if (ax > 0.8 && s === -Math.sign(lx)) continue;
         if (this.corpse) {
@@ -1055,7 +1109,11 @@
       const feet = [];
       const hands = [];
       const gy = hip.y + R + 0.5;
-      if (this.grabbedBy) {
+      if (this.grabbedBy && (this.grabbedBy.isHand || this.corpse)) {
+        // dangling limp from the cursor: everything just hangs
+        feet.push({ x: hip.x + 2, y: hip.y + 11 }, { x: hip.x - 2, y: hip.y + 11 });
+        hands.push({ x: shoulder.x + 2, y: shoulder.y + 9 }, { x: shoulder.x - 2, y: shoulder.y + 9 });
+      } else if (this.grabbedBy) {
         const w = Math.sin(this.age * 12) * 4;
         feet.push({ x: hip.x + 3 + w, y: hip.y + 10 }, { x: hip.x - 3 - w, y: hip.y + 10 });
         hands.push({ x: shoulder.x + 7, y: shoulder.y - 4 - w }, { x: shoulder.x - 7, y: shoulder.y - 4 + w });

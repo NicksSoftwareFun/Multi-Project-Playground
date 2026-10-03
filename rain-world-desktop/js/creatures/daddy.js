@@ -108,6 +108,10 @@
     canBeGrabbed() {
       return false;
     }
+    onGrabbed() {
+      if (this.holding) this.release();
+      for (const t of this.tentacles) t.release();
+    }
     carry(dx, dy) {
       this.body.x += dx;
       this.body.y += dy;
@@ -215,6 +219,14 @@
 
     update(dt) {
       if (!this.tick(dt)) {
+        for (const t of this.tentacles) this.updateTentacle(t, dt);
+        return;
+      }
+      if (this.grabbedBy) {
+        // carried by the player's hand: tentacles trail after the body
+        const hp = this.grabbedBy.holdPoint();
+        this.body.x = hp.x;
+        this.body.y = hp.y;
         for (const t of this.tentacles) this.updateTentacle(t, dt);
         return;
       }

@@ -97,7 +97,7 @@
         const hp = this.grabbedBy.holdPoint();
         p.x = hp.x;
         p.y = hp.y;
-        this.flap += dt * 50;
+        this.flap += dt * (this.grabbedBy.isHand || this.corpse ? 3 : 50); // limp in the hand
         this.struggle(dt);
         return;
       }

@@ -230,6 +230,41 @@
       }
     }
 
+    // After the pixel snap: each translucent creature is drawn opaque on a
+    // scratch layer, snapped there, then blended onto the sprite layer at its
+    // see-through alpha. k is world units -> sprite pixels.
+    drawLate(spriteCanvas, k) {
+      if (!this.late || !this.late.length) return;
+      const sc = spriteCanvas.getContext('2d');
+      const W = spriteCanvas.width;
+      const H = spriteCanvas.height;
+      if (!this.scratch) this.scratch = document.createElement('canvas');
+      const cv = this.scratch;
+      if (cv.width !== W || cv.height !== H) {
+        cv.width = W;
+        cv.height = H;
+      }
+      const x = cv.getContext('2d', { willReadFrequently: true });
+      for (const c of this.late) {
+        const b = c.bounds();
+        const x0 = Math.max(0, Math.floor(b[0] * k) - 1);
+        const y0 = Math.max(0, Math.floor(b[1] * k) - 1);
+        const x1 = Math.min(W, Math.ceil(b[2] * k) + 1);
+        const y1 = Math.min(H, Math.ceil(b[3] * k) + 1);
+        if (x1 <= x0 || y1 <= y0) continue;
+        x.setTransform(1, 0, 0, 1, 0, 0);
+        x.clearRect(x0, y0, x1 - x0, y1 - y0);
+        x.setTransform(k, 0, 0, k, 0, 0);
+        c.draw(x, true);
+        U.crispRects(cv, [[x0, y0, x1, y1]]);
+        sc.save();
+        sc.setTransform(1, 0, 0, 1, 0, 0);
+        sc.globalAlpha = c.ghostAlpha();
+        sc.drawImage(cv, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+        sc.restore();
+      }
+    }
+
     // Keep a few rocks and spears lying about (about one in four a spear).
     stockWeapons(all) {
       const E = this.cfg.ecosystem;
@@ -334,7 +369,14 @@
       // weapons stuck in creatures or in flight draw over them; the rest under
       const over = (it) => it.state === 'embedded' || it.state === 'flying';
       for (const it of this.items) if (!over(it)) it.draw(ctx);
-      for (const c of sorted) c.draw(ctx);
+      // Translucent creatures (a camouflaged white lizard) can't go through
+      // the hard-edged pixel pass, which would snap them to all-or-nothing:
+      // they're drawn afterwards, by drawLate.
+      this.late = [];
+      for (const c of sorted) {
+        if (c.ghostAlpha && c.ghostAlpha() < 0.99) this.late.push(c);
+        else c.draw(ctx);
+      }
       for (const it of this.items) if (over(it)) it.draw(ctx);
       for (const p of this.particles) {
         ctx.fillStyle = U.rgba(p.color, 1 - p.t / p.life);

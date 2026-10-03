@@ -101,10 +101,10 @@
           this.drop();
           return;
         }
-        const p = h.weaponPoint();
+        const p = h.weaponPoint(this);
         this.x = p.x;
         this.y = p.y;
-        this.ang = h.weaponAngle();
+        this.ang = h.weaponAngle(this);
         return;
       }
       if (this.state === 'embedded') {

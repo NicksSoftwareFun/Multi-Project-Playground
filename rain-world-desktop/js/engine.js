@@ -41,8 +41,79 @@
         rects: g.rects.map((r) => ({ id: r.id, kind: r.kind, x: r.x / z, y: r.y / z, w: r.w / z, h: r.h / z })),
         cursor: g.cursor ? s(g.cursor) : null,
         clicks: (g.clicks || []).map(s),
+        releases: (g.releases || []).map(s),
+        pointer: g.pointer ? s(g.pointer) : null,
         paused: g.paused,
       };
+    }
+
+    // ---- the player's hand ----------------------------------------------------
+    get hand() {
+      if (!this._hand) {
+        const eng = this;
+        this._hand = {
+          isHand: true,
+          species: 'hand',
+          x: 0,
+          y: 0,
+          vx: 0,
+          vy: 0,
+          holding: null,
+          dead: false,
+          holdPoint() {
+            return { x: this.x, y: this.y };
+          },
+          release() {
+            eng.dropHand();
+          },
+        };
+      }
+      return this._hand;
+    }
+    // The creature (living or dead) whose body is nearest the press, if any.
+    tryGrab(x, y) {
+      const hand = this.hand;
+      let best = null;
+      let bd = Infinity;
+      for (const c of this.eco.creatures) {
+        if (c.dead || c.leaving || c.alpha < 0.3 || c.grabbedBy === hand) continue;
+        for (const p of c.hitParts()) {
+          const d = Math.hypot(p.x - x, p.y - y) - p.r;
+          if (d < 10 && d < bd) {
+            bd = d;
+            best = c;
+          }
+        }
+      }
+      if (!best) return false;
+      this.dropHand();
+      if (best.grabbedBy) best.grabbedBy.release(); // snatched from a predator's jaws
+      best.grabbedBy = hand;
+      best.stunT = 0;
+      best.unburrow = null;
+      if (best.pather) best.pather.clear();
+      if (best.onGrabbed) best.onGrabbed(hand);
+      hand.holding = best;
+      hand.x = x;
+      hand.y = y;
+      hand.vx = hand.vy = 0;
+      return true;
+    }
+    // Let go: it drops (or flies a little, if the mouse was moving).
+    dropHand() {
+      const hand = this.hand;
+      const c = hand.holding;
+      hand.holding = null;
+      if (!c || c.grabbedBy !== hand) return;
+      c.grabbedBy = null;
+      const sp = Math.hypot(hand.vx, hand.vy);
+      const k = sp > 700 ? 700 / sp : 1;
+      if ('vx' in c) {
+        c.vx = hand.vx * k * 0.8;
+        c.vy = hand.vy * k * 0.8;
+      }
+      if (c.species === 'dropwig' && c.setState) c.setState('recover');
+      if (c.pather) c.pather.version = -1;
     }
 
     init(keepSeed) {
@@ -192,9 +263,22 @@
       if (moves.length) this.eco.carry(moves);
       const c = g.cursor || { x: -9999, y: -9999, inside: false };
       this.eco.setCursor(c.x, c.y, !!c.inside, dt);
-      if (g.clicks && this.cfg.ecosystem.clickDropsFood) {
-        for (const k of g.clicks) this.eco.dropFood(k.x, k.y);
+      // Press on a creature to pick it up (it hangs limp from the cursor);
+      // let go to drop it. A press on empty wallpaper drops food if enabled.
+      for (const k of g.clicks || []) {
+        if (!this.tryGrab(k.x, k.y) && this.cfg.ecosystem.clickDropsFood) this.eco.dropFood(k.x, k.y);
       }
+      const hand = this.hand;
+      if (hand.holding) {
+        const pt = g.pointer || c;
+        hand.vx += ((pt.x - hand.x) / dt - hand.vx) * 0.3;
+        hand.vy += ((pt.y - hand.y) / dt - hand.vy) * 0.3;
+        hand.x = pt.x;
+        hand.y = pt.y;
+        const h = hand.holding;
+        if (h.dead || h.leaving || h.grabbedBy !== hand) hand.holding = null;
+      }
+      if ((g.releases || []).length) this.dropHand();
       this.weather.update(dt, this.cfg, this.W, this.H, this.world);
       this.eco.update(dt);
     }
@@ -217,6 +301,7 @@
       this.eco.draw(sc);
       const rects = this.eco.dirty.map((r) => [r[0] * k - 1, r[1] * k - 1, r[2] * k + 1, r[3] * k + 1]);
       U.crispRects(this.spriteCanvas, rects);
+      this.eco.drawLate(this.spriteCanvas, k);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(this.spriteCanvas, 0, 0);
       ctx.setTransform(k, 0, 0, k, 0, 0);

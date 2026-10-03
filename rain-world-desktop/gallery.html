@@ -118,6 +118,7 @@
     sctx.setTransform(res, 0, 0, res, 0, 0);
     eco.draw(sctx);
     if (q.get('smooth') !== '1') RW.U.crisp(sprite);
+    eco.drawLate(sprite, res);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(sprite, 0, 0);
     ctx.setTransform(res, 0, 0, res, 0, 0);

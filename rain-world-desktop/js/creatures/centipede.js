@@ -217,7 +217,7 @@
         h.y = hp.y;
         this.chain.verlet(1, 0.9, 0, GRAV, dt);
         this.chain.follow(1);
-        this.phase += dt * 30;
+        if (!this.grabbedBy.isHand && !this.corpse) this.phase += dt * 30;
         this.struggle(dt);
         return;
       }

@@ -374,7 +374,7 @@
     }
     // Prey struggles; returns true if it escaped this frame.
     struggle(dt) {
-      if (this.corpse) return false;
+      if (this.corpse || (this.grabbedBy && this.grabbedBy.isHand)) return false; // limp in the hand
       const chance = this.p.escapeChance || 0.04;
       if (Math.random() < chance * dt) {
         const holder = this.grabbedBy;

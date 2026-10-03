@@ -25,6 +25,7 @@
       this.lastOk = 0;
       this.failures = 0;
       this.clicks = [];
+      this.releases = [];
       this.domCursor = { x: -9999, y: -9999, inside: false, t: 0 };
       this.paused = false;
       this.bindDom();
@@ -43,8 +44,12 @@
       // "wallpaper input" setting is enabled.
       window.addEventListener('pointerdown', (e) => {
         if (e.target.closest && e.target.closest('.rw-panel, .rw-panel-toggle')) return;
+        if (e.button !== 0) return;
         this.clicks.push({ x: e.clientX, y: e.clientY });
       });
+      const up = (e) => this.releases.push({ x: e.clientX, y: e.clientY });
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     }
 
     async loop() {
@@ -81,9 +86,13 @@
     poll() {
       const clicks = this.clicks;
       this.clicks = [];
+      const releases = this.releases;
+      this.releases = [];
+      // the forwarded DOM pointer is the most responsive thing to drag with
+      const pointer = performance.now() - this.domCursor.t < 500 ? this.domCursor : null;
       if (!this.connected || !this.data) {
         this.paused = false;
-        return { rects: [], cursor: this.domCursor, clicks };
+        return { rects: [], cursor: this.domCursor, clicks, releases, pointer: this.domCursor };
       }
       const map = this.mapper();
       const W = window.innerWidth;
@@ -106,7 +115,7 @@
       this.paused = covered;
       const c = map(this.data.cursor);
       const cursor = { x: c.x, y: c.y, inside: c.x >= 0 && c.y >= 0 && c.x < W && c.y < H };
-      return { rects, cursor, clicks, paused: covered };
+      return { rects, cursor, clicks, releases, pointer: pointer || cursor, paused: covered };
     }
 
     status() {

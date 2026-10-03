@@ -152,6 +152,10 @@
     mainPoint() {
       return this.spine.pts[0];
     }
+    // How see-through to draw (white lizards' camouflage).
+    ghostAlpha() {
+      return this.p.camouflage ? this.alpha * this.camo : 1;
+    }
     bounds() {
       return RW.Creature.ptsBounds(this.spine.pts, 56 * this.L);
     }
@@ -904,7 +908,10 @@
         this.spine.verlet(1, 0.9, 0, GRAV, dt);
         this.spine.follow(1);
         this.spine.collide(W, 3, 1);
-        this.jaw += this.corpse ? (0.25 - this.jaw) * 0.2 : (Math.random() < 0.1 ? 1 : 0 - this.jaw) * 0.3;
+        // dead or dangling from the player's hand: slack-jawed; caught by a
+        // predator: snapping
+        const limp = this.corpse || this.grabbedBy.isHand;
+        this.jaw += limp ? (0.25 - this.jaw) * 0.2 : (Math.random() < 0.1 ? 1 : 0 - this.jaw) * 0.3;
         this.updateLegs(dt, false);
         this.struggle(dt);
         return;
@@ -1192,7 +1199,8 @@
       this.updateLegs(dt, true);
       const speedNow = Math.hypot(this.vx, this.vy);
       if (this.p.camouflage) {
-        const visible = this.lungeT > 0 || this.holding ? 1 : U.clamp(speedNow / 140, 0.12, 1);
+        // fades to see-through when still, never fully invisible
+        const visible = this.lungeT > 0 || this.holding ? 1 : U.clamp(speedNow / 140, 0.35, 1);
         this.camo += (visible - this.camo) * U.approach(visible > this.camo ? 6 : 0.7, dt);
         this.lurking = this.camo < 0.4;
       }
@@ -1254,7 +1262,9 @@
       const body = U.rgba(this.bodyColor);
       const headCol = U.rgba(this.headColor);
       ctx.save();
-      ctx.globalAlpha = this.alpha * (this.p.camouflage ? this.camo : 1);
+      // (a camouflaged lizard is drawn opaque here and blended in later; see
+      // ghostAlpha and Ecosystem.drawLate)
+      ctx.globalAlpha = this.alpha;
 
       // An open mouth is a gap: keep the lizard's own neck and legs out of it
       // (clip, rather than erase, so whatever is behind still shows).

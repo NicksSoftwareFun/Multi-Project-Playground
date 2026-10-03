@@ -43,7 +43,7 @@
       rocks: 6, // rocks kept lying about for slugcats to throw
       spears: 2, // spears likewise (the wiki: about one weapon in five is a spear) // chance per creature per minute to wander off into a den
       cursorInteraction: true,
-      clickDropsFood: true,
+      clickDropsFood: false, // off: pressing on a creature picks it up instead
     },
     debug: {
       showGrid: false,
@@ -344,7 +344,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v9'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v10'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

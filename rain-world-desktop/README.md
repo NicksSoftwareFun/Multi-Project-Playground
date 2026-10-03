@@ -13,7 +13,9 @@ Everything is plain JavaScript + `<canvas>`, with no build step and no dependenc
   with draggable, resizable windows and icons over the wallpaper. They are real
   geometry: drag a window and creatures standing on it ride along.
   - Press **`** (backtick) or the ≡ button for the **ecosystem panel**.
-  - **Click** bare wallpaper to drop a dangle fruit.
+  - **Drag** a creature (living or dead) to pick it up: it hangs limp from
+    the cursor and drops where you let go. (Clicking bare wallpaper to drop
+    a dangle fruit is still available as a panel toggle, off by default.)
   - **Rest the cursor** near creatures: lizards stalk and snap at it, slugcats
     come and look at it, Daddy Long Legs reaches for it, Dropwigs drop on it.
 - **Creature gallery**: `gallery.html?spawn=lizard_pink@200,300;slugcat@400,300`

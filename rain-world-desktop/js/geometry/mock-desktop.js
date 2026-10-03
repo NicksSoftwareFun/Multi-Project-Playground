@@ -36,6 +36,7 @@
       this.root = root;
       this.cursor = { x: -9999, y: -9999, inside: false };
       this.clicks = [];
+      this.releases = [];
       this.z = 10;
       this.windows = [];
       this.build();
@@ -199,10 +200,16 @@
       });
       document.addEventListener('pointerleave', () => (this.cursor.inside = false));
       window.addEventListener('blur', () => (this.cursor.inside = false));
+      // Presses on bare wallpaper (not a window, icon, taskbar or panel) can
+      // pick up a creature (or drop food, if that's switched on); a release
+      // anywhere lets go.
       window.addEventListener('pointerdown', (e) => {
-        // Clicking bare wallpaper (not a window, icon, taskbar or panel) drops food.
+        if (e.button !== 0) return;
         if (e.target.id === 'wallpaper' || e.target === this.root) this.clicks.push({ x: e.clientX, y: e.clientY });
       });
+      const up = (e) => this.releases.push({ x: e.clientX, y: e.clientY });
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     }
 
     // Engine interface
@@ -216,7 +223,9 @@
       }
       const clicks = this.clicks;
       this.clicks = [];
-      return { rects, cursor: this.cursor, clicks };
+      const releases = this.releases;
+      this.releases = [];
+      return { rects, cursor: this.cursor, clicks, releases, pointer: this.cursor };
     }
 
     explorerHtml() {
@@ -241,7 +250,7 @@
       return (
         '<pre class="np">rain world desktop — prototype\n\n' +
         '· drag these windows around: they are\n  ledges and walls for the creatures\n' +
-        '· click bare wallpaper to drop a fruit\n' +
+        '· drag a creature to pick it up and move it\n' +
         '· rest the cursor near a lizard...\n' +
         '· press ` (backtick) for the ecosystem\n  panel: spawn weights, caps, rain\n\n' +
         'the rain comes at the end of each cycle.\n' +

@@ -26,8 +26,8 @@ with Windows 10/11.
      (undo with `-Remove`).
 3. In Lively: **Add wallpaper (+)** → paste the URL **`http://localhost:47315/`** → set it as the wallpaper.
 4. In Lively **Settings → Wallpaper → Interaction**, set *Wallpaper input* to
-   **Mouse** so creatures can react to the cursor and clicks on bare desktop
-   drop fruit.
+   **Mouse** so creatures can react to the cursor and you can drag creatures
+   around by pressing on them on bare desktop.
 
 You should see creatures standing on top of your windows, climbing their sides,
 perching on desktop icons and walking along the taskbar. Drag a window and
