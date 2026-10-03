@@ -59,6 +59,11 @@
     mainPoint() {
       return this.hip;
     }
+    bounds() {
+      const b = RW.Creature.ptsBounds([this.hip, this.head].concat(this.tail.pts), 16);
+      if (this.item) b[1] -= 8;
+      return b;
+    }
     itemPoint() {
       return { x: this.head.x + this.facing * 4, y: this.head.y + 4 };
     }
@@ -291,7 +296,7 @@
         this.vx = this.vy = 0;
         this.updateHead(dt, true);
         this.updateTail(dt);
-        if (this.struggle(dt)) this.onReleased();
+        this.struggle(dt); // escaping triggers onReleased via the holder
         return;
       }
 

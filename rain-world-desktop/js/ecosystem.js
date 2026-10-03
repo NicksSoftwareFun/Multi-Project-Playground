@@ -240,7 +240,12 @@
       }
 
       for (const p of this.plants) p.update(dt);
-      for (const c of this.creatures) c.update(dt);
+      const Wd = this.world;
+      for (const c of this.creatures) {
+        c.update(dt);
+        // anything that has fallen or been flung far out of the world is gone
+        if (c.y > Wd.h + 500 || c.y < -500 || c.x < -500 || c.x > Wd.w + 500 || !isFinite(c.x) || !isFinite(c.y)) c.remove();
+      }
       for (const it of this.items) it.update(dt);
 
       for (const c of this.creatures) {
@@ -262,8 +267,19 @@
     // Draw order roughly follows Rain World's layering: big background
     // creatures first, small skittering things on top.
     draw(ctx) {
-      for (const g of this.grass) this.drawGrass(ctx, g);
-      for (const p of this.plants) p.draw(ctx);
+      const dirty = (this.dirty = []);
+      for (const g of this.grass) {
+        this.drawGrass(ctx, g);
+        dirty.push([g.x - 20, g.y - g.h - 8, g.x + 20, g.y + 2]);
+      }
+      for (const p of this.plants) {
+        p.draw(ctx);
+        dirty.push([p.x - 14, p.y - 2, p.x + 14, p.y + p.len + 14]);
+      }
+      for (const it of this.items) dirty.push([it.x - 9, it.y - 9, it.x + 9, it.y + 9]);
+      for (const c of this.creatures) if (c.alpha > 0) dirty.push(c.bounds());
+      for (const p of this.particles) dirty.push([p.x - 3, p.y - 3, p.x + 3, p.y + 3]);
+      for (const d of this.dens) dirty.push([d.x - 24, d.y - 18, d.x + 24, d.y + 18]);
       const order = { daddy: 0, dropwig: 2, centipede: 3, slugcat: 4, batfly: 5 };
       const sorted = this.creatures.slice().sort((a, b) => (order[a.species] ?? 1) - (order[b.species] ?? 1));
       for (const it of this.items) it.draw(ctx);

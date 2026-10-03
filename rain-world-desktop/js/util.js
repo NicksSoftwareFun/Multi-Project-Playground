@@ -185,9 +185,60 @@
     ctx.putImageData(img, 0, 0);
   };
 
+  // Same, restricted to a list of pixel rects [x0, y0, x1, y1] (overlapping
+  // rects are merged first; thresholding is idempotent anyway).
+  U.crispRects = function (canvas, rects, threshold) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const W = canvas.width;
+    const H = canvas.height;
+    const t = threshold === undefined ? 110 : threshold;
+    const list = [];
+    for (const r of rects) {
+      const x0 = Math.max(0, Math.floor(r[0]));
+      const y0 = Math.max(0, Math.floor(r[1]));
+      const x1 = Math.min(W, Math.ceil(r[2]));
+      const y1 = Math.min(H, Math.ceil(r[3]));
+      if (x1 > x0 && y1 > y0) list.push([x0, y0, x1, y1]);
+    }
+    // greedy merge of overlapping rects
+    for (let merged = true; merged; ) {
+      merged = false;
+      for (let i = 0; i < list.length && !merged; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i];
+          const b = list[j];
+          if (a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3]) {
+            a[0] = Math.min(a[0], b[0]);
+            a[1] = Math.min(a[1], b[1]);
+            a[2] = Math.max(a[2], b[2]);
+            a[3] = Math.max(a[3], b[3]);
+            list.splice(j, 1);
+            merged = true;
+            break;
+          }
+        }
+      }
+    }
+    for (const r of list) {
+      const w = r[2] - r[0];
+      const h = r[3] - r[1];
+      const img = ctx.getImageData(r[0], r[1], w, h);
+      const d = new Uint32Array(img.data.buffer);
+      for (let i = 0; i < d.length; i++) {
+        const v = d[i];
+        const a = v >>> 24;
+        if (a === 0 || a === 255) continue;
+        d[i] = a < t ? 0 : v | 0xff000000;
+      }
+      ctx.putImageData(img, r[0], r[1]);
+    }
+    return list.length;
+  };
+
   U.deepMerge = function (target, src) {
     if (!src || typeof src !== 'object') return target;
     for (const k of Object.keys(src)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       const v = src[k];
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         if (!target[k] || typeof target[k] !== 'object' || Array.isArray(target[k])) target[k] = {};

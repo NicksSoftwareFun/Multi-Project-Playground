@@ -18,6 +18,7 @@
       this.vy = 0;
       this.caps = { walls: true, ceil: true, poles: true, fall: true, wallCost: 1.1, ceilCost: 1.3 };
       this.mask = { floor: true, walls: true, ceil: true, poles: true };
+      this.maskNoPole = { floor: true, walls: true, ceil: true, poles: false };
       this.pather = new RW.Pather(this, this.caps);
       this.ux = 0;
       this.uy = -1;
@@ -30,6 +31,9 @@
     }
     mainPoint() {
       return this.chain.pts[0];
+    }
+    bounds() {
+      return RW.Creature.ptsBounds(this.chain.pts, 16);
     }
     carry(dx, dy) {
       this.chain.shift(dx, dy);
@@ -104,7 +108,11 @@
       this.think(dt);
       this.pather.update(dt, h.x, h.y);
       this.pather.advance(h.x, h.y, W.cell * 0.8);
-      let g = W.nearestSurface(h.x, h.y, 14, this.mask);
+      // Poles only count when the path uses one (see lizard.js). Grip range
+      // covers path nodes that sit up to a cell from a partly covered wall.
+      const pn = this.pather.current();
+      const mask = pn && W.pole(pn.cx, pn.cy) && !W.solid(pn.cx, pn.cy + 1) ? this.mask : this.maskNoPole;
+      let g = W.nearestSurface(h.x, h.y, 24, mask);
       if (this.dropT > 0) {
         this.dropT -= dt;
         g = null;
@@ -152,7 +160,7 @@
       this.chain.verlet(1, 0.8, 0, g ? 0 : GRAV, dt);
       this.chain.follow(1);
       for (let i = 1; i < P.length; i++) {
-        const s = W.nearestSurface(P[i].x, P[i].y, 14, this.mask);
+        const s = W.nearestSurface(P[i].x, P[i].y, 18, mask);
         if (s) {
           const e = s.d - 5;
           P[i].x -= s.nx * e * 0.35;

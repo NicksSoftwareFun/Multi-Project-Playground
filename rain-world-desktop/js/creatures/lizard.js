@@ -40,6 +40,7 @@
         poleCost: 1.4,
       };
       this.mask = { floor: true, walls: !!p.climbWalls, ceil: !!p.climbCeilings, poles: !!p.poles };
+      this.maskNoPole = Object.assign({}, this.mask, { poles: false });
       this.pather = new RW.Pather(this, this.caps);
       const l1 = 13 * L;
       const l2 = 13.5 * L;
@@ -122,6 +123,9 @@
 
     mainPoint() {
       return this.spine.pts[0];
+    }
+    bounds() {
+      return RW.Creature.ptsBounds(this.spine.pts, 50 * this.L);
     }
     holdPoint() {
       const h = this.spine.pts[0];
@@ -371,8 +375,12 @@
       this.think(dt);
       this.pather.update(dt, head.x, head.y);
 
-      let g = W.nearestSurface(head.x, head.y, 22 * L, this.mask);
-      if (!g) g = W.nearestSurface(P[3].x, P[3].y, 20 * L, this.mask);
+      // Only cling to a pole when the path is actually using it; otherwise a
+      // pole base pushes the lizard sideways and it can't walk past.
+      const pn = this.pather.current();
+      const mask = pn && W.pole(pn.cx, pn.cy) && !W.solid(pn.cx, pn.cy + 1) ? this.mask : this.maskNoPole;
+      let g = W.nearestSurface(head.x, head.y, 22 * L, mask);
+      if (!g) g = W.nearestSurface(P[3].x, P[3].y, 20 * L, mask);
       if (this.dropT > 0) {
         // letting go on purpose to drop down
         this.dropT -= dt;
@@ -455,7 +463,7 @@
       for (let i = 1; i < P.length; i++) {
         const pt = P[i];
         if (g && !this.leavingSurface && i < this.bodyN + 4) {
-          const s = W.nearestSurface(pt.x, pt.y, 22 * L, this.mask);
+          const s = W.nearestSurface(pt.x, pt.y, 22 * L, mask);
           if (s) {
             const e = s.d - (i < this.bodyN ? 13 - i * 0.5 : 5 + (this.bodyN + 4 - i) * 1.4) * L;
             pt.x -= s.nx * e * 0.3;

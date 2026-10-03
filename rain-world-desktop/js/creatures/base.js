@@ -411,6 +411,26 @@
     // Window dragged under us: ride along.
     carry(dx, dy) {}
 
+    // Screen area this creature may draw into, [x0, y0, x1, y1] in world
+    // units (used to limit the per-frame pixel pass).
+    bounds() {
+      const m = this.mainPoint();
+      return [m.x - 48, m.y - 48, m.x + 48, m.y + 48];
+    }
+    static ptsBounds(pts, pad) {
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const p of pts) {
+        if (p.x < x0) x0 = p.x;
+        if (p.y < y0) y0 = p.y;
+        if (p.x > x1) x1 = p.x;
+        if (p.y > y1) y1 = p.y;
+      }
+      return [x0 - pad, y0 - pad, x1 + pad, y1 + pad];
+    }
+
     drawDebug(ctx) {
       if (!this.eco.cfg.debug.showLabels) return;
       const m = this.mainPoint();

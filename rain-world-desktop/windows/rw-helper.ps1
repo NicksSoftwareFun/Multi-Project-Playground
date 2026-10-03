@@ -19,7 +19,10 @@
   powershell -NoProfile -ExecutionPolicy Bypass -File rw-helper.ps1
 #>
 param(
-  [int]$Port = 47315
+  [int]$Port = 47315,
+  # Let a packaged (file://) Lively wallpaper read the API. Off by default:
+  # sandboxed iframes on any website also have the "null" origin.
+  [switch]$AllowFileOrigin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,7 +84,8 @@ try {
     # Poll asynchronously so Ctrl+C can interrupt between requests.
     $pending = $listener.GetContextAsync()
     while (-not $pending.AsyncWaitHandle.WaitOne(250)) { }
-    $ctx = $pending.GetAwaiter().GetResult()
+    # A client that drops the connection mid-request must not kill the helper.
+    try { $ctx = $pending.GetAwaiter().GetResult() } catch { continue }
     $req = $ctx.Request
     $res = $ctx.Response
     try {
@@ -89,7 +93,7 @@ try {
       $origin = $req.Headers['Origin']
       # A packaged (file://) wallpaper has the opaque origin "null". Nothing
       # else gets cross-origin access, so other websites can't read this.
-      if ($origin -eq 'null') { $res.Headers['Access-Control-Allow-Origin'] = 'null' }
+      if ($AllowFileOrigin -and $origin -eq 'null') { $res.Headers['Access-Control-Allow-Origin'] = 'null' }
       $path = $req.Url.AbsolutePath
 
       if ($path -eq '/api/geometry') {
@@ -100,6 +104,10 @@ try {
           $sameOrigin = (-not $origin) -or ($origin -eq "http://localhost:$Port")
           if (-not $sameOrigin -or ($req.ContentType -notlike 'application/json*')) {
             Send-Text $res 403 'text/plain' 'forbidden'
+            continue
+          }
+          if ($req.ContentLength64 -lt 0 -or $req.ContentLength64 -gt 262144) {
+            Send-Text $res 413 'text/plain' 'too large'
             continue
           }
           $reader = New-Object System.IO.StreamReader($req.InputStream, $utf8)
@@ -116,7 +124,7 @@ try {
         }
         else {
           $json = '{}'
-          if (Test-Path $configPath) { $json = [System.IO.File]::ReadAllText($configPath, $utf8) }
+          if (Test-Path -LiteralPath $configPath) { $json = [System.IO.File]::ReadAllText($configPath, $utf8) }
           Send-Text $res 200 'application/json' $json
         }
       }
@@ -124,9 +132,11 @@ try {
         $rel = [System.Uri]::UnescapeDataString($path.TrimStart('/'))
         if ($rel -eq '') { $rel = 'wallpaper.html' }
         $full = [System.IO.Path]::GetFullPath((Join-Path $root $rel))
-        $inside = $full.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)
-        $blocked = $rel -like 'windows*'
-        if ($inside -and -not $blocked -and (Test-Path $full -PathType Leaf)) {
+        $sep = [System.IO.Path]::DirectorySeparatorChar
+        $inside = $full.StartsWith($root + $sep, [System.StringComparison]::OrdinalIgnoreCase)
+        # check the resolved path, so encoded separators can't sneak into windows\
+        $blocked = $full.StartsWith($here.TrimEnd('\', '/') + $sep, [System.StringComparison]::OrdinalIgnoreCase)
+        if ($inside -and -not $blocked -and (Test-Path -LiteralPath $full -PathType Leaf)) {
           $ext = [System.IO.Path]::GetExtension($full).ToLowerInvariant()
           $type = $types[$ext]
           if (-not $type) { $type = 'application/octet-stream' }
@@ -138,7 +148,8 @@ try {
       }
     }
     catch {
-      try { Send-Text $res 500 'text/plain' $_.Exception.Message } catch { }
+      Write-Host ("request failed: " + $_.Exception.Message) -ForegroundColor DarkYellow
+      try { Send-Text $res 500 'text/plain' 'error' } catch { }
     }
   }
 }

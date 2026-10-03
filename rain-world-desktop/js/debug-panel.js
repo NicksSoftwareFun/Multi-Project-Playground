@@ -186,6 +186,7 @@
           this.select('pixel scale', Wc, 'pixelScale', [1, 2, 3], () => eng.applyPalette()),
           this.select('creature scale', Wc, 'creatureScale', [1, 1.15, 1.35, 1.5, 1.75, 2], () => eng.regenerate(false)),
           this.slider('time scale', Wc, 'timeScale', 0, 3, 0.05),
+          this.select('max fps', Wc, 'maxFps', [60, 30]),
           this.slider('ledges', Wc, 'decorLedges', 0, 14, 1),
           this.slider('poles', Wc, 'decorPoles', 0, 16, 1),
           this.slider('fruit plants', Wc, 'fruitPlants', 0, 14, 1),

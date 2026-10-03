@@ -21,6 +21,7 @@
       decorPoles: 7, // climbable poles in the wallpaper
       fruitPlants: 5,
       timeScale: 1,
+      maxFps: 60, // 30 halves drawing cost; the simulation is unaffected
     },
     rain: {
       enabled: true,

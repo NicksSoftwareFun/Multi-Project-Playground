@@ -91,7 +91,7 @@
       this.weather.t = t;
       if (!newSeed && this.zoom === oldZoom) {
         for (const c of keep) {
-          if (!this.world.isSolidPt(c.x, c.y)) {
+          if (c.x >= 0 && c.y >= 0 && c.x < this.W && c.y < this.H && !this.world.isSolidPt(c.x, c.y)) {
             c.eco = this.eco;
             c.W = this.world;
             if (c.pather) c.pather.version = -1;
@@ -113,8 +113,9 @@
       if (this.running) return;
       this.running = true;
       this.last = performance.now();
+      const token = (this.loopToken = (this.loopToken || 0) + 1);
       const loop = (now) => {
-        if (!this.running) return;
+        if (!this.running || token !== this.loopToken) return;
         const real = Math.min(0.1, (now - this.last) / 1000);
         this.last = now;
         this.fps += (1 / Math.max(real, 1e-3) - this.fps) * 0.05;
@@ -127,7 +128,10 @@
           steps++;
         }
         if (steps >= 5) this.acc = 0;
-        this.render();
+        // optional 30 fps cap: the sim stays fixed-step, only drawing is halved
+        this.frameN = (this.frameN || 0) + 1;
+        const skip = +this.cfg.world.maxFps === 30 && this.frameN % 2 === 1;
+        if (!this.paused && !skip) this.render();
         this.frameMs += (performance.now() - t0 - this.frameMs) * 0.05;
         requestAnimationFrame(loop);
       };
@@ -136,6 +140,7 @@
 
     stop() {
       this.running = false;
+      this.loopToken = (this.loopToken || 0) + 1; // orphan any pending frame
     }
 
     // Deterministic stepping for tests and screenshots.
@@ -146,6 +151,7 @@
 
     tick(dt) {
       const g = this.poll();
+      this.paused = !!g.paused;
       if (g.paused) return; // wallpaper hidden behind a fullscreen app
       const moves = this.world.setDynamic(g.rects);
       if (this.world.rebuild()) {
@@ -177,7 +183,8 @@
       sc.clearRect(0, 0, this.spriteCanvas.width, this.spriteCanvas.height);
       sc.setTransform(k, 0, 0, k, 0, 0);
       this.eco.draw(sc);
-      U.crisp(this.spriteCanvas);
+      const rects = this.eco.dirty.map((r) => [r[0] * k - 1, r[1] * k - 1, r[2] * k + 1, r[3] * k + 1]);
+      U.crispRects(this.spriteCanvas, rects);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(this.spriteCanvas, 0, 0);
       ctx.setTransform(k, 0, 0, k, 0, 0);

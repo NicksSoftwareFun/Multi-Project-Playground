@@ -45,7 +45,15 @@ public static class RwNative
     [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string name);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string name);
-    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeoutMs, out IntPtr result);
+
+    // A hung Explorer must not freeze the helper: give up after 200 ms.
+    static IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l)
+    {
+        IntPtr result;
+        if (SendMessageTimeout(h, msg, w, l, 0x0002 /* SMTO_ABORTIFHUNG */, 200, out result) == IntPtr.Zero) return IntPtr.Zero;
+        return result;
+    }
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h, ref POINT p);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT pt, uint flags);

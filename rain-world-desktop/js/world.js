@@ -12,7 +12,7 @@
 
   class World {
     constructor(cellSize) {
-      this.cell = cellSize || 20;
+      this.cell = Math.min(40, Math.max(12, +cellSize || 20)); // keep the nav grid sane
       this.w = 0;
       this.h = 0;
       this.staticSolids = [];

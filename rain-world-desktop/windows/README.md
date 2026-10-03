@@ -42,7 +42,11 @@ and the live wallpaper picks them up within about 3 seconds.
 Alternative: zip the `rain-world-desktop` folder (with `LivelyInfo.json` at the
 top of the zip) and drag the zip into Lively. Lively's **Customise** button then
 shows sliders for creature scale, population and per-creature spawn weights.
-The helper still needs to be running for creatures to see your windows.
+The helper still needs to be running for creatures to see your windows, and
+for a packaged wallpaper it must be started with `-AllowFileOrigin`
+(`start-helper.cmd -AllowFileOrigin`). That lets pages loaded from files read the
+geometry API. It's off by default because sandboxed frames on websites
+share that "null" origin. The URL route above doesn't need it.
 
 ## Notes and limits
 

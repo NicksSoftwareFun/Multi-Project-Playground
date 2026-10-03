@@ -27,6 +27,9 @@
     mainPoint() {
       return this.pos;
     }
+    bounds() {
+      return [this.pos.x - 10, this.pos.y - 10, this.pos.x + 10, this.pos.y + 10];
+    }
     carry(dx, dy) {
       if (this.perched) {
         this.pos.x += dx;

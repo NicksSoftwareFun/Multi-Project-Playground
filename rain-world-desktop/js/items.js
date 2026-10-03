@@ -54,6 +54,9 @@
           this.rot += this.vx * dt * 0.2;
         }
       }
+      // Drop a claim whose slugcat gave up, fled, left or was eaten.
+      const cl = this.claimedBy;
+      if (cl && (cl.dead || cl.leaving || (cl.item !== this && (cl.food !== this || cl.state !== 'forage')))) this.claimedBy = null;
       if (this.age > 240 && !this.claimedBy) this.dead = true; // rots away eventually
     }
     draw(ctx) {

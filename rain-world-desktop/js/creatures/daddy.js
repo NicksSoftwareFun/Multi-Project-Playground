@@ -94,6 +94,11 @@
     mainPoint() {
       return this.body;
     }
+    bounds() {
+      const all = [{ x: this.body.x - this.R * 1.4, y: this.body.y - this.R * 1.4 }, { x: this.body.x + this.R * 1.4, y: this.body.y + this.R * 1.4 }];
+      for (const t of this.tentacles) for (const p of t.chain.pts) all.push(p);
+      return RW.Creature.ptsBounds(all, 8);
+    }
     holdPoint() {
       for (const t of this.tentacles) if (t.state === 'hold') return t.tip();
       return this.body;

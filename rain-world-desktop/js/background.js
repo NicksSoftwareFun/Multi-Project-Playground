@@ -615,14 +615,27 @@
       };
     }
 
+    // Fog puffs are one pre-rendered gradient sprite, stretched and faded;
+    // building six radial gradients every frame was a measurable cost.
     drawFog(ctx, pal) {
-      for (const f of this.fog) {
-        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
-        g.addColorStop(0, U.rgba(pal.fog, f.a * (0.6 + this.intensity)));
+      if (this.fogSpritePal !== pal) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        const g2 = c.getContext('2d');
+        const g = g2.createRadialGradient(64, 64, 0, 64, 64, 64);
+        g.addColorStop(0, U.rgba(pal.fog, 1));
         g.addColorStop(1, U.rgba(pal.fog, 0));
-        ctx.fillStyle = g;
-        ctx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+        g2.fillStyle = g;
+        g2.fillRect(0, 0, 128, 128);
+        this.fogSprite = c;
+        this.fogSpritePal = pal;
       }
+      const a0 = ctx.globalAlpha;
+      for (const f of this.fog) {
+        ctx.globalAlpha = Math.min(1, f.a * (0.6 + this.intensity));
+        ctx.drawImage(this.fogSprite, f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+      }
+      ctx.globalAlpha = a0;
     }
 
     drawChains(ctx, decor, pal, t) {
