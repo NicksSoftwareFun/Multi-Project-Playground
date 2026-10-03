@@ -38,8 +38,11 @@
         ceil: !!p.climbCeilings,
         poles: !!p.poles,
         fall: true,
-        jumpX: 0,
-        jumpUp: 0,
+        // short leaps to and from poles, shorter for bigger lizards (slugcats
+        // jump much further)
+        jumpX: p.poles ? Math.max(2, Math.round(3.2 / L)) : 0,
+        jumpUp: p.poles ? (L <= 1 ? 2 : 1) : 0,
+        leapPoles: true,
         wallCost: 1.3,
         ceilCost: 1.8,
         poleCost: 1.4,
@@ -859,6 +862,21 @@
       for (const l of this.legs) l.leg.planted = false;
     }
 
+    // Leap for a nearby pole: a ballistic arc over to the next path node.
+    launchLeap(node) {
+      const head = this.spine.pts[0];
+      const cell = this.W.cell;
+      const apexY = Math.min(head.y, node.y) - cell * 1.1;
+      const vy0 = -Math.sqrt(2 * GRAV * Math.max(4, head.y - apexY));
+      const tUp = -vy0 / GRAV;
+      const tDown = Math.sqrt((2 * Math.max(1, node.y - apexY)) / GRAV);
+      this.vx = (node.x - head.x) / (tUp + tDown);
+      this.vy = vy0;
+      this.leap = { t: 0, tx: node.x, ty: node.y, dur: tUp + tDown };
+      this.leapNode = null;
+      for (const l of this.legs) l.leg.planted = false;
+    }
+
     // Turning round: the body swings over through the vertical instead of
     // the head ploughing back through its own shoulders.
     startTurn() {
@@ -961,6 +979,13 @@
         this.dropT -= dt;
         g = null;
       }
+      if (this.leap) {
+        // mid-leap: don't snag on the pole we left; grab hold near the far end
+        const lp = this.leap;
+        const near = U.dist(head.x, head.y, lp.tx, lp.ty) < W.cell * 1.6;
+        if (!near && lp.t < lp.dur * 0.75) g = null;
+      }
+      if (this.scramble) g = null; // hauling over a ledge lip: no hugging
       this.grip = g;
 
       if (this.lungeT > 0) {
@@ -998,7 +1023,49 @@
         let dvx = 0;
         let dvy = 0;
         this.leavingSurface = false;
-        if (node) {
+        this.scrambleCd = (this.scrambleCd || 0) - dt;
+        if (!this.scramble && !this.leap && !(this.leapWind > 0) && this.scrambleCd <= 0) {
+          // off a pole onto the ledge beside it: scramble up over the lip
+          // (smaller lizards make it more often)
+          const corner = this.cornerAhead(head);
+          if (corner) this.startScramble(corner, head, 6 * L, 15 * L, U.clamp(0.95 - L * 0.4, 0.35, 0.7));
+        }
+        if (this.scramble) {
+          const sc = this.scramble;
+          if (this.stepScramble(dt, head) === null) {
+            // the body wriggles and the feet paw at the face
+            for (let i = 1; i < this.bodyN; i++) P[i].x += Math.sin(sc.t * 30 - i * 1.1) * 0.6 * L;
+            this.raise = 0.5;
+          }
+        } else if (this.leap) {
+          // airborne: a ballistic arc until we catch hold of something
+          const lp = this.leap;
+          lp.t += dt;
+          this.vy += GRAV * dt;
+          if ((g && lp.t > 0.12) || lp.t > lp.dur + 0.8) {
+            this.leap = null;
+            this.pather.timer = Math.min(this.pather.timer, 0.1);
+          }
+        } else if (this.leapWind > 0) {
+          // crouch, then spring
+          this.leapWind -= dt;
+          this.vx *= 0.7;
+          this.vy *= 0.7;
+          if (this.leapWind <= 0 && this.leapNode) this.launchLeap(this.leapNode);
+        } else if (node && node.type === Nav.JUMP) {
+          // a leap: get to the take-off point first
+          const prev = this.pather.previous();
+          if (g && (!prev || U.dist(head.x, head.y, prev.x, prev.y) < cell * 0.9)) {
+            this.leapWind = 0.14;
+            this.leapNode = node;
+          } else if (prev) {
+            const dx = prev.x - head.x;
+            const dy = prev.y - head.y;
+            const d = Math.hypot(dx, dy) || 1;
+            dvx = (dx / d) * this.speed;
+            dvy = (dy / d) * this.speed;
+          }
+        } else if (node) {
           let tx = node.x;
           let ty = node.y;
           if (node.type === Nav.FALL && g) {
@@ -1025,7 +1092,9 @@
           // Deliberately stepping off a surface: don't let the hug pull us back.
           this.leavingSurface = node.type === Nav.FALL || (g && (dx / d) * g.nx + (dy / d) * g.ny > 0.6);
         }
-        if (g) {
+        if (this.leap || this.scramble) {
+          // (gravity already applied or scrambling; no steering)
+        } else if (g) {
           // heavy lizards are slow to get going and slow to stop
           const k = U.approach(U.clamp(11 / Math.sqrt(this.mass), 3.5, 9), dt);
           this.vx += (dvx - this.vx) * k;

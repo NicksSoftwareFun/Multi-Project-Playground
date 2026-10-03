@@ -757,7 +757,22 @@
       const prev = this.pather.previous();
       const speed = this.speed || 105;
 
-      if (this.pole) {
+      this.scrambleCd = (this.scrambleCd || 0) - dt;
+      if (this.scramble) {
+        // hauling up over a ledge lip, hands on the edge
+        const lip = this.scramble.lip;
+        this.facing = this.scramble.side;
+        const res = this.stepScramble(dt, hip);
+        this.reachTo = res ? null : { x: lip.x + this.facing * 3, y: lip.y - 1 };
+        if (res === 'slip') {
+          // lost the edge: catch the pole again and slide down a little
+          const pole = this.findPole(hip.x, hip.y);
+          if (pole && Math.abs(pole.x - hip.x) < W.cell) this.pole = pole;
+        } else {
+          hip.x += this.vx * dt;
+          hip.y += this.vy * dt;
+        }
+      } else if (this.pole) {
         const pole = this.pole;
         hip.x += (pole.x - hip.x) * 0.25;
         this.vx = 0;
@@ -770,6 +785,13 @@
             const dy = node.y - hip.y;
             tvy = Math.abs(dy) > 2 ? Math.sign(dy) * (this.p.climbSpeed || 80) : 0;
             this.climbPhase += Math.abs(this.vy) * dt * 0.25;
+          } else if (this.cornerAhead(hip)) {
+            // the ledge right beside the pole: scramble up over the lip
+            // (after a slip, hang on a moment before trying again)
+            if (this.scrambleCd <= 0) {
+              this.startScramble(this.cornerAhead(hip), hip, R + 1, R + 1, 0.8);
+              this.pole = null;
+            }
           } else {
             // Step or drop off the pole toward the next node.
             this.pole = null;

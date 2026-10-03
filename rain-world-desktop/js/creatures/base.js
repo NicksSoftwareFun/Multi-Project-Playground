@@ -322,6 +322,92 @@
       }
       return true;
     }
+    // Scrambling: stepping off a pole onto the ledge right beside it means
+    // hauling up over the corner, which plain steering bumps into. Returns the
+    // ledge-top node when that's the next move and `pt` is down by the lip.
+    cornerAhead(pt) {
+      const W = this.W;
+      const n = this.pather.current();
+      const pv = this.pather.previous();
+      if (!n || !pv || n.type !== RW.Nav.WALK || n.cy > pv.cy || Math.abs(n.cx - pv.cx) !== 1) return null;
+      if (W.pole(n.cx, n.cy) || !W.solid(n.cx, n.cy + 1) || !W.pole(pv.cx, pv.cy) || W.solid(pv.cx, pv.cy + 1)) return null;
+      const top = (n.cy + 1) * W.cell;
+      if (pt.y < top - W.cell * 0.3 || pt.y > top + W.cell * 2.5 || Math.abs(pt.x - n.x) > W.cell * 1.8) return null;
+      return n;
+    }
+    // Start a scramble for ledge-top node `n`: `r` is how far `pt` keeps off
+    // the ledge face, `lift` how high it rides above a surface, `chance` the
+    // odds this attempt gets over (smaller, nimbler creatures do better).
+    startScramble(n, pt, r, lift, chance) {
+      const cell = this.W.cell;
+      const side = Math.sign(n.x - pt.x) || 1; // toward the ledge
+      const face = side > 0 ? n.cx * cell : (n.cx + 1) * cell;
+      const top = (n.cy + 1) * cell;
+      this.scramble = {
+        t: 0,
+        dur: U.rand(0.5, 0.75) + Math.max(0, pt.y - top) / 140, // longer from further down
+        x0: pt.x,
+        y0: pt.y,
+        side,
+        lip: { x: face, y: top },
+        p1: { x: face - side * r, y: top - lift * 0.5 },
+        p2: { x: face + side * (r + 3), y: top - lift },
+        ok: Math.random() < chance,
+      };
+    }
+    // Advance a scramble, steering `pt` by setting vx/vy. Returns 'done' once
+    // over the lip, 'slip' when this attempt fails, otherwise null.
+    stepScramble(dt, pt) {
+      const s = this.scramble;
+      if (s.last !== undefined && this.age - s.last > 0.1) {
+        // interrupted (stunned, grabbed, fighting): start over from scratch
+        this.scramble = null;
+        this.scrambleCd = 0.3;
+        return 'slip';
+      }
+      s.last = this.age;
+      s.t += dt;
+      const u = s.t / s.dur;
+      if (!s.ok && u > 0.5) {
+        // couldn't get a grip on the lip: slide back down and try again
+        this.scramble = null;
+        this.scrambleCd = U.rand(0.35, 0.8);
+        this.vx = -s.side * 25;
+        this.vy = 70;
+        this.scrambleFails = (this.scrambleFails || 0) + 1;
+        if (this.scrambleFails >= 4) {
+          this.scrambleFails = 0;
+          this.pather.clear(); // give up on this route for now
+        }
+        return 'slip';
+      }
+      let tx;
+      let ty;
+      if (u < 0.6) {
+        // claw up the face to the lip, wriggling side to side
+        const k = U.smooth(u / 0.6);
+        tx = U.lerp(s.x0, s.p1.x, Math.min(1, k * 1.6));
+        ty = U.lerp(s.y0, s.p1.y, k);
+        tx += Math.sin(s.t * 34) * 2.2 * (1 - k * 0.5);
+        ty += Math.sin(s.t * 23) * 1.5;
+      } else {
+        // then haul over the top
+        const k = Math.min(1, (u - 0.6) / 0.4);
+        tx = U.lerp(s.p1.x, s.p2.x, k);
+        ty = U.lerp(s.p1.y, s.p2.y, k) - Math.sin(k * Math.PI) * 3;
+      }
+      this.vx = U.clamp((tx - pt.x) / dt, -400, 400);
+      this.vy = U.clamp((ty - pt.y) / dt, -400, 400);
+      if (u >= 1) {
+        this.scramble = null;
+        this.scrambleFails = 0;
+        this.vx = s.side * 30;
+        this.vy = 0;
+        return 'done';
+      }
+      return null;
+    }
+
     // Stuck too long (or walled in): dig down into the surface underfoot and
     // disappear. The surface clips the creature as it sinks (see
     // Ecosystem.draw), with a little dirt kicked up.

@@ -150,6 +150,8 @@
           const tcx = cx + tx;
           const tcy = cy + ty;
           if (!W.inBounds(tcx, tcy) || !standable(W, tcx, tcy, c)) continue;
+          // pole leapers (lizards) only jump to or from a pole
+          if (c.leapPoles && !W.pole(cx, cy) && !W.pole(tcx, tcy)) continue;
           if (ty < 0 && (tx * tx) / (jx * jx) + (ty * ty) / (ju * ju) > 1.05) continue;
           if (ty >= 0) {
             // Only jump across or down when there's actually a gap to clear.
@@ -339,7 +341,7 @@
   }
 
   function capsKey(c) {
-    return [c.fly ? 1 : 0, c.walls ? 1 : 0, c.ceil ? 1 : 0, c.poles ? 1 : 0, c.fall ? 1 : 0, c.jumpX | 0, c.jumpUp | 0].join('');
+    return [c.fly ? 1 : 0, c.walls ? 1 : 0, c.ceil ? 1 : 0, c.poles ? 1 : 0, c.fall ? 1 : 0, c.jumpX | 0, c.jumpUp | 0, c.leapPoles ? 1 : 0].join('');
   }
 
   // Every cell a creature with these caps can be in (and the standable ones),
