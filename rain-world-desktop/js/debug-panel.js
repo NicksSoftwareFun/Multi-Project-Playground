@@ -204,6 +204,7 @@
           }),
           this.slider('time scale', Wc, 'timeScale', 0, 3, 0.05),
           this.select('max fps', Wc, 'maxFps', [60, 30]),
+          this.select('layout', Wc, 'layout', ['tiers', 'scatter'], () => eng.regenerate(false)),
           this.slider('ledges', Wc, 'decorLedges', 0, 14, 1),
           this.slider('poles', Wc, 'decorPoles', 0, 16, 1),
           this.slider('ledge poles', Wc, 'ledgePoles', 0, 1, 0.05),

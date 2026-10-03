@@ -42,7 +42,32 @@
     const nL = cfg.world.decorLedges | 0;
     const overlaps = (a, pad) =>
       ledges.some((b) => a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y);
-    for (let i = 0, tries = 0; i < nL && tries < 300; tries++) {
+    if (cfg.world.layout !== 'scatter') {
+      // Tiers (the default): rows of ledges at a few shared heights, with gaps
+      // between neighbours that horizontal poles can bridge and vertical poles
+      // linking the rows.
+      const nT = 3;
+      const perTier = Math.max(1, Math.round(nL / nT));
+      for (let t = 0; t < nT && ledges.length < nL; t++) {
+        const ty = H * (0.22 + (t * 0.52) / (nT - 1)) + R(-0.025, 0.025) * H;
+        let x = rnd() < 0.3 ? 0 : R(20, 140);
+        let placed = 0;
+        while (x < W - 100 && placed < perTier + 1 && ledges.length < nL) {
+          const w = Math.round(Math.min(R(140, 300), W - x));
+          if (w < 100) break;
+          const L = { id: 'ledge-' + ledges.length, kind: 'ledge', x: Math.round(x), y: Math.round(ty + R(-4, 4)), w, h: Math.round(R(22, 38)), seed: rnd() * 1000, tier: t };
+          // now and then leave a stretch of the row open
+          if (placed > 0 && rnd() < 0.2) {
+            x += w * 0.6;
+            continue;
+          }
+          ledges.push(L);
+          placed++;
+          x += w + R(60, 220); // a gap a pole can bridge
+        }
+      }
+    }
+    for (let i = ledges.length, tries = 0; i < nL && tries < 300; tries++) {
       const w = Math.round(R(130, 320));
       const h = Math.round(R(22, 38));
       let x;
@@ -96,7 +121,9 @@
       for (const b of ledges.slice()) {
         if (a === b || (a.split && a.split === b.split)) continue;
         const gap = b.x - (a.x + a.w);
-        if (gap < 40 || gap > 260 || Math.abs(a.y - b.y) > 10 || rnd() >= pBeam) continue;
+        // ledges in the same row are bridged more often
+        const pb = a.tier !== undefined && a.tier === b.tier ? Math.min(1, pBeam * 1.4) : pBeam;
+        if (gap < 40 || gap > 260 || Math.abs(a.y - b.y) > 10 || rnd() >= pb) continue;
         const beam = { id: 'beam-' + beams.length, kind: 'beam', x: a.x + a.w, y: Math.min(a.y, b.y), w: gap, h: 4, seed: rnd() * 1000 };
         if (hits(beam, 16, [a, b])) continue;
         beams.push(beam);
@@ -214,6 +241,12 @@
           if (x < 8 || x > W - 8) continue;
           const y1 = Math.max(12, Math.round(q.y - R(25, 45)));
           const y2 = groundBelow(x, q.y + q.h + 1);
+          // a horizontal pole bridging the gap where this climb has to go
+          // gives way: bridges are optional, getting up there isn't
+          const inWay = solidsNow().filter((l) => x > l.x - 6 && x < l.x + l.w + 6 && y2 > l.y && y1 < l.y + l.h);
+          if (inWay.length && inWay.every((l) => l.kind === 'beam' && l !== q)) {
+            for (const l of inWay) beams.splice(beams.indexOf(l), 1);
+          }
           if (blocked(x, y1, y2)) continue;
           // a pole already in this column: stretch it to cover the climb;
           // otherwise add one (poles in neighbouring columns are fine)
