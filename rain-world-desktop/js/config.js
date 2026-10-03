@@ -87,6 +87,8 @@
           chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 12, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 60, // wiki attemptBiteRadius x 0.75
+          biteDamage: 1, // wiki biteDamage (lizard fights)
+          toughness: 1, // wiki toughness
           spines: 0,
           pattern: 'dapple',
           tailTip: true,
@@ -112,6 +114,8 @@
           chargeRate: 1.0, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 20, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 75, // wiki attemptBiteRadius x 0.75
+          biteDamage: 2, // wiki biteDamage (lizard fights)
+          toughness: 2.5, // wiki toughness
           spines: 9,
           pattern: 'dots',
         },
@@ -136,6 +140,8 @@
           chargeRate: 0.01, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 14, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 68, // wiki attemptBiteRadius x 0.75
+          biteDamage: 0.7, // wiki biteDamage (lizard fights)
+          toughness: 0.5, // wiki toughness
           spines: 0,
           pattern: 'fins',
           tailTip: true,
@@ -161,6 +167,8 @@
           chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 15, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 64, // wiki attemptBiteRadius x 0.75
+          biteDamage: 1, // wiki biteDamage (lizard fights)
+          toughness: 0.9, // wiki toughness
           spines: 0,
           pattern: 'spots',
           camouflage: true,
@@ -186,6 +194,8 @@
           chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 2, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 90, // wiki attemptBiteRadius x 0.75
+          biteDamage: 4, // wiki biteDamage (lizard fights)
+          toughness: 3, // wiki toughness
           spines: 18,
           pattern: 'dots',
         },
@@ -210,6 +220,8 @@
           chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 21, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 30, // wiki attemptBiteRadius x 0.75
+          biteDamage: 0.8, // wiki biteDamage (lizard fights)
+          toughness: 0.8, // wiki toughness
           spines: 0,
           pattern: 'dapple',
           tailTip: true,
@@ -235,6 +247,8 @@
           chargeRate: 0.033, // wiki loungeTendency: chance to pounce from afar
           biteDelay: 12, // wiki biteDelay (frames at 40fps): windup before a bite
           biteRange: 68, // wiki attemptBiteRadius x 0.75
+          biteDamage: 1, // wiki biteDamage (lizard fights)
+          toughness: 0.9, // wiki toughness
           spines: 0,
           pattern: 'rings',
         },

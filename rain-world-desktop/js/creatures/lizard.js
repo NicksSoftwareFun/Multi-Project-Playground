@@ -11,6 +11,10 @@
   const GRAV = 900;
   const LIZARDS = ['lizard_*'];
   const REAR = [0, 0.9, 0.65, 0.35, 0.12]; // how much each front spine point lifts when rearing
+  const TERR_R = 150; // territory radius around a lizard's hangout
+  const RIVALRY = ['challenge', 'display', 'fight'];
+  // Rain World wiki: biteDamage and toughness per species (fights only)
+  const isLizard = (c) => c.species.startsWith('lizard_');
 
   class Lizard extends RW.Creature {
     constructor(eco, species, x, y) {
@@ -74,9 +78,14 @@
       this.idleT = 0;
       this.cursorBites = 0;
       this.cursorBored = 0;
-      // (lizards ignore batflies, per the Rain World wiki)
+      // (lizards ignore batflies, per the Rain World wiki; greens and cyans
+      // eat blue lizards)
       this.diet = ['slugcat', 'centipede', 'dropwig'];
-      if (L >= 1.1) this.diet.push('lizard_blue');
+      if (species === 'lizard_green' || species === 'lizard_cyan') this.diet.push('lizard_blue');
+      this.hp = 1; // fighting condition; recovers slowly
+      this.home = null; // favourite hangout: { sid, ox } on top of a solid
+      this.homeAwayT = 0;
+      this.truces = new Map(); // lizard id -> eco time until which we leave it be
       this.threats = ['daddy'];
       this.camo = 1;
       this.mass = p.mass || 2 * L;
@@ -171,6 +180,9 @@
       this.raise = 0; // head stays in line with the body unless rearing
       this.lash = 0.08 + 0.2 * pe.nervous; // nervous ones twitch their tails
 
+      if (this.holding && RIVALRY.includes(this.state) && this.rival) {
+        if (this.rivalry(dt, perceive)) return; // someone wants our food
+      }
       if (this.holding) {
         this.setState('eat');
         this.eatT += dt;
@@ -215,43 +227,23 @@
         this.setState('wander');
       }
 
-      // Rival standoff: two lizards that meet rear up and hiss; the smaller backs off.
+      // Territory (Rain World's rivalry): an owner challenges lizards that
+      // stray onto its hangout, and hungry lizards go after one that has
+      // food. Both hiss and rear up trying to make the other back off; if
+      // neither does, it becomes a fight until one submits (and maybe
+      // leaves), dies, or is distracted by prey or a predator.
       this.rivalCd -= dt;
-      if (this.state === 'display') {
-        const r = this.rival;
-        this.pather.clear();
-        this.raise = 1;
-        this.lash = 1;
-        this.lookAt = r && !r.dead ? r.spine.pts[0] : null;
-        this.jawTarget = 0.55 + 0.45 * Math.max(0, Math.sin(this.stateT * 9));
-        if (!r || r.dead || r.leaving || this.stateT > this.displayFor) {
-          // the less dominant (and lighter) lizard backs down
-          const score = (c) => c.pers.dominance + c.mass * 0.06;
-          const lost = r && !r.dead && score(r) > score(this);
-          this.rival = null;
-          this.rivalCd = U.rand(20, 40);
-          if (lost) {
-            const g = this.fleeGoal(this.caps, r.x, r.y, 300);
-            if (g) this.pather.setGoal(g.x, g.y, true);
-            this.setState('flee');
-          } else {
-            this.setState('wander');
-          }
-        }
-        return;
+      this.hp = Math.min(1, this.hp + dt * 0.02);
+      if (RIVALRY.includes(this.state)) {
+        if (this.rivalry(dt, perceive)) return;
       }
+      if (perceive) this.updateHome(0.3);
       if (perceive && this.rivalCd <= 0 && this.state !== 'hunt') {
-        const r = this.nearestOf(LIZARDS, 95 * this.L, (c) => c.rivalCd <= 0 && !c.holding && !c.grabbedBy && c.state !== 'hunt' && c.state !== 'display');
-        // only the aggressive bother squaring up; the rest look away
-        if (r && Math.random() > 0.25 + 0.75 * Math.max(pe.aggression, r.pers.aggression)) {
-          this.rivalCd = U.rand(4, 10);
-        } else if (r) {
-          const t = U.rand(1.6, 3.2) * (0.7 + 0.6 * Math.max(pe.dominance, r.pers.dominance));
-          for (const [a, b] of [[this, r], [r, this]]) {
-            a.rival = b;
-            a.displayFor = t;
-            a.setState('display');
-          }
+        const f = this.findFoe();
+        if (f) {
+          this.rival = f.c;
+          this.rivalWhy = f.why;
+          this.setState('challenge');
           return;
         }
       }
@@ -365,15 +357,287 @@
       if (this.pather.done() || !this.pather.goal || this.stateT > 14) {
         // low-energy lizards stop to rest more often and for longer; a
         // low-energy white lizard lies still long enough to vanish (lurk)
-        if (this.pather.goal && Math.random() < 0.2 + 0.35 * (1 - pe.energy)) {
+        if (this.pather.goal && Math.random() < 0.2 + 0.35 * (1 - pe.energy) + (this.atHome() ? 0.2 : 0)) {
           this.setState('idle');
           this.idleT = U.rand(1.5, 4.5) * (1.5 - pe.energy) * (this.p.camouflage ? 2.5 - 1.5 * pe.energy : 1);
           return;
         }
-        const g = this.wanderGoal(this.caps, 500);
+        const g = this.homeGoal() || this.wanderGoal(this.caps, 500);
         if (g) this.pather.setGoal(g.x, g.y, true);
         this.stateT = 0;
       }
+    }
+
+    // ------------------------------------------------------------ territory --
+    homePos() {
+      const h = this.home;
+      if (!h) return null;
+      const sol = this.W.solidById(h.sid);
+      if (!sol) return null;
+      const x = sol.x + Math.min(h.ox, sol.w - 6);
+      const y = sol.y - 12;
+      if (y < 4 || this.W.isSolidPt(x, y)) return null; // covered over
+      return { x, y };
+    }
+    // Hangouts: the tops of windows, the taskbar and wallpaper ledges.
+    pickHome(exclude) {
+      const W = this.W;
+      const head = this.spine.pts[0];
+      let best = null;
+      let bs = -Infinity;
+      for (const sol of W.solids) {
+        if (sol.kind === 'edge' || sol.kind === 'icon' || sol.w < 80 || sol.id === exclude) continue;
+        const ox = sol.w * U.rand(0.2, 0.8);
+        const x = sol.x + ox;
+        const y = sol.y - 12;
+        if (y < 4 || W.isSolidPt(x, y)) continue;
+        // unclaimed spots appeal; a dominant lizard may covet a claimed one
+        let owner = null;
+        for (const c of this.eco.creatures) {
+          if (c !== this && c.home && c.home.sid === sol.id && isLizard(c) && !c.dead) owner = c;
+        }
+        const claim = owner ? (this.pers.dominance - owner.pers.dominance) * 0.8 - 0.25 : 0.3;
+        const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400;
+        if (sc > bs) {
+          bs = sc;
+          best = { sid: sol.id, ox };
+        }
+      }
+      this.home = best;
+      this.homeAwayT = 0;
+    }
+    updateHome(dt) {
+      const hp = this.homePos();
+      if (!hp) return this.pickHome();
+      const head = this.spine.pts[0];
+      // can't get there (or keeps getting chased off): settle somewhere else
+      if (U.dist(head.x, head.y, hp.x, hp.y) > TERR_R) this.homeAwayT += dt;
+      else this.homeAwayT = 0;
+      if (this.homeAwayT > 70) this.pickHome(this.home.sid);
+    }
+    atHome() {
+      const hp = this.homePos();
+      const head = this.spine.pts[0];
+      return !!hp && U.dist(head.x, head.y, hp.x, hp.y) < TERR_R;
+    }
+    homeGoal() {
+      const hp = this.homePos();
+      if (!hp || Math.random() > 0.55 + 0.3 * (1 - this.pers.energy)) return null;
+      return Nav.randomValid(this.W, this.caps, hp.x, hp.y, TERR_R * 0.6);
+    }
+    truce(c, sec) {
+      this.truces.set(c.id, this.eco.t + sec);
+    }
+    // Who, if anyone, is worth squaring up to right now?
+    findFoe() {
+      const head = this.spine.pts[0];
+      const L = this.L;
+      const pe = this.pers;
+      const hp = this.homePos();
+      const home = this.atHome();
+      let best = null;
+      let bd = Infinity;
+      for (const c of this.eco.creatures) {
+        if (c === this || !isLizard(c) || c.dead || c.leaving || c.grabbedBy || c.alpha < 0.8) continue;
+        if (this.diet.includes(c.species) || c.diet.includes(this.species)) continue; // that's hunting, not rivalry
+        if ((this.truces.get(c.id) || 0) > this.eco.t) continue;
+        if (RIVALRY.includes(c.state) || c.state === 'flee' || c.state === 'leave') continue;
+        const ch = c.spine.pts[0];
+        const d = U.dist(head.x, head.y, ch.x, ch.y);
+        if (d > 200 * L || !this.canSee(ch.x, ch.y, 220 * L)) continue;
+        let why = null;
+        if (home && hp && U.dist(ch.x, ch.y, hp.x, hp.y) < TERR_R * 0.9) {
+          // trespasser on our hangout
+          if (Math.random() < 0.3 + 0.7 * Math.max(pe.aggression, pe.dominance)) why = 'territory';
+        } else if (c.holding && this.fullT <= 0 && !this.holding) {
+          // it has food and we're hungry
+          if (Math.random() < 0.25 + 0.6 * pe.aggression) why = 'food';
+        } else if (d < 70 * L && Math.random() < 0.1 * pe.aggression) {
+          why = 'meet'; // bumped into each other
+        }
+        if (why && d < bd) {
+          bd = d;
+          best = { c, why };
+        }
+      }
+      return best;
+    }
+    // How determined we are to win against c.
+    resolve(c) {
+      const pe = this.pers;
+      let r = pe.dominance * 0.5 + pe.aggression * 0.25 + pe.bravery * 0.15 + this.mass * 0.05 + this.hp * 0.3;
+      if (this.rivalWhy === 'territory' && this.atHome()) r += 0.25; // defending our own patch
+      if (this.holding) r += 0.15; // possession
+      if (this.rivalWhy === 'food' && this.fullT <= 0) r += 0.1;
+      return r;
+    }
+    endRivalry(cd) {
+      this.cancelStrike();
+      this.rival = null;
+      this.rivalCd = cd;
+      if (RIVALRY.includes(this.state)) this.setState('wander');
+    }
+    // Runs the challenge / display / fight states. Returns true while busy.
+    rivalry(dt, perceive) {
+      const r = this.rival;
+      const head = this.spine.pts[0];
+      const L = this.L;
+      const gone = !r || r.dead || r.leaving || r.grabbedBy;
+      if (gone || (this.state !== 'challenge' && (r.rival !== this || !RIVALRY.includes(r.state)))) {
+        this.endRivalry(U.rand(4, 8));
+        return false;
+      }
+      const rh = r.spine.pts[0];
+      const d = U.dist(head.x, head.y, rh.x, rh.y);
+      this.lookAt = rh;
+      this.lash = 1;
+      // a meal wandering past or a predator breaks it up
+      if (perceive && this.state === 'fight' && this.fullT <= 0) {
+        const prey = this.nearestOf(this.diet, 90 * L, (c) => !c.grabbedBy && c !== r);
+        if (prey) {
+          this.endRivalry(10);
+          r.endRivalry(10);
+          return false;
+        }
+      }
+
+      if (this.state === 'challenge') {
+        // stride over, head up, hissing
+        this.speed = (this.p.speed || 50) * 1.15;
+        this.raise = 0.35;
+        this.jawTarget = 0.35;
+        this.pather.interval = 0.5;
+        this.pather.setGoal(rh.x, rh.y);
+        const hp = this.homePos();
+        const left = this.rivalWhy === 'territory' && hp && U.dist(rh.x, rh.y, hp.x, hp.y) > TERR_R * 1.3;
+        if (left || this.stateT > 9 || (this.rivalWhy === 'food' && !r.holding)) {
+          // it moved on (or the food's gone): good enough
+          this.truce(r, 20);
+          this.endRivalry(U.rand(3, 6));
+          return false;
+        }
+        if (d < 90 * L && !RIVALRY.includes(r.state)) {
+          const t = U.rand(1.6, 3.2) * (0.7 + 0.6 * Math.max(this.pers.dominance, r.pers.dominance));
+          for (const [a, b] of [[this, r], [r, this]]) {
+            a.rival = b;
+            a.rivalWhy = this.rivalWhy;
+            a.displayFor = t;
+            a.setState('display');
+            a.pather.clear();
+          }
+        }
+        return true;
+      }
+
+      if (this.state === 'display') {
+        // rear up, gape and hiss, face it, edge closer
+        this.raise = 1;
+        this.jawTarget = this.holding ? 0.3 : 0.55 + 0.45 * Math.max(0, Math.sin(this.stateT * 9));
+        if (d > 95 * L) {
+          this.speed = (this.p.speed || 50) * 0.6;
+          this.pather.setGoal(rh.x, rh.y);
+        } else {
+          this.pather.clear();
+        }
+        this.faceToward(rh);
+        if (this.stateT > this.displayFor && this.id < r.id) this.settleDisplay(r);
+        return true;
+      }
+
+      // fight: close in and snap; each bite staggers and wears the other down
+      this.raise = 0.3;
+      this.jawTarget = 0.5;
+      this.speed = (this.p.huntSpeed || 90) * 0.8;
+      this.pather.interval = 0.35;
+      this.pather.setGoal(rh.x, rh.y);
+      this.faceToward(rh);
+      if (d < (this.p.biteRange || 60) * L + 12 && this.lungeCd <= 0 && this.grip && this.windT <= 0 && this.lungeT <= 0) {
+        this.lunge(rh.x, rh.y, r, false);
+        this.lungeCd = U.rand(0.5, 1.1) * (1.3 - 0.5 * this.pers.aggression);
+      }
+      if (this.stateT > 14 && this.id < r.id) {
+        // a long scrap: whoever is worse off gives up
+        if (this.hp < r.hp) this.submitTo(r);
+        else r.submitTo(this);
+      }
+      return true;
+    }
+    cancelStrike() {
+      if (this.lungePrey && isLizard(this.lungePrey) && !this.diet.includes(this.lungePrey.species)) {
+        this.lungePrey = null;
+        this.windT = 0;
+      }
+    }
+    faceToward(pt) {
+      const P = this.spine.pts;
+      const fx = P[0].x - P[2].x;
+      const fy = P[0].y - P[2].y;
+      if (!this.turn && this.turnCd <= 0 && this.grip && fx * (pt.x - P[0].x) + fy * (pt.y - P[0].y) < 0) this.startTurn();
+    }
+    // End of the hissing: one backs down, or it comes to blows.
+    settleDisplay(r) {
+      const diff = this.resolve(r) - r.resolve(this) + U.rand(-0.12, 0.12);
+      if (Math.abs(diff) > 0.2) {
+        if (diff > 0) r.submitTo(this);
+        else this.submitTo(r);
+        return;
+      }
+      for (const a of [this, r]) {
+        if (a.holding) a.release(); // drop the food to fight for it
+        a.setState('fight');
+      }
+    }
+    // Back down: run from the winner, maybe give up the hangout or the food,
+    // and maybe leave the screen altogether.
+    submitTo(w) {
+      const eco = this.eco;
+      const why = this.rivalWhy;
+      const food = this.holding;
+      if (food) {
+        this.release();
+        if (eco.cfg.ecosystem.predation && w.diet.includes(food.species) && !w.holding) w.grab(food);
+      }
+      if (why === 'territory' && this.home && w.home && this.atHome()) {
+        // the winner takes over this hangout; we look for another
+        w.home = this.home;
+        w.homeAwayT = 0;
+        this.pickHome(this.home.sid);
+      }
+      this.cancelStrike();
+      this.truce(w, 40);
+      w.truce(this, 40);
+      w.endRivalry(U.rand(8, 15));
+      this.rival = null;
+      this.rivalCd = U.rand(20, 40);
+      const g = this.fleeGoal(this.caps, w.x, w.y, 300);
+      if (g) this.pather.setGoal(g.x, g.y, true);
+      this.setState('flee');
+      if (Math.random() < 0.3 * (1 - this.pers.bravery) + (this.hp < 0.35 ? 0.35 : 0)) this.migrating = true;
+    }
+    // A fight bite landed on our rival.
+    biteRival(r) {
+      const L = this.L;
+      const head = this.spine.pts[0];
+      const rh = r.spine.pts[0];
+      const dmg = ((this.p.biteDamage || 1) / (r.p.toughness || 1)) * 0.16 * U.rand(0.8, 1.2);
+      r.hp -= dmg;
+      const dx = rh.x - head.x;
+      const dy = rh.y - head.y;
+      const dl = Math.hypot(dx, dy) || 1;
+      r.vx += (dx / dl) * 230;
+      r.vy += (dy / dl) * 230 - 60;
+      r.thrashT = 0.35;
+      this.thrashT = 0.25;
+      this.eco.burst(rh.x, rh.y, r.bloodColor || '#20141a', 3);
+      if (r.hp <= 0) {
+        // killed
+        this.eco.burst(rh.x, rh.y, r.bloodColor || '#20141a', 14);
+        r.remove();
+        this.endRivalry(U.rand(15, 25));
+        return;
+      }
+      const submitAt = 0.2 + 0.35 * (1 - r.pers.bravery);
+      if (r.hp < submitAt || Math.random() < 0.08 * (1 - r.pers.bravery)) r.submitTo(this);
     }
 
     // Lunges have a short windup (stop, rear, gape) before the strike.
@@ -499,8 +763,15 @@
         }
         if (this.lungeT < 0.12) this.vy += GRAV * dt;
         const prey = this.lungePrey;
-        if (prey && !prey.dead && U.dist(head.x, head.y, prey.x, prey.y) < 18 * L) {
-          if (this.eco.cfg.ecosystem.predation && this.grab(prey)) {
+        if (prey && prey === this.rival && this.state === 'fight' && !prey.dead && U.dist(head.x, head.y, prey.x, prey.y) < 22 * L) {
+          this.lungeT = 0;
+          this.lungePrey = null;
+          this.biteRival(prey);
+        } else if (prey && !prey.dead && U.dist(head.x, head.y, prey.x, prey.y) < 18 * L) {
+          if (isLizard(prey) && !this.diet.includes(prey.species)) {
+            // a rival, not a meal (the scrap ended mid-lunge): just snap shut
+            this.lungeT = 0;
+          } else if (this.eco.cfg.ecosystem.predation && this.grab(prey)) {
             this.eatT = 0;
             this.lungeT = 0;
             this.thrashT = 1.1; // shake the catch
@@ -877,6 +1148,19 @@
       this.drawHead(ctx, px);
       ctx.restore();
       this.drawPath(ctx, this.pather);
+      if (this.eco.cfg.debug.showPaths) {
+        // territory: a ring round the hangout, in the lizard's colour
+        const hp = this.homePos();
+        if (hp) {
+          ctx.strokeStyle = U.rgba(this.headColor, 0.9);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(hp.x, hp.y, TERR_R, 0, U.TAU);
+          ctx.stroke();
+          ctx.fillStyle = U.rgba(this.headColor, 0.8);
+          ctx.fillRect(hp.x - 2, hp.y - 2, 4, 4);
+        }
+      }
       this.drawDebug(ctx);
     }
 
