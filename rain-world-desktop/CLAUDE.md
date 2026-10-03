@@ -1,3 +1,8 @@
+> **Moved.** Rain World Desktop now lives in its own repository:
+> <https://github.com/NicksSoftwareFun/rain-world-desktop> (playable at
+> <https://nickssoftwarefun.github.io/rain-world-desktop/>). This copy is
+> frozen at the point of the move; make changes there.
+
 # Rain World Desktop: notes for Claude sessions
 
 A Rain World-style ecosystem of procedurally animated creatures that lives on
