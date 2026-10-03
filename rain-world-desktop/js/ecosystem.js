@@ -87,14 +87,14 @@
 
     count(species) {
       let n = 0;
-      for (const c of this.creatures) if (c.species === species && !c.dead) n++;
+      for (const c of this.creatures) if (c.species === species && !c.dead && !c.corpse) n++;
       return n;
     }
 
     population() {
       let p = 0;
       for (const c of this.creatures) {
-        if (c.dead) continue;
+        if (c.dead || c.corpse) continue;
         const s = this.cfg.species[c.species];
         p += s ? s.popCost || 1 : 1;
       }

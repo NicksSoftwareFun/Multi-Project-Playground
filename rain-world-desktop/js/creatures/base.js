@@ -283,6 +283,18 @@
       }
       this.alpha = Math.min(1, this.alpha + dt * 1.6);
       if (this.unburrowStep(dt)) return false;
+      // Dead: a limp ragdoll until something eats it (or it rots away). A
+      // carried corpse lets its own grabbed-branch hang it from the jaws.
+      if (this.corpse) {
+        this.corpseT += dt;
+        if (this.corpseT > 100 && !this.grabbedBy) {
+          this.alpha -= dt * 0.4;
+          if (this.alpha <= 0) this.dead = true;
+        }
+        if (this.grabbedBy) return true;
+        this.limp(dt);
+        return false;
+      }
       // Stunned (a rock, say): limp until it wears off.
       if (this.stunT > 0 && !this.grabbedBy) {
         this.stunT -= dt;
@@ -320,6 +332,22 @@
     }
 
     // --- grabbing ---
+    // The nearest corpse of one of these species (scavenging).
+    nearestCorpse(species, range) {
+      const m = this.mainPoint();
+      let best = null;
+      let bd = range * range;
+      for (const c of this.eco.creatures) {
+        if (!c.corpse || c.dead || c.grabbedBy || c.alpha < 0.5 || c === this) continue;
+        if (!species.some((s) => (s.endsWith('*') ? c.species.startsWith(s.slice(0, -1)) : s === c.species))) continue;
+        const d = U.dist2(m.x, m.y, c.x, c.y);
+        if (d < bd) {
+          bd = d;
+          best = c;
+        }
+      }
+      return best;
+    }
     canBeGrabbed() {
       return !this.dead && !this.leaving && !this.grabbedBy && this.alpha > 0.5;
     }
@@ -346,6 +374,7 @@
     }
     // Prey struggles; returns true if it escaped this frame.
     struggle(dt) {
+      if (this.corpse) return false;
       const chance = this.p.escapeChance || 0.04;
       if (Math.random() < chance * dt) {
         const holder = this.grabbedBy;
@@ -366,7 +395,7 @@
       let best = null;
       let bd = range * range;
       for (const c of this.eco.creatures) {
-        if (c === this || c.dead || c.leaving || c.alpha < 0.6) continue;
+        if (c === this || c.dead || c.corpse || c.leaving || c.alpha < 0.6) continue;
         if (!species.some((s) => (s.endsWith('*') ? c.species.startsWith(s.slice(0, -1)) : s === c.species))) continue;
         if (filter && !filter(c)) continue;
         const d = U.dist2(m.x, m.y, c.x, c.y);
@@ -434,11 +463,22 @@
     }
     limp(dt) {}
     onRecovered() {}
-    // Killed outright: a spray, then gone.
+    // Killed: a spray, then a corpse that lies where it falls (X'd-out eyes)
+    // until a predator carries it off and swallows it.
     die(n) {
       const m = this.mainPoint();
       this.eco.burst(m.x, m.y, this.bloodColor || '#2a1418', n || 12);
-      this.remove();
+      this.kill();
+    }
+    kill() {
+      if (this.corpse || this.dead) return;
+      this.corpse = true;
+      this.corpseT = 0;
+      this.stunT = 0;
+      this.flipped = Math.random() < 0.5;
+      if (this.holding) this.release();
+      this.state = 'dead';
+      this.label = '';
     }
 
     // Window dragged under us: ride along.

@@ -184,17 +184,47 @@
         if (this.rivalry(dt, perceive)) return; // someone wants our food
       }
       if (this.holding) {
-        this.setState('eat');
-        this.eatT += dt;
+        const prey = this.holding;
         this.jawTarget = 0.3;
         this.lash = 0.5;
-        this.speed *= 0.6;
-        if (this.pather.done() || this.stateT > 6) {
-          const g = this.wanderGoal(this.caps, 250);
-          if (g) this.pather.setGoal(g.x, g.y);
+        if (!prey.corpse) {
+          // still kicking in our jaws: shake it until it dies
+          this.setState('kill');
+          this.pather.clear();
+          if (this.killT === undefined) this.killT = U.rand(0.8, 2.2);
+          this.killT -= dt;
+          this.thrashT = Math.max(this.thrashT, 0.15);
+          if (this.killT <= 0) {
+            this.killT = undefined;
+            prey.kill();
+          }
+          return;
         }
-        if (this.eatT > 4.5) {
-          eco.consume(this.holding, this);
+        // Dead: carry it back to our hangout before swallowing it there.
+        const hp = this.homePos();
+        const homeD = hp ? U.dist(head.x, head.y, hp.x, hp.y) : 0;
+        if (hp && homeD > 45 && this.state !== 'eat' && !(this.state === 'carry' && this.stateT > 45)) {
+          this.setState('carry');
+          this.speed *= 0.85;
+          this.pather.interval = 0.8;
+          this.pather.setGoal(hp.x, hp.y);
+          // no route, or no progress for a while: eat it here after all
+          const cc = this.carryCheck || (this.carryCheck = { x: head.x, y: head.y, t: 0 });
+          cc.t += dt;
+          let stalled = false;
+          if (cc.t > 5) {
+            stalled = U.dist(head.x, head.y, cc.x, cc.y) < 10;
+            this.carryCheck = { x: head.x, y: head.y, t: 0 };
+          }
+          const stuck = stalled || (this.pather.nodes && !this.pather.complete && this.pather.remaining() === 0 && this.stateT > 2);
+          if (!stuck) return;
+          this.carryCheck = null;
+        }
+        this.setState('eat');
+        this.pather.clear();
+        this.eatT += dt;
+        if (this.eatT > 3) {
+          eco.consume(prey, this);
           this.holding = null;
           this.fullT = U.rand(30, 60) * (1.3 - 0.5 * pe.aggression);
           this.eatT = 0;
@@ -244,6 +274,33 @@
           this.rival = f.c;
           this.rivalWhy = f.why;
           this.setState('challenge');
+          return;
+        }
+      }
+
+      // Scavenging: a corpse of something we eat is an easy meal to carry home.
+      if (this.state === 'scavenge') {
+        const c = this.prey;
+        if (!c || c.dead || !c.corpse || c.grabbedBy || this.stateT > 20) {
+          this.prey = null;
+          this.setState('wander');
+        } else {
+          this.pather.interval = 0.6;
+          this.pather.setGoal(c.x, c.y);
+          this.lookAt = c.mainPoint();
+          const hp = c.hitParts()[0];
+          if (U.dist(head.x, head.y, hp.x, hp.y) < 16 * this.L && this.grab(c)) {
+            this.eatT = 0;
+            this.prey = null;
+          }
+          return;
+        }
+      }
+      if (perceive && this.fullT <= 0 && this.state !== 'hunt') {
+        const c = this.nearestCorpse(this.diet, (this.p.vision || 300) * 0.8);
+        if (c && this.canSee(c.x, c.y, (this.p.vision || 300) * 0.8)) {
+          this.prey = c;
+          this.setState('scavenge');
           return;
         }
       }
@@ -422,8 +479,9 @@
       this.ux /= ul;
       this.uy /= ul;
       this.headAng = U.lerpAngle(this.headAng, Math.atan2(head.y - P[1].y, head.x - P[1].x), U.approach(10, dt));
-      this.jaw += (0.5 + 0.3 * Math.sin(this.age * 20) - this.jaw) * 0.2;
-      this.lash = 1;
+      this.jaw += ((this.corpse ? 0.25 : 0.5 + 0.3 * Math.sin(this.age * 20)) - this.jaw) * 0.2;
+      this.lash = this.corpse ? 0 : 1;
+      this.lashS *= this.corpse ? 0.9 : 1;
       for (const l of this.legs) l.leg.planted = false;
       this.updateLegs(dt, false);
     }
@@ -502,8 +560,7 @@
     pickHome(exclude) {
       const W = this.W;
       const head = this.spine.pts[0];
-      let best = null;
-      let bs = -Infinity;
+      const cands = [];
       for (const sol of W.solids) {
         if (sol.kind === 'edge' || sol.kind === 'icon' || sol.w < 80 || sol.id === exclude) continue;
         const ox = sol.w * U.rand(0.2, 0.8);
@@ -513,16 +570,23 @@
         // unclaimed spots appeal; a dominant lizard may covet a claimed one
         let owner = null;
         for (const c of this.eco.creatures) {
-          if (c !== this && c.home && c.home.sid === sol.id && isLizard(c) && !c.dead) owner = c;
+          if (c !== this && c.home && c.home.sid === sol.id && isLizard(c) && !c.dead && !c.corpse) owner = c;
         }
         const claim = owner ? (this.pers.dominance - owner.pers.dominance) * 0.8 - 0.25 : 0.3;
         const sc = Math.random() * 0.6 + claim - U.dist(head.x, head.y, x, y) / 1400;
-        if (sc > bs) {
-          bs = sc;
-          best = { sid: sol.id, ox };
+        cands.push({ sc, sid: sol.id, ox, x, y });
+      }
+      // best-scoring spot we can actually walk to (checking only a few)
+      cands.sort((a, b) => b.sc - a.sc);
+      let best = null;
+      for (const c of cands.slice(0, 4)) {
+        const r = Nav.findPath(W, head.x, head.y, c.x, c.y, this.caps, 4000);
+        if (r && r.complete) {
+          best = { sid: c.sid, ox: c.ox };
+          break;
         }
       }
-      this.home = best;
+      this.home = best || (cands[0] ? { sid: cands[0].sid, ox: cands[0].ox } : null);
       this.homeAwayT = 0;
     }
     updateHome(dt) {
@@ -557,7 +621,7 @@
       let best = null;
       let bd = Infinity;
       for (const c of this.eco.creatures) {
-        if (c === this || !isLizard(c) || c.dead || c.leaving || c.grabbedBy || c.alpha < 0.8) continue;
+        if (c === this || !isLizard(c) || c.dead || c.corpse || c.leaving || c.grabbedBy || c.alpha < 0.8) continue;
         if (this.diet.includes(c.species) || c.diet.includes(this.species)) continue; // that's hunting, not rivalry
         if ((this.truces.get(c.id) || 0) > this.eco.t) continue;
         if (RIVALRY.includes(c.state) || c.state === 'flee' || c.state === 'leave') continue;
@@ -749,9 +813,8 @@
       this.thrashT = 0.25;
       this.eco.burst(rh.x, rh.y, r.bloodColor || '#20141a', 3);
       if (r.hp <= 0) {
-        // killed
-        this.eco.burst(rh.x, rh.y, r.bloodColor || '#20141a', 14);
-        r.remove();
+        // killed: it stays where it fell
+        r.die(14);
         this.endRivalry(U.rand(15, 25));
         return;
       }
@@ -781,6 +844,8 @@
       const sp = this.pounce ? 380 + 120 * this.L : 240 + 80 * this.L;
       this.lungeV = { x: (dx / d) * sp, y: (dy / d) * sp };
       this.lungeT = this.pounce ? 0.32 : 0.22;
+      // the whole body is thrown into the strike, not just the head
+      this.jolt = { hx: head.x, hy: head.y };
       // feet leave the ground for the strike
       for (const l of this.legs) l.leg.planted = false;
     }
@@ -834,7 +899,7 @@
         this.spine.verlet(1, 0.9, 0, GRAV, dt);
         this.spine.follow(1);
         this.spine.collide(W, 3, 1);
-        this.jaw += (Math.random() < 0.1 ? 1 : 0 - this.jaw) * 0.3;
+        this.jaw += this.corpse ? (0.25 - this.jaw) * 0.2 : (Math.random() < 0.1 ? 1 : 0 - this.jaw) * 0.3;
         this.updateLegs(dt, false);
         this.struggle(dt);
         return;
@@ -856,6 +921,19 @@
         this.jawTarget = 0.9;
         this.vx *= 0.7;
         this.vy *= 0.7;
+        // coil: draw the head and shoulders back away from the target
+        const lt = this.lungeTarget;
+        if (lt) {
+          const dx = lt.x - head.x;
+          const dy = lt.y - head.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const pull = 30 * L * dt;
+          for (let i = 0; i < this.bodyN; i++) {
+            const k = 1 - (i / this.bodyN) * 0.7; // the whole body rocks back
+            P[i].x -= (dx / d) * pull * k;
+            P[i].y -= (dy / d) * pull * k;
+          }
+        }
         if (this.windT <= 0) this.launchLunge();
       }
       if (this.lungeT > 0) this.jawTarget = 1; // hold the gape through the strike
@@ -1009,6 +1087,24 @@
           pt.x += ((a.x + b.x) / 2 - pt.x) * 0.12;
           pt.y += ((a.y + b.y) / 2 - pt.y) * 0.12;
         }
+      }
+
+      // Lunge follow-through: shoulders, hips and tail lurch after the head.
+      // Each point is dragged along by a share of the head's own movement this
+      // frame, most at the shoulders, least at the tail tip.
+      if (this.jolt) {
+        const j = this.jolt;
+        const mx = head.x - j.hx;
+        const my = head.y - j.hy;
+        j.hx = head.x;
+        j.hy = head.y;
+        const n = P.length;
+        for (let i = 1; i < n; i++) {
+          const k = Math.pow(1 - i / n, 0.8) * 0.6;
+          P[i].x += mx * k;
+          P[i].y += my * k;
+        }
+        if (this.lungeT <= 0) this.jolt = null;
       }
 
       // Smoothed "up" (away from surface) and head angle.
@@ -1504,8 +1600,18 @@
       const open = this.blink > 0 ? 0.35 : this.noticeT > 0 ? 1.3 : 1 - Math.min(0.5, this.jaw * 0.6);
       const es = Math.max(u * 2, 2.8);
       const eh = Math.max(u, es * open);
-      ctx.fillRect(4, -5.4 + (es - eh) / 2, es, eh);
-      if (open > 0.5) {
+      if (this.corpse) {
+        // dead: an X for an eye
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = Math.max(u, 0.9);
+        ctx.beginPath();
+        ctx.moveTo(4, -6);
+        ctx.lineTo(4 + es + 0.6, -6 + es + 0.6);
+        ctx.moveTo(4 + es + 0.6, -6);
+        ctx.lineTo(4, -6 + es + 0.6);
+        ctx.stroke();
+      } else ctx.fillRect(4, -5.4 + (es - eh) / 2, es, eh);
+      if (open > 0.5 && !this.corpse) {
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
         ctx.fillRect(4, -5.4 + (es - eh) / 2, Math.max(u, 0.6), Math.max(u, 0.6));
         ctx.fillStyle = ink;

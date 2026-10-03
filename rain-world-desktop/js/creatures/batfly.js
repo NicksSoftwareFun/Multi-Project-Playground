@@ -150,6 +150,7 @@
       let avy = 0;
       let n = 0;
       for (const o of eco.creatures) {
+        if (o.corpse) continue;
         if (o === this || o.flock !== f || o.dead) continue;
         n++;
         cx += o.pos.x;

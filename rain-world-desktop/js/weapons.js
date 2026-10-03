@@ -174,7 +174,7 @@
 
       // creatures (never slugcats; the thrower is safe for a moment)
       for (const c of eco.creatures) {
-        if (c.dead || c.leaving || c.alpha < 0.5 || c.species === 'slugcat') continue;
+        if (c.dead || c.corpse || c.leaving || c.alpha < 0.5 || c.species === 'slugcat') continue;
         if (c === this.thrower && this.flyT < 0.25) continue;
         const parts = c.hitParts();
         let hit = -1;

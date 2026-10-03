@@ -110,6 +110,41 @@
       this.weapon = null;
       super.remove();
     }
+    kill() {
+      if (this.weapon) this.weapon.drop();
+      this.weapon = null;
+      if (this.item) {
+        this.item.heldBy = null;
+        this.item = null;
+      }
+      this.lie = 1;
+      super.kill();
+    }
+    // Dead (or knocked out): a ragdoll lying on its side.
+    limp(dt) {
+      const hip = this.hip;
+      this.vy += GRAV * dt;
+      this.vx *= Math.pow(0.2, dt);
+      hip.x += this.vx * dt;
+      hip.y += this.vy * dt;
+      const c = this.W.collideCircle(hip, R);
+      this.grounded = false;
+      if (c) {
+        const vn = this.vx * c.nx + this.vy * c.ny;
+        if (vn < 0) {
+          this.vx -= vn * c.nx;
+          this.vy -= vn * c.ny;
+        }
+        if (c.ny < -0.6) this.grounded = true;
+      }
+      this.pole = null;
+      this.jumping = false;
+      this.lie += (1 - this.lie) * U.approach(6, dt);
+      this.look += (this.facing - this.look) * U.approach(6, dt);
+      this.updateHead(dt, false);
+      this.updateTail(dt);
+      this.updateHand();
+    }
     leave() {
       if (this.weapon) this.weapon.dead = true; // taken into the den
       this.weapon = null;
@@ -193,6 +228,7 @@
         return;
       }
       if (this.holding) {
+        if (!this.holding.corpse) this.holding.kill();
         // a batfly in hand: nibble it, then rest
         this.setState('eat');
         this.pather.clear();
@@ -257,7 +293,11 @@
 
       // Prey knocked down by a rock: go and pick it up.
       if (perceive && this.hunger > 0.3 && this.state !== 'forage') {
-        const downed = this.nearestOf(['batfly', 'centipede'], 320, (c) => c.stunT > 0.4 && c.canBeGrabbed() && (c.size || 1) <= 1);
+        let downed = this.nearestOf(['batfly', 'centipede'], 320, (c) => c.stunT > 0.4 && c.canBeGrabbed() && (c.size || 1) <= 1);
+        if (!downed) {
+          const c = this.nearestCorpse(['batfly', 'centipede'], 320);
+          if (c && (c.size || 1) <= 1) downed = c;
+        }
         if (downed) {
           this.food = downed;
           this.setState('forage');
@@ -265,7 +305,7 @@
       }
       if (this.state === 'forage' && this.food instanceof RW.Creature) {
         const f = this.food;
-        if (f.dead || f.leaving || f.grabbedBy || !(f.stunT > 0) || this.stateT > 12) {
+        if (f.dead || f.leaving || f.grabbedBy || !(f.stunT > 0 || f.corpse) || this.stateT > 12) {
           this.food = null;
           this.setState('wander');
         } else {
@@ -882,6 +922,19 @@
       const closed = this.blink > 0 || this.sleeping || (this.grabbedBy && Math.sin(this.age * 7) > 0);
       for (const s of [-1, 1]) {
         if (ax > 0.8 && s === -Math.sign(lx)) continue;
+        if (this.corpse) {
+          // dead: X'd-out eyes
+          ctx.strokeStyle = '#0b0b10';
+          ctx.lineWidth = 1;
+          const cx = ex + s * sep;
+          ctx.beginPath();
+          ctx.moveTo(cx - 1.6, ey - 1.6);
+          ctx.lineTo(cx + 1.6, ey + 1.6);
+          ctx.moveTo(cx + 1.6, ey - 1.6);
+          ctx.lineTo(cx - 1.6, ey + 1.6);
+          ctx.stroke();
+          continue;
+        }
         ctx.beginPath();
         if (closed) ctx.ellipse(ex + s * sep, ey + 0.9, 1.7, 0.5, 0, 0, U.TAU);
         else ctx.ellipse(ex + s * sep, ey, 1.45, 2.6, 0, 0, U.TAU);

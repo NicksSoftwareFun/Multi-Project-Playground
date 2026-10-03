@@ -171,7 +171,9 @@
         this.huntT = 0.35;
         const hunting = this.tentacles.filter((t) => t.state === 'hunt').length;
         if (this.fullT <= 0 && hunting < 2) {
-          const prey = this.nearestOf(this.diet, this.reach * 0.9, (c) => c.canBeGrabbed() && !this.tentacles.some((t) => t.prey === c));
+          const prey =
+            this.nearestOf(this.diet, this.reach * 0.9, (c) => c.canBeGrabbed() && !this.tentacles.some((t) => t.prey === c)) ||
+            this.nearestCorpse(this.diet, this.reach * 0.9); // happy to eat the dead
           if (prey) this.assign('hunt', prey);
         }
         const cur = eco.cursor;

@@ -147,7 +147,7 @@
           };
           let target = null;
           for (const c of eco.creatures) {
-            if (this.prey.indexOf(c.species) < 0 || !c.canBeGrabbed()) continue;
+            if (this.prey.indexOf(c.species) < 0 || c.corpse || !c.canBeGrabbed()) continue;
             if (below(c.x, c.y, c.vx)) {
               target = c;
               break;
