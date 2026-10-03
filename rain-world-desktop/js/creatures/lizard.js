@@ -1109,6 +1109,7 @@
             dvy = (dy / d) * this.speed;
           }
         } else if (node) {
+          if (g && this.speed > 0 && this.windT <= 0) this.noteProgress(dt, head); // jammed on a corner: clamber
           let tx = node.x;
           let ty = node.y;
           if (node.type === Nav.FALL && g) {

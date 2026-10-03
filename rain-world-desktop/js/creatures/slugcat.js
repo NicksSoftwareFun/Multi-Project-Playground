@@ -791,6 +791,8 @@
       const speed = this.speed || 105;
 
       this.scrambleCd = (this.scrambleCd || 0) - dt;
+      // jammed against a corner on the way to the next cell: clamber round it
+      if ((this.grounded || this.pole) && !this.jumping && !(this.crouchT > 0) && this.state !== 'eat') this.noteProgress(dt, hip);
       if (this.scramble) {
         // hauling up over a ledge lip, hands on the edge
         const lip = this.scramble.lip;

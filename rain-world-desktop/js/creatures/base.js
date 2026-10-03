@@ -330,8 +330,21 @@
       }
       // No den reachable from here: slip away quietly rather than wait forever.
       if (this.state === 'leave' && this.stateT > 30) this.leave();
+      // Easing out of a wedged spot (see below): a couple of px a frame.
+      if (this.nudge) {
+        const m = this.mainPoint();
+        const dx = this.nudge.x - m.x;
+        const dy = this.nudge.y - m.y;
+        const d = Math.hypot(dx, dy);
+        const step = Math.min(d, 90 * dt);
+        if (d > 0.5) this.shiftAll((dx / d) * step, (dy / d) * step);
+        if (d <= 90 * dt || (this.nudgeT -= dt) <= 0) this.nudge = null;
+      }
       // Safety net for odd geometry (e.g. a window dropped on top of us):
-      // anything that hasn't budged in 25s while trying to go somewhere leaves.
+      // anything that hasn't budged while trying to go somewhere first eases
+      // out of a dead cell (one it can't stand or cling in, such as a slot
+      // between ledge pieces) into the nearest usable one; one that's trying
+      // to leave with no way to a den slips away; after 25s anything leaves.
       this.stuckCheckT = (this.stuckCheckT || 0) + dt;
       if (this.stuckCheckT > 5) {
         this.stuckCheckT = 0;
@@ -340,6 +353,24 @@
         this.lastCheck = { x: m.x, y: m.y };
         const busy = this.pather && this.pather.goal && !this.grabbedBy && !this.holding;
         this.stillFor = moved < 3 && busy ? (this.stillFor || 0) + 5 : 0;
+        if (this.stillFor >= 10 && this.caps && !this.nudge) {
+          const W = this.W;
+          const cx = W.cellX(m.x);
+          const cy = W.cellY(m.y);
+          const to = !RW.Nav.valid(W, cx, cy, this.caps) && RW.Nav.nearestValid(W, m.x, m.y, this.caps, 3);
+          if (to) {
+            this.nudge = { x: W.centerX(to.cx), y: W.centerY(to.cy) };
+            this.nudgeT = 1.5;
+            this.pather.clear();
+            this.stillFor = 0;
+          } else if (this.state === 'leave') {
+            // as close to a den as it can get: in it goes; nowhere near one
+            // (no way there): it slips away underground
+            const den = this.eco.nearestDen(m.x, m.y);
+            if (den && Math.hypot(den.x - m.x, den.y - m.y) < W.cell * 3) this.leave();
+            else this.burrowAway();
+          }
+        }
         if (this.stillFor >= 25) this.burrowAway();
       }
       return true;
@@ -376,6 +407,37 @@
         p2: { x: face + side * (r + 3), y: top - lift },
         ok: Math.random() < chance,
       };
+    }
+    // Clambering: a creature pushing at a corner it can't get round (a
+    // one-cell step, a ledge end onto the pole beside it, a low overhang)
+    // makes no progress toward the next cell of its path. After 1.5s of that
+    // it clambers there, round the open side of the corner, using the
+    // scramble motion (always succeeds). Call each frame while steering.
+    noteProgress(dt, pt) {
+      const n = this.pather.current();
+      if (!n || this.scramble) {
+        this.stallKey = null;
+        return;
+      }
+      const d = Math.hypot(n.x - pt.x, n.y - pt.y);
+      const key = n.cx + ',' + n.cy;
+      if (this.stallKey !== key || d < this.stallBest - 2) {
+        this.stallKey = key;
+        this.stallBest = d;
+        this.stallT = 0;
+        return;
+      }
+      this.stallT += dt;
+      if (this.stallT < 1.5 || d > this.W.cell * 1.8) return;
+      this.stallT = 0;
+      const W = this.W;
+      const cx = W.cellX(pt.x);
+      const cy = W.cellY(pt.y);
+      const dx = Math.sign(n.cx - cx);
+      const dy = Math.sign(n.cy - cy);
+      let mid = { x: (pt.x + n.x) / 2, y: (pt.y + n.y) / 2 };
+      if (dx && dy) mid = !W.solid(cx + dx, cy) ? { x: W.centerX(cx + dx), y: W.centerY(cy) } : { x: W.centerX(cx), y: W.centerY(cy + dy) };
+      this.scramble = { t: 0, dur: 0.5, x0: pt.x, y0: pt.y, side: dx || 1, lip: { x: n.x, y: n.y }, p1: mid, p2: { x: n.x, y: n.y }, ok: true };
     }
     // Advance a scramble, steering `pt` by setting vx/vy. Returns 'done' once
     // over the lip, 'slip' when this attempt fails, otherwise null.
