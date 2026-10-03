@@ -136,7 +136,7 @@
         h('div', { class: 'sec' },
           h('div', { class: 'st', text: 'Population' }),
           this.slider('max population', E, 'maxPopulation', 0, 80, 1),
-          this.slider('spawn every (s)', E, 'spawnIntervalSec', 0.2, 20, 0.1),
+          this.slider('spawns /min', E, 'spawnPerMinute', 0.5, 30, 0.5),
           this.slider('migration /min', E, 'migrationPerMinute', 0, 1, 0.05),
           this.toggleCtl('predators eat prey', E, 'predation'),
           this.toggleCtl('creatures react to cursor', E, 'cursorInteraction'),

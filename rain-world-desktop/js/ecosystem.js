@@ -232,7 +232,7 @@
 
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
-        this.spawnT = Math.max(0.2, cfg.ecosystem.spawnIntervalSec);
+        this.spawnT = 60 / Math.max(0.1, +cfg.ecosystem.spawnPerMinute || 0.1);
         if (!this.shouldShelter()) {
           const sp = this.chooseSpecies();
           if (sp) this.spawn(sp);

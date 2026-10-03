@@ -25,7 +25,7 @@
     },
     rain: {
       enabled: true,
-      cycleMinutes: 7, // length of one rain cycle
+      cycleMinutes: 4, // length of one rain cycle
       downpourFraction: 0.12, // final part of the cycle that is a downpour
       shelterDuringDownpour: true, // creatures retreat into dens when the rain hits
       drizzle: 0.24, // light rain outside the downpour (0-1)
@@ -34,11 +34,11 @@
       showCycleHud: true,
     },
     ecosystem: {
-      maxPopulation: 22,
-      spawnIntervalSec: 2.5,
+      maxPopulation: 12,
+      spawnPerMinute: 2.5, // new arrivals per minute while below the population cap
       startPopulated: true, // fill the screen immediately on load
       predation: true, // predators actually eat prey (off = chase, bite, release)
-      migrationPerMinute: 0.15, // chance per creature per minute to wander off into a den
+      migrationPerMinute: 0.5, // chance per creature per minute to wander off into a den
       cursorInteraction: true,
       clickDropsFood: true,
     },
@@ -290,7 +290,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v4'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v5'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);
