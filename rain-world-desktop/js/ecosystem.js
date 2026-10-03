@@ -85,6 +85,18 @@
       return best;
     }
 
+    // The open den farthest from (ox, oy) that a creature at (x, y) with
+    // these caps can actually walk to (falls back to the farthest outright).
+    farthestDen(ox, oy, x, y, caps) {
+      const pts = this.openDens().map((d) => this.denSpawnPoint(d));
+      pts.sort((a, b) => U.dist2(b.x, b.y, ox, oy) - U.dist2(a.x, a.y, ox, oy));
+      for (const p of pts.slice(0, 4)) {
+        const r = Nav.findPath(this.world, x, y, p.x, p.y, caps, 6000);
+        if (r && r.complete) return p;
+      }
+      return pts[0] || null;
+    }
+
     count(species) {
       let n = 0;
       for (const c of this.creatures) if (c.species === species && !c.dead && !c.corpse) n++;

@@ -302,6 +302,8 @@
         params: {
           segments: [6, 9],
           speed: 55,
+          huntSpeed: 80,
+          diet: ['batfly'], // small ones snatch batflies
         },
       },
       centipede_medium: {
@@ -316,8 +318,8 @@
           speed: 45,
           huntSpeed: 85,
           toughness: 1.5,
-          diet: ['batfly', 'centipede', 'slugcat'],
-          threats: ['daddy', 'centipede_large', 'lizard_green', 'lizard_red'],
+          diet: ['slugcat', 'centipede', 'dropwig'], // bigger prey than batflies
+          threats: ['daddy', 'centipede_large', 'lizard_*'],
           colors: ['#d0662a', '#dc8a2e', '#6a2412', '#5a1e10'],
         },
       },
@@ -331,9 +333,9 @@
           size: 2,
           segments: [10, 13],
           speed: 38,
-          huntSpeed: 75,
+          huntSpeed: 95, // a burst of speed that can run down the slower lizards
           toughness: 3,
-          diet: ['slugcat', 'centipede', 'centipede_medium', 'lizard_blue', 'dropwig'],
+          diet: ['lizard_*', 'slugcat', 'centipede_medium', 'dropwig'], // hunts lizards
           threats: ['daddy'],
           colors: ['#b8401e', '#c45a24', '#4a160c', '#3c120a'],
         },
@@ -341,7 +343,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v7'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v8'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

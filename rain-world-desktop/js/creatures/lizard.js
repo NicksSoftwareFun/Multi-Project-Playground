@@ -88,9 +88,9 @@
       this.homeAwayT = 0;
       this.truces = new Map(); // lizard id -> eco time until which we leave it be
       this.threats = ['daddy'];
-      // big lizards take on large centipedes; the rest give them a wide berth
-      if (species === 'lizard_green' || species === 'lizard_red') this.diet.push('centipede_large');
-      else this.threats.push('centipede_large');
+      // large centipedes hunt lizards: every lizard backs away from one
+      // (how close it lets one come depends on its bravery)
+      this.threats.push('centipede_large');
       this.camo = 1;
       this.mass = p.mass || 2 * L;
       // Rain World personality: energy, bravery, sympathy, dominance,

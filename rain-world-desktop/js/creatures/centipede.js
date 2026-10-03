@@ -147,6 +147,8 @@
           this.setState('hunt');
         }
       }
+      // danger first: drop the hunt and let the threat check below run
+      if (this.state === 'hunt' && perceive && this.threatNear(170)) this.setState('wander');
       if (this.state === 'hunt') {
         const prey = this.prey;
         if (!prey || prey.dead || prey.leaving || prey.grabbedBy || this.stateT > 18) {

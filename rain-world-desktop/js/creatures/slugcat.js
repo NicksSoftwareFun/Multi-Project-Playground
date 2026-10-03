@@ -43,7 +43,12 @@
       this.climbPhase = 0;
       this.blinkT = U.rand(1, 4);
       this.blink = 0;
-      this.hunger = U.rand(0.2, 0.7);
+      // Transitory: in through one pipe hungry, eat twice, then cross the map
+      // and out through the pipe farthest from where we came in.
+      this.hunger = U.rand(0.6, 0.85);
+      this.meals = 0;
+      this.origin = null;
+      this.exitDen = null;
       this.item = null;
       this.eatT = 0;
       this.restT = 0;
@@ -241,6 +246,7 @@
         this.snackT -= dt;
         if (this.snackT <= 0) {
           this.hunger = Math.max(0, this.hunger - this.snackVal);
+          this.ate();
           this.setState('rest');
           this.restT = U.rand(1, 3);
         }
@@ -255,6 +261,7 @@
           this.item.dead = true;
           this.item = null;
           this.hunger = Math.max(0, this.hunger - 0.6);
+          this.ate();
           this.eatT = 0;
           this.setState('rest');
           this.restT = U.rand(1, 3);
@@ -270,6 +277,7 @@
         if (this.eatT > 1.8) {
           eco.consume(this.holding, this);
           this.hunger = Math.max(0, this.hunger - 0.35);
+          this.ate();
           this.eatT = 0;
           this.setState('rest');
           this.restT = U.rand(1, 3);
@@ -277,14 +285,27 @@
         return;
       }
 
-      if (this.wantsToLeave(dt)) {
+      // A transit slugcat still runs from danger on its way out.
+      const passing = this.exitDen && !eco.shouldShelter();
+      if (this.wantsToLeave(dt) && !(passing && this.state === 'flee' && this.stateT < 3.5)) {
+        if (passing && perceive) {
+          const t = this.threatNear(p.vision || 260);
+          if (t) {
+            this.threat = t;
+            if (this.weapon && Math.random() < 0.35 + 0.6 * this.pers.bravery) this.startThrow(t);
+            const g = this.fleeGoal(this.caps, t.x, t.y, 380);
+            if (g) this.pather.setGoal(g.x, g.y, true);
+            this.setState('flee');
+            return;
+          }
+        }
         this.setState('leave');
-        const den = eco.nearestDen(hip.x, hip.y);
+        const den = passing ? this.exitDen : eco.nearestDen(hip.x, hip.y);
         if (den) {
           this.pather.setGoal(den.x, den.y);
           if (U.dist(hip.x, hip.y, den.x, den.y) < 22) this.leave();
         }
-        this.speed = p.runSpeed || 170;
+        this.speed = passing ? p.speed || 105 : p.runSpeed || 170;
         return;
       }
 
@@ -496,6 +517,22 @@
       }
     }
 
+    // Transit: the downpour sends everyone to the nearest den; otherwise a
+    // slugcat leaves once it has eaten twice (or given up after a while),
+    // heading for the den farthest from the one it arrived by.
+    wantsToLeave(dt) {
+      if (this.eco.shouldShelter()) return true;
+      if (!this.origin) this.origin = this.eco.nearestDen(this.spawnX, this.spawnY) || { x: this.spawnX, y: this.spawnY };
+      if (!this.exitDen && (this.meals >= 2 || this.age > 210) && !this.holding && !this.item && this.snackT <= 0) {
+        const hip = this.hip;
+        this.exitDen = this.eco.farthestDen(this.origin.x, this.origin.y, hip.x, hip.y, this.caps);
+      }
+      return !!this.exitDen;
+    }
+    ate() {
+      this.meals++;
+      if (this.meals < 2) this.hunger = Math.max(this.hunger, 0.6); // still peckish
+    }
     findWeapon(range) {
       const hip = this.hip;
       let best = null;
