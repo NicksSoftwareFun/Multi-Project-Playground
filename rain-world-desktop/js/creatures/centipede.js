@@ -104,14 +104,21 @@
       this.think(dt);
       this.pather.update(dt, h.x, h.y);
       this.pather.advance(h.x, h.y, W.cell * 0.8);
-      const g = W.nearestSurface(h.x, h.y, 14, this.mask);
+      let g = W.nearestSurface(h.x, h.y, 14, this.mask);
+      if (this.dropT > 0) {
+        this.dropT -= dt;
+        g = null;
+      }
       const node = this.pather.current();
       let dvx = 0;
       let dvy = 0;
       let leaving = false;
       if (node) {
         let ty = node.y;
-        if (node.type === Nav.FALL && g) ty = h.y;
+        if (node.type === Nav.FALL && g) {
+          if (Math.abs(node.x - h.x) < W.cell * 0.6) this.dropT = 0.35;
+          else ty = h.y;
+        }
         const dx = node.x - h.x;
         const dy = ty - h.y;
         const d = Math.hypot(dx, dy) || 1;

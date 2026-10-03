@@ -282,6 +282,20 @@
         return false;
       }
       this.alpha = Math.min(1, this.alpha + dt * 1.6);
+      // No den reachable from here: slip away quietly rather than wait forever.
+      if (this.state === 'leave' && this.stateT > 30) this.leave();
+      // Safety net for odd geometry (e.g. a window dropped on top of us):
+      // anything that hasn't budged in 25s while trying to go somewhere leaves.
+      this.stuckCheckT = (this.stuckCheckT || 0) + dt;
+      if (this.stuckCheckT > 5) {
+        this.stuckCheckT = 0;
+        const m = this.mainPoint();
+        const moved = this.lastCheck ? Math.hypot(m.x - this.lastCheck.x, m.y - this.lastCheck.y) : 99;
+        this.lastCheck = { x: m.x, y: m.y };
+        const busy = this.pather && this.pather.goal && !this.grabbedBy && !this.holding;
+        this.stillFor = moved < 3 && busy ? (this.stillFor || 0) + 5 : 0;
+        if (this.stillFor >= 25) this.leave();
+      }
       return true;
     }
     // Eaten, despawned or left the screen.

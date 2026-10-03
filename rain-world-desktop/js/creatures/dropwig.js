@@ -65,10 +65,16 @@
       const W = this.W;
       const h = this.spine.pts[0];
       return Nav.randomValid(W, this.caps, h.x, h.y, 600, (cx, cy) => {
-        if (!W.solid(cx, cy - 1)) return false;
+        if (!W.solid(cx, cy - 1) || W.solid(cx - 1, cy) || W.solid(cx + 1, cy)) return false;
         for (let k = 1; k <= 7; k++) if (W.solid(cx, cy + k)) return false;
         return true;
       });
+    }
+
+    underCeiling() {
+      const h = this.spine.pts[0];
+      const W = this.W;
+      return W.isSolidPt(h.x, h.y - 14);
     }
 
     think(dt) {
@@ -103,13 +109,13 @@
       }
       if (this.state === 'seek') {
         this.mandible = 0;
-        if (!this.spot || this.stateT > 30) {
+        if (!this.spot || this.stateT > 30 || (this.pather.done() && this.pather.nodes && U.dist(h.x, h.y, this.spot.x, this.spot.y) < 16 && !this.underCeiling())) {
           this.spot = this.pickSpot();
           this.stateT = 0;
         }
         if (this.spot) {
           this.pather.setGoal(this.spot.x, this.spot.y);
-          if (U.dist(h.x, h.y, this.spot.x, this.spot.y) < 14 && this.grip && this.grip.type === 'ceil') {
+          if (U.dist(h.x, h.y, this.spot.x, this.spot.y) < 16 && this.underCeiling()) {
             this.setState('wait');
             this.pather.clear();
           }
@@ -117,7 +123,7 @@
         return;
       }
       if (this.state === 'wait') {
-        if (!this.grip || this.grip.type !== 'ceil' || this.stateT > (this.p.patience || 70)) {
+        if (!this.underCeiling() || this.stateT > (this.p.patience || 70)) {
           this.setState('seek');
           this.spot = null;
           return;
@@ -174,6 +180,10 @@
       this.think(dt);
       const falling = this.state === 'drop' || this.state === 'recover';
       let g = falling ? null : W.nearestSurface(h.x, h.y, 22, this.mask);
+      if (this.dropT > 0) {
+        this.dropT -= dt;
+        g = null;
+      }
       this.grip = g;
       let leaving = false;
 
@@ -200,7 +210,10 @@
         let dvy = 0;
         if (node && this.state !== 'wait' && this.state !== 'feed') {
           let ty = node.y;
-          if (node.type === Nav.FALL && g) ty = h.y;
+          if (node.type === Nav.FALL && g) {
+            if (Math.abs(node.x - h.x) < W.cell * 0.6) this.dropT = 0.35;
+            else ty = h.y;
+          }
           const dx = node.x - h.x;
           const dy = ty - h.y;
           const d = Math.hypot(dx, dy) || 1;

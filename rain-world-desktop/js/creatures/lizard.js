@@ -149,7 +149,8 @@
       // Hunting
       if (perceive && this.fullT <= 0) {
         const vision = this.p.vision || 300;
-        const prey = this.nearestOf(this.diet, vision, (c) => !c.grabbedBy && this.canSee(c.x, c.y, vision));
+        if (this.giveUpT > 0) this.giveUpT -= 0.25;
+        const prey = this.nearestOf(this.diet, vision, (c) => !c.grabbedBy && !(this.giveUpT > 0 && c === this.gaveUpOn) && this.canSee(c.x, c.y, vision));
         if (prey) {
           this.prey = prey;
           this.setState('hunt');
@@ -160,7 +161,12 @@
       }
       if (this.state === 'hunt' && this.prey) {
         const prey = this.prey;
-        if (prey.dead || prey.leaving || prey.grabbedBy || this.stateT > 25) {
+        const hopeless = this.stateT > 25 || (this.stateT > 8 && !this.pather.complete);
+        if (hopeless) {
+          this.gaveUpOn = prey;
+          this.giveUpT = 20;
+        }
+        if (prey.dead || prey.leaving || prey.grabbedBy || hopeless) {
           this.prey = null;
           this.setState('wander');
         } else {
@@ -263,6 +269,11 @@
 
       let g = W.nearestSurface(head.x, head.y, 22 * L, this.mask);
       if (!g) g = W.nearestSurface(P[3].x, P[3].y, 20 * L, this.mask);
+      if (this.dropT > 0) {
+        // letting go on purpose to drop down
+        this.dropT -= dt;
+        g = null;
+      }
       this.grip = g;
 
       if (this.lungeT > 0) {
@@ -290,7 +301,10 @@
         if (node) {
           let tx = node.x;
           let ty = node.y;
-          if (node.type === Nav.FALL && g) ty = head.y; // walk off the edge first
+          if (node.type === Nav.FALL && g) {
+            if (Math.abs(node.x - head.x) < cell * 0.6) this.dropT = 0.35; // right above it: let go
+            else ty = head.y; // walk off the edge first
+          }
           const dx = tx - head.x;
           const dy = ty - head.y;
           const d = Math.hypot(dx, dy) || 1;

@@ -82,11 +82,13 @@
       this.solids = this.borders.concat(this.staticSolids, this.dynamicSolids);
       const { cols, rows, cell, grid } = this;
       grid.fill(0);
+      // A cell counts as solid when a rect covers more than 30% of it.
+      const t = cell * 0.3;
       for (const s of this.solids) {
-        let cx0 = Math.ceil((s.x - cell / 2) / cell);
-        let cx1 = Math.ceil((s.x + s.w - cell / 2) / cell) - 1;
-        let cy0 = Math.ceil((s.y - cell / 2) / cell);
-        let cy1 = Math.ceil((s.y + s.h - cell / 2) / cell) - 1;
+        let cx0 = Math.floor((s.x + t) / cell);
+        let cx1 = Math.ceil((s.x + s.w - t) / cell) - 1;
+        let cy0 = Math.floor((s.y + t) / cell);
+        let cy1 = Math.ceil((s.y + s.h - t) / cell) - 1;
         // Thin rects that straddle no cell centre still block their middle cell.
         if (cx0 > cx1) cx0 = cx1 = Math.floor((s.x + s.w / 2) / cell);
         if (cy0 > cy1) cy0 = cy1 = Math.floor((s.y + s.h / 2) / cell);
@@ -97,6 +99,25 @@
         for (let cy = cy0; cy <= cy1; cy++) {
           const row = cy * cols;
           for (let cx = cx0; cx <= cx1; cx++) grid[row + cx] = SOLID;
+        }
+      }
+      // Gaps squeezed between two solids (a window resting just above a
+      // ledge) are too narrow for anything to fit: close them too.
+      const m = 4;
+      for (let cy = 0; cy < rows; cy++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const i = cy * cols + cx;
+          if (grid[i]) continue;
+          const x0 = cx * cell;
+          const y0 = cy * cell;
+          const mx = x0 + cell / 2;
+          const my = y0 + cell / 2;
+          if (
+            (this.isSolidPt(mx, y0 + m) && this.isSolidPt(mx, y0 + cell - m)) ||
+            (this.isSolidPt(x0 + m, my) && this.isSolidPt(x0 + cell - m, my))
+          ) {
+            grid[i] = SOLID;
+          }
         }
       }
       for (const p of this.poles) {

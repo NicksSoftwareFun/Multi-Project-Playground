@@ -64,9 +64,10 @@
     }
 
     openDens() {
+      const W = this.world;
       return this.dens.filter((d) => {
         const p = this.denSpawnPoint(d);
-        return !this.world.isSolidPt(p.x, p.y);
+        return !W.solid(W.cellX(p.x), W.cellY(p.y)) && !W.isSolidPt(p.x, p.y) && !W.isSolidPt(p.x, p.y - 14);
       });
     }
 
