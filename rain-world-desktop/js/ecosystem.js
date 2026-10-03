@@ -34,6 +34,27 @@
       this.grass = decor.grass.map((g) => Object.assign({}, g));
       this.plants = decor.fruitPlants.map((p) => new RW.FruitPlant(this, p.x, p.y, p.len));
       this.nests = (decor.nests || []).map((n) => ({ x: n.x, y: n.y, phase: n.x % 10, pulse: 0 }));
+      this.ledges = decor.ledges || [];
+    }
+    // A nest buried under a window for a while is rebuilt under another
+    // ledge that's in the open, so there's always one to see.
+    moveNest(n) {
+      const W = this.world;
+      const spots = [];
+      for (const l of this.ledges) {
+        if (l.w < 60 || l.y + l.h + 60 > W.h * 0.85) continue;
+        for (let k = 0; k < 4; k++) {
+          const x = l.x + 18 + Math.random() * (l.w - 36);
+          const y = l.y + l.h;
+          if (!W.isSolidPt(x, y + 4) && !W.isSolidPt(x, y + 14) && !W.isSolidPt(x, y + 32)) spots.push({ x, y });
+        }
+      }
+      n.coveredT = 0;
+      if (!spots.length) return;
+      const sp = U.pick(spots);
+      n.x = Math.round(sp.x);
+      n.y = sp.y;
+      for (const c of this.creatures) if (c.flock && c.flock.roost) c.flock.roost = null; // find the new one
     }
     // Batflies hatch from the nest (not from dens) unless it's buried under a
     // window; with a window or icon right below it they slip out sideways.
@@ -360,7 +381,11 @@
 
       // The nest keeps batflies about (prey for everyone): whenever they run
       // low it lets out a fresh flock. They don't count toward the cap.
-      for (const n of this.nests) n.pulse = Math.max(0, n.pulse - dt);
+      for (const n of this.nests) {
+        n.pulse = Math.max(0, n.pulse - dt);
+        n.coveredT = this.world.isSolidPt(n.x, n.y + 14) ? (n.coveredT || 0) + dt : 0;
+        if (n.coveredT > 10) this.moveNest(n);
+      }
       this.nestT = (this.nestT === undefined ? 4 : this.nestT) - dt;
       if (this.nestT <= 0) {
         this.nestT = 18;
