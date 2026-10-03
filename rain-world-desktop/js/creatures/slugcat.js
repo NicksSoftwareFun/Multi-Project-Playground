@@ -575,7 +575,6 @@
       const col = this.color;
       const f = this.facing;
       const dark = U.rgba(U.scale(col, 0.45)); // far limbs: clearly shaded so they separate
-      const edge = U.rgba(U.scale(col, 0.55)); // rim on near limbs crossing the body
       const main = U.rgba(col);
       const lie = this.lie;
       ctx.save();
@@ -598,7 +597,7 @@
 
       // far limbs
       this.drawLimb(ctx, hip.x - f, hip.y + 2, limbs.feet[1], LEG, LEG, dark, 3, f);
-      this.drawArm(ctx, shoulder, limbs.hands[1], dark, null, 2);
+      this.drawArm(ctx, shoulder, limbs.hands[1], dark, 2);
 
       // tail
       const T = this.tail.pts;
@@ -619,15 +618,14 @@
       this.drawLimb(ctx, hip.x + f, hip.y + 2, limbs.feet[0], LEG, LEG, main, 3.2, f);
       ctx.restore();
 
-      // near arm, rimmed in shade so it reads against the white body; drawn
-      // before the head so a hand never paints across the face
+      // near arm, drawn before the head so a hand never paints across the face
       // (reaching, climbing or flailing, the arm comes out in front instead)
       const armFront = !!this.reachTo || !!this.grabbedBy || !!this.pole || (!this.grounded && this.lie < 0.5);
-      let hand = armFront ? null : this.drawArm(ctx, shoulder, limbs.hands[0], main, edge, 2.2);
+      let hand = armFront ? null : this.drawArm(ctx, shoulder, limbs.hands[0], main, 2.2);
 
       // head
       this.drawHeadShape(ctx, h.x, h.y, this.look, main);
-      if (armFront) hand = this.drawArm(ctx, shoulder, limbs.hands[0], main, edge, 2.2);
+      if (armFront) hand = this.drawArm(ctx, shoulder, limbs.hands[0], main, 2.2);
 
       // held fruit sits in the near hand, just under the chin while eating
       if (this.item) {
@@ -745,27 +743,14 @@
     }
 
     // Thin two-bone arm ending in a small round hand.
-    drawArm(ctx, sh, t, col, rim, w) {
+    drawArm(ctx, sh, t, col, w) {
       const k = U.ik2(sh.x, sh.y, t.x, t.y, ARM, ARM, -this.facing);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
       ctx.beginPath();
       ctx.moveTo(sh.x, sh.y);
       ctx.lineTo(k.kx, k.ky);
       ctx.lineTo(k.ex, k.ey);
-      if (rim) {
-        ctx.strokeStyle = rim;
-        ctx.lineWidth = w + 1.4;
-        ctx.stroke();
-        ctx.fillStyle = rim;
-        ctx.beginPath();
-        ctx.arc(k.ex, k.ey, 2.3, 0, U.TAU);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(sh.x, sh.y);
-        ctx.lineTo(k.kx, k.ky);
-        ctx.lineTo(k.ex, k.ey);
-      }
-      ctx.strokeStyle = col;
-      ctx.lineWidth = w;
       ctx.stroke();
       ctx.fillStyle = col;
       ctx.beginPath();

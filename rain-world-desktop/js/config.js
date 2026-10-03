@@ -77,12 +77,16 @@
           headColor: '#ff36c4',
           bodyColor: '#120b11',
           length: 1.0,
-          speed: 95,
-          huntSpeed: 175,
-          climbWalls: true,
+          speed: 49, // wiki baseSpeed 4.1 x 12
+          huntSpeed: 83,
+          climbWalls: false,
           climbCeilings: false,
           poles: true,
-          vision: 320,
+          vision: 297,
+          mass: 2.1, // wiki bodyMass
+          chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 12, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 60, // wiki attemptBiteRadius x 0.75
           spines: 0,
           pattern: 'dapple',
           tailTip: true,
@@ -98,12 +102,16 @@
           headColor: '#41f53c',
           bodyColor: '#0c0d10',
           length: 1.25,
-          speed: 70,
-          huntSpeed: 140,
+          speed: 80, // wiki baseSpeed 6.7 x 12
+          huntSpeed: 136,
           climbWalls: false,
           climbCeilings: false,
           poles: false,
           vision: 280,
+          mass: 7.5, // wiki bodyMass
+          chargeRate: 1.0, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 20, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 75, // wiki attemptBiteRadius x 0.75
           spines: 9,
           pattern: 'dots',
         },
@@ -118,12 +126,16 @@
           headColor: '#2d8cff',
           bodyColor: '#0c0d10',
           length: 0.8,
-          speed: 120,
-          huntSpeed: 200,
+          speed: 38, // wiki baseSpeed 3.2 x 12
+          huntSpeed: 65,
           climbWalls: true,
           climbCeilings: true,
           poles: true,
-          vision: 300,
+          vision: 314,
+          mass: 1.4, // wiki bodyMass
+          chargeRate: 0.01, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 14, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 68, // wiki attemptBiteRadius x 0.75
           spines: 0,
           pattern: 'fins',
           tailTip: true,
@@ -139,12 +151,16 @@
           headColor: '#b6bac3',
           bodyColor: '#e9e9ec',
           length: 1.05,
-          speed: 85,
-          huntSpeed: 230,
+          speed: 46, // wiki baseSpeed 3.8 x 12
+          huntSpeed: 78,
           climbWalls: true,
-          climbCeilings: true,
+          climbCeilings: false,
           poles: true,
-          vision: 340,
+          vision: 396,
+          mass: 2.1, // wiki bodyMass
+          chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 15, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 64, // wiki attemptBiteRadius x 0.75
           spines: 0,
           pattern: 'spots',
           camouflage: true,
@@ -160,12 +176,16 @@
           headColor: '#ff1e2a',
           bodyColor: '#0c0608',
           length: 1.35,
-          speed: 65,
-          huntSpeed: 160,
+          speed: 60, // wiki baseSpeed 5.0 x 12
+          huntSpeed: 102,
           climbWalls: false,
           climbCeilings: false,
           poles: true,
-          vision: 360,
+          vision: 520,
+          mass: 3.1, // wiki bodyMass
+          chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 2, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 90, // wiki attemptBiteRadius x 0.75
           spines: 18,
           pattern: 'dots',
         },
@@ -180,12 +200,16 @@
           headColor: '#ffbf1c',
           bodyColor: '#120d06',
           length: 0.95,
-          speed: 105,
-          huntSpeed: 175,
-          climbWalls: true,
+          speed: 49, // wiki baseSpeed 4.1 x 12
+          huntSpeed: 83,
+          climbWalls: false,
           climbCeilings: false,
           poles: true,
-          vision: 300,
+          vision: 297,
+          mass: 1.7, // wiki bodyMass
+          chargeRate: 0.05, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 21, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 30, // wiki attemptBiteRadius x 0.75
           spines: 0,
           pattern: 'dapple',
           tailTip: true,
@@ -201,12 +225,16 @@
           headColor: '#18d8e8',
           bodyColor: '#0a0d10',
           length: 0.95,
-          speed: 120,
-          huntSpeed: 210,
+          speed: 58, // wiki baseSpeed 4.85 x 12
+          huntSpeed: 99,
           climbWalls: true,
           climbCeilings: true,
           poles: true,
-          vision: 320,
+          vision: 327,
+          mass: 2.0, // wiki bodyMass
+          chargeRate: 0.033, // wiki loungeTendency: chance to pounce from afar
+          biteDelay: 12, // wiki biteDelay (frames at 40fps): windup before a bite
+          biteRange: 68, // wiki attemptBiteRadius x 0.75
           spines: 0,
           pattern: 'rings',
         },
@@ -262,7 +290,7 @@
     },
   };
 
-  const STORAGE_KEY = 'rw-desktop-config-v3'; // bumped when defaults change shape
+  const STORAGE_KEY = 'rw-desktop-config-v4'; // bumped when defaults change shape
 
   RW.loadConfig = function () {
     const cfg = RW.U.clone(RW.DEFAULT_CONFIG);

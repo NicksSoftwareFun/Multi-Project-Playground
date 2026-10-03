@@ -46,7 +46,8 @@
       this.pather = new RW.Pather(this, this.caps);
       const l1 = 16 * L;
       const l2 = 16 * L;
-      const o = { stepDur: 0.17, lift: 6 * L };
+      // heavy species take slower, flatter steps
+      const o = { stepDur: 0.2 + 0.015 * (p.mass || 2), lift: 4.5 * L };
       this.legs = [
         { leg: new RW.Leg(l1, l2, Object.assign({ group: 0, forward: 0.65 }, o)), at: 2, near: true },
         { leg: new RW.Leg(l1, l2, Object.assign({ group: 1, forward: 0.35 }, o)), at: 2, near: false },
@@ -73,11 +74,16 @@
       this.idleT = 0;
       this.cursorBites = 0;
       this.cursorBored = 0;
-      this.diet = ['slugcat', 'centipede', 'batfly'];
+      // (lizards ignore batflies, per the Rain World wiki)
+      this.diet = ['slugcat', 'centipede', 'dropwig'];
       if (L >= 1.1) this.diet.push('lizard_blue');
       this.threats = ['daddy'];
       this.camo = 1;
-      this.mass = 2 * L;
+      this.mass = p.mass || 2 * L;
+      // Rain World personality: energy, bravery, sympathy, dominance,
+      // nervousness and aggression, each 0..1.
+      this.pers = U.personality();
+      this.walkPh = 0;
       // personality state
       this.look = 0; // head angle offset from the neck, radians
       this.lookAt = null; // point the head is turned toward
@@ -156,12 +162,14 @@
       this.cursorBored -= dt;
       const perceive = this.perceiveT <= 0;
       if (perceive) this.perceiveT = 0.25 + Math.random() * 0.1;
-      this.speed = this.p.speed || 90;
+      const pe = this.pers;
+      // energetic lizards amble a little quicker
+      this.speed = (this.p.speed || 50) * (0.88 + 0.24 * pe.energy);
       this.jawTarget = 0;
       this.pather.interval = 1.2;
       this.lookAt = null;
       this.raise = 0; // head stays in line with the body unless rearing
-      this.lash = 0.15;
+      this.lash = 0.08 + 0.2 * pe.nervous; // nervous ones twitch their tails
 
       if (this.holding) {
         this.setState('eat');
@@ -176,7 +184,7 @@
         if (this.eatT > 4.5) {
           eco.consume(this.holding, this);
           this.holding = null;
-          this.fullT = U.rand(30, 60);
+          this.fullT = U.rand(30, 60) * (1.3 - 0.5 * pe.aggression);
           this.eatT = 0;
         }
         return;
@@ -194,7 +202,7 @@
       }
 
       if (perceive) {
-        const threat = this.threatNear(200);
+        const threat = this.threatNear(200 * (1.3 - 0.6 * pe.bravery)); // the brave let danger come closer
         if (threat) {
           this.setState('flee');
           const g = this.fleeGoal(this.caps, threat.x, threat.y, 350);
@@ -202,7 +210,7 @@
         }
       }
       if (this.state === 'flee') {
-        this.speed = this.p.huntSpeed || 160;
+        this.speed = this.p.huntSpeed || 90;
         if (this.stateT < 3) return;
         this.setState('wander');
       }
@@ -217,7 +225,9 @@
         this.lookAt = r && !r.dead ? r.spine.pts[0] : null;
         this.jawTarget = 0.55 + 0.45 * Math.max(0, Math.sin(this.stateT * 9));
         if (!r || r.dead || r.leaving || this.stateT > this.displayFor) {
-          const lost = r && !r.dead && r.L * (r.p.huntSpeed || 150) > this.L * (this.p.huntSpeed || 150);
+          // the less dominant (and lighter) lizard backs down
+          const score = (c) => c.pers.dominance + c.mass * 0.06;
+          const lost = r && !r.dead && score(r) > score(this);
           this.rival = null;
           this.rivalCd = U.rand(20, 40);
           if (lost) {
@@ -232,8 +242,11 @@
       }
       if (perceive && this.rivalCd <= 0 && this.state !== 'hunt') {
         const r = this.nearestOf(LIZARDS, 95 * this.L, (c) => c.rivalCd <= 0 && !c.holding && !c.grabbedBy && c.state !== 'hunt' && c.state !== 'display');
-        if (r) {
-          const t = U.rand(1.6, 3.2);
+        // only the aggressive bother squaring up; the rest look away
+        if (r && Math.random() > 0.25 + 0.75 * Math.max(pe.aggression, r.pers.aggression)) {
+          this.rivalCd = U.rand(4, 10);
+        } else if (r) {
+          const t = U.rand(1.6, 3.2) * (0.7 + 0.6 * Math.max(pe.dominance, r.pers.dominance));
           for (const [a, b] of [[this, r], [r, this]]) {
             a.rival = b;
             a.displayFor = t;
@@ -249,7 +262,7 @@
         if (this.giveUpT > 0) this.giveUpT -= 0.25;
         const prey = this.nearestOf(this.diet, vision, (c) => !c.grabbedBy && !(this.giveUpT > 0 && c === this.gaveUpOn) && this.canSee(c.x, c.y, vision));
         if (prey) {
-          if (this.state !== 'hunt') this.noticeT = 0.45; // freeze and stare before the charge
+          if (this.state !== 'hunt') this.noticeT = 0.45 * (1.4 - pe.aggression); // freeze and stare before the charge
           this.prey = prey;
           this.setState('hunt');
         } else if (this.state === 'hunt' && this.stateT > 4) {
@@ -259,7 +272,8 @@
       }
       if (this.state === 'hunt' && this.prey) {
         const prey = this.prey;
-        const hopeless = this.stateT > 25 || (this.stateT > 8 && !this.pather.complete);
+        const persist = 0.6 + pe.aggression;
+        const hopeless = this.stateT > 25 * persist || (this.stateT > 8 * persist && !this.pather.complete);
         if (hopeless) {
           this.gaveUpOn = prey;
           this.giveUpT = 20;
@@ -268,7 +282,7 @@
           this.prey = null;
           this.setState('wander');
         } else {
-          this.speed = this.p.huntSpeed || 160;
+          this.speed = (this.p.huntSpeed || 90) * (0.9 + 0.2 * pe.aggression);
           this.pather.interval = 0.45;
           this.pather.setGoal(prey.x, prey.y);
           this.lookAt = prey.mainPoint();
@@ -282,8 +296,12 @@
             return;
           }
           if (d < 140) this.jawTarget = 0.35;
-          if (d < 75 * this.L && this.lungeCd <= 0 && this.grip && this.W.lineClear(head.x, head.y, prey.x, prey.y)) {
-            this.lunge(prey.x, prey.y, prey);
+          const canStrike = this.lungeCd <= 0 && this.grip && this.W.lineClear(head.x, head.y, prey.x, prey.y);
+          if (canStrike && d < (this.p.biteRange || 60) * this.L) {
+            this.lunge(prey.x, prey.y, prey, false);
+          } else if (canStrike && perceive && d < 170 * this.L && Math.random() < (this.p.chargeRate || 0.05)) {
+            // a long pounce from afar: green lizards always, most others rarely
+            this.lunge(prey.x, prey.y, prey, true);
           }
           return;
         }
@@ -296,15 +314,15 @@
         const vision = this.p.vision || 300;
         if (d < vision && cur.still > 0.5 && (this.state === 'stalk' || (perceive && Math.random() < 0.08))) {
           this.setState('stalk');
-          this.speed = (this.p.speed || 90) * 0.75;
+          this.speed = (this.p.speed || 50) * 0.75;
           this.jawTarget = 0.25;
           this.lookAt = cur;
           this.raise = 0.5;
           this.lash = 0.6;
           this.pather.interval = 0.6;
           this.pather.setGoal(cur.x, cur.y);
-          if (d < 70 * this.L && this.lungeCd <= 0 && this.grip) {
-            this.lunge(cur.x, cur.y, null);
+          if (d < (this.p.biteRange || 60) * this.L && this.lungeCd <= 0 && this.grip) {
+            this.lunge(cur.x, cur.y, null, false);
             if (++this.cursorBites >= 3) {
               this.cursorBites = 0;
               this.cursorBored = U.rand(12, 25);
@@ -327,7 +345,7 @@
         this.idleLook.t -= dt;
         if (this.idleLook.t <= 0) {
           const a = U.rand(0, U.TAU);
-          this.idleLook = { x: head.x + Math.cos(a) * 80, y: head.y + Math.sin(a) * 80, t: U.rand(0.8, 2.2) };
+          this.idleLook = { x: head.x + Math.cos(a) * 80, y: head.y + Math.sin(a) * 80, t: U.rand(0.8, 2.2) * (1.4 - 0.8 * pe.nervous) };
         }
         this.lookAt = this.idleLook;
         // every few seconds: rear up and gape
@@ -345,9 +363,11 @@
         return;
       }
       if (this.pather.done() || !this.pather.goal || this.stateT > 14) {
-        if (this.pather.goal && Math.random() < 0.35) {
+        // low-energy lizards stop to rest more often and for longer; a
+        // low-energy white lizard lies still long enough to vanish (lurk)
+        if (this.pather.goal && Math.random() < 0.2 + 0.35 * (1 - pe.energy)) {
           this.setState('idle');
-          this.idleT = U.rand(1.5, 4.5);
+          this.idleT = U.rand(1.5, 4.5) * (1.5 - pe.energy) * (this.p.camouflage ? 2.5 - 1.5 * pe.energy : 1);
           return;
         }
         const g = this.wanderGoal(this.caps, 500);
@@ -357,11 +377,14 @@
     }
 
     // Lunges have a short windup (stop, rear, gape) before the strike.
-    lunge(tx, ty, prey) {
-      this.windT = 0.18;
+    // A bite is a short snap once in range; a pounce is a long leap from
+    // further off. The windup follows the species' bite delay.
+    lunge(tx, ty, prey, pounce) {
+      this.windT = 0.08 + ((this.p.biteDelay === undefined ? 12 : this.p.biteDelay) / 40) * 0.5;
       this.lungeTarget = { x: tx, y: ty };
       this.lungeCd = U.rand(1.3, 2.4);
       this.lungePrey = prey;
+      this.pounce = !!pounce;
     }
 
     launchLunge() {
@@ -372,9 +395,9 @@
       const dx = tx - head.x;
       const dy = ty - head.y;
       const d = Math.hypot(dx, dy) || 1;
-      const sp = 380 + 120 * this.L;
+      const sp = this.pounce ? 380 + 120 * this.L : 240 + 80 * this.L;
       this.lungeV = { x: (dx / d) * sp, y: (dy / d) * sp };
-      this.lungeT = 0.26;
+      this.lungeT = this.pounce ? 0.32 : 0.22;
       // feet leave the ground for the strike
       for (const l of this.legs) l.leg.planted = false;
     }
@@ -506,7 +529,8 @@
           const dy = ty - head.y;
           const d = Math.hypot(dx, dy) || 1;
           // speed surges as feet step and eases as they plant
-          const surge = this.legs.some((l) => l.leg.stepping) ? 1.12 : 0.84;
+          // lumbering: a heave forward as feet swing, a sag as they plant
+          const surge = this.legs.some((l) => l.leg.stepping) ? 1.25 : 0.68;
           dvx = (dx / d) * this.speed * surge;
           dvy = (dy / d) * this.speed * surge;
           if (g && this.speed > 0 && this.turnCd <= 0 && this.windT <= 0) {
@@ -522,7 +546,8 @@
           this.leavingSurface = node.type === Nav.FALL || (g && (dx / d) * g.nx + (dy / d) * g.ny > 0.6);
         }
         if (g) {
-          const k = U.approach(9, dt);
+          // heavy lizards are slow to get going and slow to stop
+          const k = U.approach(U.clamp(11 / Math.sqrt(this.mass), 3.5, 9), dt);
           this.vx += (dvx - this.vx) * k;
           this.vy += (dvy - this.vy) * k;
         } else {
@@ -531,12 +556,30 @@
         }
       }
 
+      // On a surface the head never walks backwards into its own shoulders
+      // (that folds the body up behind it); it has to turn round instead.
+      if (g && this.lungeT <= 0 && !this.leavingSurface) {
+        let fx = head.x - P[2].x;
+        let fy = head.y - P[2].y;
+        const fl = Math.hypot(fx, fy) || 1;
+        fx /= fl;
+        fy /= fl;
+        const back = this.vx * fx + this.vy * fy;
+        if (back < 0) {
+          this.vx -= back * fx;
+          this.vy -= back * fy;
+        }
+      }
       head.x += this.vx * dt;
       head.y += this.vy * dt;
       if (g && this.lungeT <= 0 && !this.leavingSurface) {
         // hug the surface at a fixed body height
         this.raiseS = (this.raiseS || 0) + (this.raise - (this.raiseS || 0)) * U.approach(5, dt);
-        const err = g.d - (15 + this.raiseS * 12) * L;
+        // a slow rise and fall with the stride
+        const moving = U.clamp(Math.hypot(this.vx, this.vy) / 40, 0, 1);
+        this.walkPh += Math.hypot(this.vx, this.vy) * dt * 0.11 / L;
+        const bob = Math.sin(this.walkPh * 2) * 1.3 * moving;
+        const err = g.d - (15 + bob + this.raiseS * 12) * L;
         head.x -= g.nx * err * 0.25;
         head.y -= g.ny * err * 0.25;
         this.contactId = g.id;
@@ -567,6 +610,16 @@
         }
         W.collideCircle(pt, i < this.bodyN ? 4 * L : 2.5);
       }
+      // A little backbone stiffness: the body resists folding into a heap.
+      if (g && !this.leavingSurface) {
+        for (let i = 1; i < this.bodyN + 2; i++) {
+          const a = P[i - 1];
+          const b = P[i + 1];
+          const pt = P[i];
+          pt.x += ((a.x + b.x) / 2 - pt.x) * 0.12;
+          pt.y += ((a.y + b.y) / 2 - pt.y) * 0.12;
+        }
+      }
 
       // Smoothed "up" (away from surface) and head angle.
       const ux = g ? g.nx : 0;
@@ -588,6 +641,25 @@
       // never let the head point more than ~35 degrees off the body line
       const bodyAng = Math.atan2(P[1].y - P[3].y, P[1].x - P[3].x);
       ang = bodyAng + U.clamp(U.angleDiff(bodyAng, ang), -0.6, 0.6);
+      // ...and on a surface, keep the head near level with it: a little
+      // up-tilt (more when rearing), never nosing down into the ground
+      if (g && this.lungeT <= 0) {
+        const hx = Math.cos(ang);
+        const hy = Math.sin(ang);
+        const up = hx * this.ux + hy * this.uy;
+        const maxUp = Math.sin(0.4 + (this.raiseS || 0) * 0.7);
+        const maxDown = -Math.sin(0.25);
+        if (up > maxUp || up < maxDown) {
+          let tx = hx - up * this.ux;
+          let ty = hy - up * this.uy;
+          const tl = Math.hypot(tx, ty) || 1;
+          tx /= tl;
+          ty /= tl;
+          const u = U.clamp(up, maxDown, maxUp);
+          const c = Math.sqrt(1 - u * u);
+          ang = Math.atan2(ty * c + this.uy * u, tx * c + this.ux * u);
+        }
+      }
       if (this.thrashT > 0) {
         this.thrashT -= dt;
         ang += Math.sin(this.age * 38) * 0.45 * Math.min(1, this.thrashT);
@@ -808,11 +880,50 @@
       this.drawDebug(ctx);
     }
 
+    // Sprawling limbs, seen from the side: front elbows point back and hind
+    // knees forward, and a joint never rises above the body's centreline
+    // (the leg splays out sideways instead, so it reads foreshortened).
+    legJoint(l) {
+      const P = this.spine.pts;
+      const h = P[l.at];
+      const leg = l.leg;
+      const L = this.L;
+      const a = P[l.at - 1];
+      const b = P[l.at + 1];
+      let fx = a.x - b.x;
+      let fy = a.y - b.y;
+      const fl = Math.hypot(fx, fy) || 1;
+      fx /= fl;
+      fy /= fl;
+      const sgn = l.at <= 2 ? -1 : 1;
+      const k = U.ikToward(h.x, h.y, leg.foot.x, leg.foot.y, leg.l1, leg.l2, fx * sgn, fy * sgn);
+      // limit how far the joint sticks out from the hip-foot line
+      const mx = (h.x + k.ex) / 2;
+      const my = (h.y + k.ey) / 2;
+      let ox = k.kx - mx;
+      let oy = k.ky - my;
+      const ol = Math.hypot(ox, oy);
+      const maxOff = 7 * L;
+      if (ol > maxOff) {
+        ox *= maxOff / ol;
+        oy *= maxOff / ol;
+      }
+      let kx = mx + ox;
+      let ky = my + oy;
+      // never above the centreline: push it down toward the surface
+      const up = (kx - h.x) * this.ux + (ky - h.y) * this.uy;
+      if (up > -1.5 * L) {
+        kx -= this.ux * (up + 1.5 * L);
+        ky -= this.uy * (up + 1.5 * L);
+      }
+      return { kx, ky, ex: k.ex, ey: k.ey };
+    }
+
     drawLeg(ctx, l, px) {
       const P = this.spine.pts;
       const h = P[l.at];
       const leg = l.leg;
-      const k = leg.solve(h.x, h.y, this.ux, this.uy);
+      const k = this.legJoint(l);
       const L = this.L;
       // near-black legs; only the feet carry the species colour
       const base = this.p.camouflage ? this.bodyColor : U.scale(this.bodyColor, l.near ? 1.6 : 1);

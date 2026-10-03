@@ -111,6 +111,23 @@
 
   // Pick the IK bend so the knee points along (nx, ny) — i.e. away from the
   // surface a foot is gripping.
+  // A creature personality, rolled the way Rain World does it: energy,
+  // bravery and sympathy are free; nervousness, aggression and dominance lean
+  // on them. Each is 0..1, pushed away from the middle.
+  U.personality = function (rnd) {
+    const R = rnd || Math.random;
+    const push = (v, p) => (v < 0.5 ? Math.pow(v * 2, p) * 0.5 : 1 - Math.pow((1 - v) * 2, p) * 0.5);
+    const sympathy = push(R(), 1.5);
+    const energy = push(R(), 1.5);
+    const bravery = push(R(), 1.5);
+    let nervous = U.lerp(R(), U.lerp(energy, 1 - bravery, 0.5), Math.pow(R(), 0.25));
+    let aggression = U.lerp(R(), ((energy + bravery) / 2) * (1 - sympathy), Math.pow(R(), 0.25));
+    const dominance = U.lerp(R(), (energy + bravery + aggression) / 3, Math.pow(R(), 0.25));
+    nervous = push(nervous, 2.5);
+    aggression = push(aggression, 2.5);
+    return { energy, bravery, sympathy, dominance, nervous, aggression };
+  };
+
   U.ikToward = function (ax, ay, bx, by, l1, l2, nx, ny) {
     const s1 = U.ik2(ax, ay, bx, by, l1, l2, 1);
     const s2 = U.ik2(ax, ay, bx, by, l1, l2, -1);
