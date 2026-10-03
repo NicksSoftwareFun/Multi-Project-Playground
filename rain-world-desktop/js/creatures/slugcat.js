@@ -9,6 +9,8 @@
 
   const GRAV = 1100;
   const R = 6.5;
+  const ARM = 4.8; // upper arm and forearm length
+  const LEG = 5.6;
 
   class Slugcat extends RW.Creature {
     constructor(eco, species, x, y) {
@@ -53,6 +55,9 @@
       this.crouchT = 0;
       this.lastX = x;
       this.lastY = y;
+      this.lie = 0; // 0 standing .. 1 lying flat
+      this.reachTo = null; // something the near hand is reaching for
+      this.handPt = null;
       this.diet = ['batfly'];
       this.threats = ['lizard_*', 'daddy', 'dropwig'];
       this.bloodColor = '#3a1f22';
@@ -66,8 +71,12 @@
       if (this.item) b[1] -= 8;
       return b;
     }
+    // Held things sit in the near hand.
     itemPoint() {
-      return { x: this.head.x + this.facing * 4, y: this.head.y + 4 };
+      return this.handPt || { x: this.head.x + this.facing * 4, y: this.head.y + 4 };
+    }
+    holdPoint() {
+      return this.itemPoint();
     }
     carry(dx, dy) {
       this.hip.x += dx;
@@ -84,6 +93,7 @@
     onGrabbed() {
       this.pole = null;
       this.jumping = false;
+      if (this.holding) this.release();
       if (this.item) {
         this.item.heldBy = null;
         this.item.claimedBy = null;
@@ -116,6 +126,7 @@
       this.ignoreFoodT = (this.ignoreFoodT || 0) - dt;
       this.speed = p.speed || 105;
       this.sleeping = false;
+      this.reachTo = null;
 
       if (this.item) {
         this.setState('eat');
@@ -125,6 +136,20 @@
           this.item.dead = true;
           this.item = null;
           this.hunger = Math.max(0, this.hunger - 0.6);
+          this.eatT = 0;
+          this.setState('rest');
+          this.restT = U.rand(1, 3);
+        }
+        return;
+      }
+      if (this.holding) {
+        // a batfly in hand: nibble it, then rest
+        this.setState('eat');
+        this.pather.clear();
+        this.eatT += dt;
+        if (this.eatT > 1.8) {
+          eco.consume(this.holding, this);
+          this.hunger = Math.max(0, this.hunger - 0.35);
           this.eatT = 0;
           this.setState('rest');
           this.restT = U.rand(1, 3);
@@ -199,7 +224,9 @@
           f.claimedBy = this;
           this.pather.interval = 0.7;
           this.pather.setGoal(f.x, f.y - 4);
-          if (U.dist(hip.x, hip.y, f.x, f.y) < 14) {
+          const fd = U.dist(hip.x, hip.y, f.x, f.y);
+          if (fd < 30) this.reachTo = f;
+          if (fd < 14) {
             f.heldBy = this;
             this.item = f;
             this.eatT = 0;
@@ -208,16 +235,21 @@
         }
       }
       if (this.hunger > 0.3) {
-        const bf = this.nearestOf(['batfly'], 50, (c) => !c.grabbedBy);
+        const bf = this.nearestOf(['batfly'], 50, (c) => c.canBeGrabbed());
         if (bf) {
+          this.reachTo = bf.mainPoint();
           if (this.grounded && bf.y < hip.y) {
             this.vy = -Math.sqrt(2 * GRAV * Math.max(10, Math.min(90, hip.y - bf.y + 10)));
             this.vx = U.clamp((bf.x - hip.x) * 3, -200, 200);
             this.grounded = false;
           }
-          if (U.dist(this.head.x, this.head.y, bf.x, bf.y) < 14) {
-            eco.consume(bf, this);
-            this.hunger = Math.max(0, this.hunger - 0.35);
+          // snatch it out of the air with a hand
+          const hp = this.handPt || this.head;
+          if (U.dist(hp.x, hp.y, bf.x, bf.y) < 9 || U.dist(this.head.x, this.head.y, bf.x, bf.y) < 14) {
+            if (this.grab(bf)) {
+              this.eatT = 0;
+              this.reachTo = null;
+            }
           }
         }
       }
@@ -249,7 +281,7 @@
       if (this.pather.done() || !this.pather.goal || this.stateT > 16 || this.stuckT > 3) {
         if (this.pather.goal && Math.random() < 0.3 && this.grounded) {
           this.setState('rest');
-          this.restT = U.rand(2, 8);
+          this.restT = U.rand(3, 12);
           return;
         }
         const g = this.wanderGoal(this.caps, 550);
@@ -313,6 +345,8 @@
         this.vx = this.vy = 0;
         this.updateHead(dt, true);
         this.updateTail(dt);
+        this.lie = 0;
+        this.updateHand();
         this.struggle(dt); // escaping triggers onReleased via the holder
         return;
       }
@@ -447,8 +481,11 @@
       this.lastX = hip.x;
       this.lastY = hip.y;
 
+      const lieT = this.state === 'rest' && this.grounded && this.stateT > 1 ? 1 : 0;
+      this.lie += (lieT - this.lie) * U.approach(lieT > this.lie ? 2.5 : 9, dt);
       this.updateHead(dt, false);
       this.updateTail(dt);
+      this.updateHand();
       this.blinkT -= dt;
       if (this.blinkT <= 0) {
         this.blink = 0.12;
@@ -456,7 +493,9 @@
       }
       this.blink = Math.max(0, this.blink - dt);
       let lookTarget = this.vx / 120;
-      if (this.lookAt) lookTarget = U.clamp((this.lookAt.x - this.head.x) / 60, -1, 1);
+      if (this.lie > 0.4) lookTarget = this.facing; // lying in profile
+      else if (this.reachTo) lookTarget = U.clamp((this.reachTo.x - this.head.x) / 30, -1, 1);
+      else if (this.lookAt) lookTarget = U.clamp((this.lookAt.x - this.head.x) / 60, -1, 1);
       else if (this.state === 'flee' && this.threat) lookTarget = U.clamp((this.threat.x - this.head.x) / 60, -1, 1);
       this.look += (U.clamp(lookTarget, -1, 1) - this.look) * U.approach(6, dt);
     }
@@ -488,16 +527,34 @@
         ty = hip.y - 11 + Math.abs(lean) * 1.5 + Math.sin(this.walkPhase * 2) * Math.abs(lean) * 0.8;
       }
       if (this.state === 'eat') ty += Math.sin(this.age * 14) * 0.8;
+      if (this.lie > 0) {
+        // chin down on the floor in front of the body
+        tx = U.lerp(tx, hip.x + this.facing * 10, this.lie);
+        ty = U.lerp(ty, hip.y + 1.5, this.lie);
+      }
       const k = U.approach(held ? 6 : 22, dt);
       h.x += (tx - h.x) * k;
       h.y += (ty - h.y) * k;
       const dx = h.x - hip.x;
       const dy = h.y - hip.y;
       const d = Math.hypot(dx, dy) || 1;
-      const L = this.state === 'eat' || this.state === 'rest' ? 8.5 : 11;
+      const L = U.lerp(this.state === 'eat' || this.state === 'rest' ? 8.5 : 11, 10, this.lie);
       h.x = hip.x + (dx / d) * L;
       h.y = hip.y + (dy / d) * L;
       this.W.collideCircle(h, 5.5);
+    }
+
+    shoulder() {
+      const hip = this.hip;
+      const h = this.head;
+      return { x: U.lerp(hip.x, h.x, 0.42), y: U.lerp(hip.y, h.y, 0.42) + this.lie * 1.5 };
+    }
+    // Where the near hand actually is (after IK), so held things sit in it.
+    updateHand() {
+      const sh = this.shoulder();
+      const t = this.limbTargets(sh).hands[0];
+      const k = U.ik2(sh.x, sh.y, t.x, t.y, ARM, ARM, -this.facing);
+      this.handPt = { x: k.ex, y: k.ey };
     }
 
     updateTail(dt) {
@@ -516,19 +573,32 @@
       const hip = this.hip;
       const h = this.head;
       const col = this.color;
+      const f = this.facing;
       const dark = U.rgba(U.scale(col, 0.45)); // far limbs: clearly shaded so they separate
+      const edge = U.rgba(U.scale(col, 0.55)); // rim on near limbs crossing the body
       const main = U.rgba(col);
+      const lie = this.lie;
       ctx.save();
       ctx.globalAlpha = this.alpha;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      const shoulder = { x: U.lerp(hip.x, h.x, 0.62), y: U.lerp(hip.y, h.y, 0.62) };
+      const shoulder = this.shoulder();
       const limbs = this.limbTargets(shoulder);
 
+      // Lying down squashes body, tail and limbs toward the floor (the head
+      // keeps its shape and rests on the floor by itself).
+      const floorY = hip.y + R;
+      ctx.save();
+      if (lie > 0.01) {
+        ctx.translate(0, floorY);
+        ctx.scale(1, 1 - 0.32 * lie);
+        ctx.translate(0, -floorY);
+      }
+
       // far limbs
-      this.drawLimb(ctx, hip.x - this.facing, hip.y + 2, limbs.feet[1], 5.6, 5.4, dark, 3, this.facing);
-      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[1], 4.6, 4.4, dark, 2.6, -this.facing);
+      this.drawLimb(ctx, hip.x - f, hip.y + 2, limbs.feet[1], LEG, LEG, dark, 3, f);
+      this.drawArm(ctx, shoulder, limbs.hands[1], dark, null, 2);
 
       // tail
       const T = this.tail.pts;
@@ -536,48 +606,56 @@
       U.taperPath(ctx, T, [5, 4.4, 3.6, 2.6, 1.2]);
       ctx.fill();
 
-      // body
-      const mid = { x: U.lerp(hip.x, h.x, 0.5) - this.facing * 0.5, y: U.lerp(hip.y, h.y, 0.5) };
-      // a slimmer body than the head, so head, body and legs read separately
-      U.taperPath(ctx, [{ x: hip.x, y: hip.y - 1 }, mid, h], [4.8, 4.2, 3.9]);
+      // body: a teardrop, broad at the hips
+      const mid = { x: U.lerp(hip.x, h.x, 0.5) - f * 0.5, y: U.lerp(hip.y, h.y, 0.5) };
+      U.taperPath(ctx, [{ x: hip.x, y: hip.y - 1 }, mid, h], [5, 4.2, 3.7]);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(hip.x, hip.y - 1.2, 4.4, 0, U.TAU);
+      ctx.arc(hip.x, hip.y - 1.2, 4.8 + lie * 0.6, 0, U.TAU);
       ctx.fill();
 
-      // near limbs
-      this.drawLimb(ctx, hip.x + this.facing, hip.y + 2, limbs.feet[0], 5.6, 5.4, main, 3.2, this.facing);
+      // near leg
+      this.drawLimb(ctx, hip.x + f, hip.y + 2, limbs.feet[0], LEG, LEG, main, 3.2, f);
+      ctx.restore();
+
+      // near arm, rimmed in shade so it reads against the white body; drawn
+      // before the head so a hand never paints across the face
+      // (reaching, climbing or flailing, the arm comes out in front instead)
+      const armFront = !!this.reachTo || !!this.grabbedBy || !!this.pole || (!this.grounded && this.lie < 0.5);
+      let hand = armFront ? null : this.drawArm(ctx, shoulder, limbs.hands[0], main, edge, 2.2);
 
       // head
-      ctx.fillStyle = main;
-      ctx.beginPath();
-      ctx.arc(h.x, h.y, 6.9, 0, U.TAU);
-      ctx.fill();
-      this.drawLimb(ctx, shoulder.x, shoulder.y, limbs.hands[0], 4.6, 4.4, main, 2.8, -this.facing);
+      this.drawHeadShape(ctx, h.x, h.y, this.look, main);
+      if (armFront) hand = this.drawArm(ctx, shoulder, limbs.hands[0], main, edge, 2.2);
 
+      // held fruit sits in the near hand, just under the chin while eating
       if (this.item) {
         const ip = this.itemPoint();
-        RW.drawFruit(ctx, ip.x, ip.y, 0, 1);
-        if (this.state === 'eat') {
-          // shrink as it's eaten
-          ctx.fillStyle = main;
-          ctx.beginPath();
-          ctx.arc(ip.x, ip.y + 4 - 6 * Math.min(1, this.eatT / 2.4), 4, 0, U.TAU);
-          ctx.fill();
-        }
+        const left = this.state === 'eat' ? 1 - Math.min(1, this.eatT / 2.4) : 1;
+        const sc = 0.4 + 0.6 * left; // shrinks as it's eaten
+        ctx.save();
+        ctx.translate(ip.x, ip.y - 1);
+        ctx.scale(sc, sc);
+        RW.drawFruit(ctx, 0, 0, 0, 1);
+        ctx.restore();
+        // fingers over the fruit
+        ctx.fillStyle = main;
+        ctx.fillRect(hand.x - 1, hand.y - 0.5, 2, 2);
       }
 
-      // eyes
+      // eyes: big black ovals, low and wide; in profile only the near one
       const lx = this.look;
-      const sep = 2.7 * (1 - 0.35 * Math.abs(lx));
-      const ex = h.x + lx * 2.3;
-      const ey = h.y + 0.6;
+      const ax = Math.abs(lx);
+      const sep = 3.1 * (1 - 0.45 * ax);
+      const ex = h.x + lx * 2.6;
+      const ey = h.y + 0.9;
       ctx.fillStyle = '#0b0b10';
       const closed = this.blink > 0 || this.sleeping || (this.grabbedBy && Math.sin(this.age * 7) > 0);
       for (const s of [-1, 1]) {
+        if (ax > 0.8 && s === -Math.sign(lx)) continue;
         ctx.beginPath();
-        if (closed) ctx.ellipse(ex + s * sep, ey + 0.8, 1.6, 0.45, 0, 0, U.TAU);
-        else ctx.ellipse(ex + s * sep, ey, 1.35, 2.4, 0, 0, U.TAU);
+        if (closed) ctx.ellipse(ex + s * sep, ey + 0.9, 1.7, 0.5, 0, 0, U.TAU);
+        else ctx.ellipse(ex + s * sep, ey, 1.45, 2.6, 0, 0, U.TAU);
         ctx.fill();
       }
       ctx.restore();
@@ -585,43 +663,114 @@
       this.drawDebug(ctx);
     }
 
+    // The slugcat head: wider than tall, flat-topped with two pointed ears at
+    // the corners and full cheeks tapering to a soft chin. Turning (look) slides
+    // the ears back and the face forward until it reads as a profile.
+    drawHeadShape(ctx, x, y, l, fill) {
+      const a = Math.abs(l);
+      const w = 7.4 * (1 - 0.12 * a); // half width across the cheeks
+      const sx = -l * 0.8; // skull shifts back as the face turns
+      const eb = l * 2.2; // ears sweep back
+      const front = l * 1.4; // and the muzzle side bulges forward
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(x + sx - l * 0.4, y - 5.6);
+      ctx.lineTo(x + sx + w * 0.5, y - 5.4);
+      ctx.lineTo(x + sx + w * 0.88 - eb + 0.6 * (1 - a), y - 8.4); // right ear tip
+      ctx.lineTo(x + sx + w + Math.max(0, front) * 0.4, y - 3.6);
+      ctx.quadraticCurveTo(x + sx + w + 0.8 + Math.max(0, front), y + 3.8, x + sx + w * 0.42 + Math.max(0, front) * 0.6, y + 5.7);
+      ctx.lineTo(x + sx - w * 0.42 + Math.min(0, front) * 0.6, y + 5.7);
+      ctx.quadraticCurveTo(x + sx - w - 0.8 + Math.min(0, front), y + 3.8, x + sx - w + Math.min(0, front) * 0.4, y - 3.6);
+      ctx.lineTo(x + sx - w * 0.88 - eb - 0.6 * (1 - a), y - 8.4); // left ear tip
+      ctx.lineTo(x + sx - w * 0.5, y - 5.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     limbTargets(shoulder) {
       const hip = this.hip;
       const f = this.facing;
       const feet = [];
       const hands = [];
+      const gy = hip.y + R + 0.5;
       if (this.grabbedBy) {
         const w = Math.sin(this.age * 12) * 4;
         feet.push({ x: hip.x + 3 + w, y: hip.y + 10 }, { x: hip.x - 3 - w, y: hip.y + 10 });
-        hands.push({ x: shoulder.x + 6, y: shoulder.y - 4 - w }, { x: shoulder.x - 6, y: shoulder.y - 4 + w });
+        hands.push({ x: shoulder.x + 7, y: shoulder.y - 4 - w }, { x: shoulder.x - 7, y: shoulder.y - 4 + w });
       } else if (this.pole) {
+        // hugging the pole, hand over hand
         const px = this.pole.x;
         const c = this.climbPhase;
         feet.push({ x: px + 1, y: hip.y + 8 + Math.sin(c) * 2 }, { x: px - 1, y: hip.y + 8 - Math.sin(c) * 2 });
-        hands.push({ x: px, y: this.head.y - 3 + Math.sin(c) * 3 }, { x: px, y: this.head.y - 3 - Math.sin(c) * 3 });
+        hands.push({ x: px + f, y: this.head.y - 3 + Math.sin(c) * 3 }, { x: px - f, y: this.head.y - 3 - Math.sin(c) * 3 });
+      } else if (this.lie > 0.5) {
+        // lying flat: hind legs out behind, forepaws tucked under the chin
+        feet.push({ x: hip.x - f * 4, y: gy }, { x: hip.x - f * 7, y: gy });
+        hands.push({ x: this.head.x - f * 0.5, y: gy - 0.5 }, { x: this.head.x - f * 3, y: gy - 0.5 });
       } else if (!this.grounded) {
         feet.push({ x: hip.x - f * 3, y: hip.y + 7 }, { x: hip.x + f * 3, y: hip.y + 6 });
-        hands.push({ x: shoulder.x + f * 6, y: shoulder.y - 3 }, { x: shoulder.x - f * 2, y: shoulder.y + 4 });
+        // arms flung up and out mid-jump
+        hands.push({ x: shoulder.x + f * 8, y: shoulder.y - 4 }, { x: shoulder.x - f * 5, y: shoulder.y - 2 });
       } else {
         const moving = U.clamp(Math.abs(this.vx) / 60, 0, 1);
         const ph = this.walkPhase;
-        const gy = hip.y + R + 0.5;
         for (const k of [0, Math.PI]) {
           feet.push({
             x: hip.x + Math.sin(ph + k) * 5 * moving + f * 1 + (k ? -2 : 2) * (1 - moving),
             y: gy - Math.max(0, Math.cos(ph + k)) * 3 * moving,
           });
         }
-        if (this.state === 'eat' || this.item) {
-          const ip = this.itemPoint();
-          hands.push({ x: ip.x - 1, y: ip.y + 2 }, { x: ip.x + 1, y: ip.y + 2 });
+        if (this.state === 'eat') {
+          // both hands bring the food up to the mouth
+          const mx = this.head.x + f * 5;
+          const my = this.head.y + 7 + Math.sin(this.age * 14) * 0.6;
+          hands.push({ x: mx, y: my }, { x: mx - f * 2, y: my + 1 });
         } else {
+          // arms swing opposite the legs, held a little out from the body
           for (const k of [Math.PI, 0]) {
-            hands.push({ x: shoulder.x + Math.sin(ph + k) * 3 * moving + f * 1.5, y: shoulder.y + 6.5 });
+            hands.push({
+              x: shoulder.x + Math.sin(ph + k) * 4.5 * moving + f * (k ? 6.5 : -4.5),
+              y: shoulder.y + 6 - Math.max(0, -Math.cos(ph + k)) * 2 * moving,
+            });
           }
         }
       }
+      // reaching for fruit or a batfly overrides the near hand
+      if (this.reachTo && !this.grabbedBy && !this.pole) {
+        hands[0] = { x: this.reachTo.x, y: this.reachTo.y };
+        hands[1] = { x: U.lerp(hands[1].x, this.reachTo.x, 0.4), y: U.lerp(hands[1].y, this.reachTo.y, 0.4) };
+      }
       return { feet, hands };
+    }
+
+    // Thin two-bone arm ending in a small round hand.
+    drawArm(ctx, sh, t, col, rim, w) {
+      const k = U.ik2(sh.x, sh.y, t.x, t.y, ARM, ARM, -this.facing);
+      ctx.beginPath();
+      ctx.moveTo(sh.x, sh.y);
+      ctx.lineTo(k.kx, k.ky);
+      ctx.lineTo(k.ex, k.ey);
+      if (rim) {
+        ctx.strokeStyle = rim;
+        ctx.lineWidth = w + 1.4;
+        ctx.stroke();
+        ctx.fillStyle = rim;
+        ctx.beginPath();
+        ctx.arc(k.ex, k.ey, 2.3, 0, U.TAU);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(sh.x, sh.y);
+        ctx.lineTo(k.kx, k.ky);
+        ctx.lineTo(k.ex, k.ey);
+      }
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(k.ex, k.ey, 1.7, 0, U.TAU);
+      ctx.fill();
+      return { x: k.ex, y: k.ey };
     }
 
     drawLimb(ctx, ax, ay, t, l1, l2, col, w, bend) {
