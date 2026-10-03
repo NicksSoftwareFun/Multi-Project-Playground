@@ -154,7 +154,7 @@
       this.jawTarget = 0;
       this.pather.interval = 1.2;
       this.lookAt = null;
-      this.raise = 0.35; // carry the head a little high, as in the game
+      this.raise = 0; // head stays in line with the body unless rearing
       this.lash = 0.15;
 
       if (this.holding) {
@@ -754,7 +754,9 @@
       const topY = -Math.cos(a);
       if (topX * this.ux + topY * this.uy < 0) ctx.scale(1, -1);
       ctx.scale(L, L);
-      ctx.translate(-3, 0);
+      // centre the skull+jaw on the spine so the head continues the neck
+      // line (as in the game) instead of perching on top of it
+      ctx.translate(-3, 2.2);
       const u = px / L; // one art pixel in head-local units
       const jawA = this.jaw * 0.95;
       const c = Math.cos(jawA);
