@@ -36,12 +36,12 @@
   const DEFAULT_SETTINGS = {
     enabled: true,
     opacity: 0.9, // 0..1, dot layer opacity
-    dim: 0.35, // 0..1, darkens the basemap under the dots so pale colors read
+    dim: 0, // 0..1, darkens the basemap under the dots so pale colors read
     dotSize: 0, // px; 0 = auto by zoom
     dotValue: 0, // people per dot; 0 = auto by zoom
     level: 'auto', // 'auto' | 'state' | 'county' | 'tract'
-    outlines: true,
-    legend: true,
+    outlines: false,
+    legend: false,
     hidden: [], // race fields switched off
   };
 

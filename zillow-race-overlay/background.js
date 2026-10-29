@@ -141,8 +141,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true; // async response
 });
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async ({ previousVersion }) => {
   const { DEFAULT_SETTINGS } = self.ZRO_CONFIG;
   const stored = await chrome.storage.sync.get('settings');
-  await chrome.storage.sync.set({ settings: { ...DEFAULT_SETTINGS, ...(stored.settings || {}) } });
+  const settings = { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
+  // 1.1.0 made the map show only dots by default; carry that to 1.0.0 installs.
+  if (previousVersion === '1.0.0') Object.assign(settings, { legend: false, outlines: false, dim: 0 });
+  await chrome.storage.sync.set({ settings });
 });
