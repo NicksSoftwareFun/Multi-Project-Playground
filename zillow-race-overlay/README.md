@@ -11,10 +11,9 @@ neighborhood demographics in one view.
   layer.
 - Switches geography by zoom: **state** (zoomed way out) → **county** →
   **census tract** (city / neighborhood zoom, where you'll usually be on Zillow).
-- Hover over any spot to see that tract's name, population, and percent by group.
-- Shows only the dots by default. The legend, area outlines and basemap
-  darkening are off but can be turned on in the toolbar popup, along with opacity,
-  dot size, people-per-dot, basemap darkening, and outlines.
+- Shows only the dots by default. A legend (with a hover readout of each
+  tract's population mix), area outlines and basemap darkening can be turned
+  on in the toolbar popup, along with opacity, dot size and people-per-dot.
 - No account or API key needed. Data is fetched from Esri's public service.
 
 > Dots are placed **randomly** inside each tract/county to show the mix and
