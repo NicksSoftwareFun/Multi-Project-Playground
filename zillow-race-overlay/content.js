@@ -36,19 +36,13 @@
 
     if (msg.type === 'ready') {
       loadSettings();
-    } else if (msg.type === 'query') {
-      const { reqId, level, tile } = msg;
-      if (typeof level !== 'string' || !tile) return;
-      chrome.runtime
-        .sendMessage({
-          type: 'zro-query',
-          level,
-          tile: { z: tile.z | 0, x: tile.x | 0, y: tile.y | 0 },
-        })
-        .then(
-          (res) => toPage({ type: 'queryResult', reqId, ...(res || { error: 'no response' }) }),
-          (err) => toPage({ type: 'queryResult', reqId, error: String(err && err.message) })
-        );
+    } else if (msg.type === 'rpc' && typeof msg.method === 'string') {
+      // The background worker validates method and params.
+      const { reqId, method, params } = msg;
+      chrome.runtime.sendMessage({ type: 'zro-rpc', method, params }).then(
+        (res) => toPage({ type: 'rpcResult', reqId, ...(res || { error: 'no response' }) }),
+        (err) => toPage({ type: 'rpcResult', reqId, error: String(err && err.message) })
+      );
     } else if (msg.type === 'saveSettings' && msg.patch && typeof msg.patch === 'object') {
       const patch = {};
       for (const k of Object.keys(settings)) if (k in msg.patch) patch[k] = msg.patch[k];

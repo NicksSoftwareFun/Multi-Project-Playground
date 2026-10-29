@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Zillow Race Dot-Density Overlay",
-  "version": "1.1.0",
-  "description": "Overlays the ArcGIS Living Atlas \"Race in the US by Dot Density\" (ACS table B03002) onto Zillow's map.",
+  "name": "Zillow Map Overlays: Race, DC Metro, Road Distance",
+  "version": "1.2.0",
+  "description": "Adds ACS race dot density (Esri Living Atlas), DC Metrorail lines, and a two-click road-distance tool to Zillow's map.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -13,13 +13,15 @@
     "storage"
   ],
   "host_permissions": [
-    "https://services.arcgis.com/*"
+    "https://services.arcgis.com/*",
+    "https://maps2.dcgis.dc.gov/*",
+    "https://router.project-osrm.org/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Race dot-density overlay",
+    "default_title": "Zillow map overlays",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

@@ -127,17 +127,140 @@ function getTile(level, tile) {
   return p;
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (!msg || msg.type !== 'zro-query') return false;
-  const { level, tile } = msg;
-  if (!LEVELS[level] || !tile || ![tile.z, tile.x, tile.y].every(Number.isInteger)) {
-    sendResponse({ error: 'bad request' });
-    return false;
+// ------------------------------------------------------------ DC Metro
+
+const METRO_TTL_MS = 7 * 24 * 3600 * 1000;
+let metroPromise = null;
+
+// Each line in the DC GIS layer was digitized on its own, in whatever
+// direction. The page draws lines that share track side by side using a
+// per-line offset to the left of travel, so lines that share track must run
+// the same way. Orient each line to agree with the nearest already-oriented
+// line it runs alongside.
+function orientLines(lines) {
+  const mx = (dLng) => dLng * 86650; // metres per degree of longitude at DC's latitude
+  const done = [];
+  for (const line of lines) {
+    let agree = 0, disagree = 0;
+    const pts = line.path;
+    for (let i = 0; i + 1 < pts.length; i += 20) {
+      const [x, y] = pts[i];
+      const tx = pts[i + 1][0] - x, ty = pts[i + 1][1] - y;
+      for (const other of done) {
+        const q = other.path;
+        let best = Infinity, bj = -1;
+        for (let j = 0; j + 1 < q.length; j++) {
+          const d = mx(q[j][0] - x) ** 2 + ((q[j][1] - y) * 111000) ** 2;
+          if (d < best) { best = d; bj = j; }
+        }
+        if (best > 40 * 40) continue; // not sharing track here
+        const ox = q[bj + 1][0] - q[bj][0], oy = q[bj + 1][1] - q[bj][1];
+        if (tx * ox + ty * oy >= 0) agree++;
+        else disagree++;
+      }
+    }
+    if (disagree > agree) line.path.reverse();
+    done.push(line);
   }
-  getTile(level, tile).then(
-    (features) => sendResponse({ features }),
-    (err) => sendResponse({ error: String((err && err.message) || err) })
-  );
+  return lines;
+}
+
+async function fetchMetro() {
+  const { METRO } = self.ZRO_CONFIG;
+  const base = METRO.SERVICE_URL;
+  const q = (layer, extra) =>
+    `${base}/${layer}/query?${new URLSearchParams({ where: '1=1', outSR: '4326', f: 'geojson', ...extra })}`;
+  const [linesJson, stationsJson] = await Promise.all([
+    getJson(q(METRO.LINES_LAYER, { outFields: 'NAME', geometryPrecision: '6', maxAllowableOffset: '0.00001' })),
+    getJson(q(METRO.STATIONS_LAYER, { outFields: 'NAME,LINE', geometryPrecision: '6' })),
+  ]);
+  const lines = [];
+  for (const f of linesJson.features || []) {
+    const name = String((f.properties || {}).NAME || '').toLowerCase();
+    const g = f.geometry;
+    if (!g) continue;
+    const parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+    for (const path of parts) if (path.length > 1) lines.push({ name, path });
+  }
+  // Orient in a fixed order so trunk lines lead and branches follow them.
+  const order = METRO.LINES.map((l) => l.name);
+  lines.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+  orientLines(lines);
+  const stations = (stationsJson.features || [])
+    .filter((f) => f.geometry && f.geometry.type === 'Point')
+    .map((f) => ({
+      name: f.properties.NAME,
+      lines: String(f.properties.LINE || '').toLowerCase(),
+      lng: f.geometry.coordinates[0],
+      lat: f.geometry.coordinates[1],
+    }));
+  return { lines, stations };
+}
+
+function getMetro() {
+  if (!metroPromise) {
+    metroPromise = (async () => {
+      const { metro } = await chrome.storage.local.get('metro');
+      if (metro && metro.version === 2 && Date.now() - metro.at < METRO_TTL_MS) return metro.data;
+      const data = await fetchMetro();
+      await chrome.storage.local.set({ metro: { version: 2, at: Date.now(), data } });
+      return data;
+    })();
+    metroPromise.catch(() => (metroPromise = null));
+  }
+  return metroPromise;
+}
+
+// ------------------------------------------------------------- routing
+
+// Driving route between two points from the public OSRM server
+// (OpenStreetMap roads, free-flow speeds, no traffic).
+async function getRoute(from, to) {
+  const coords = `${from[0]},${from[1]};${to[0]},${to[1]}`;
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  let json = null;
+  try {
+    json = await res.json();
+  } catch (_) {
+    /* fall through */
+  }
+  if (!json || json.code !== 'Ok' || !json.routes || !json.routes.length) {
+    const why = json && json.code === 'NoRoute' ? 'No road route between those points' : json && json.message;
+    throw new Error(why || `Routing service error (HTTP ${res.status})`);
+  }
+  const r = json.routes[0];
+  return { meters: r.distance, seconds: r.duration, path: r.geometry.coordinates };
+}
+
+// ----------------------------------------------------------- messages
+
+const isLngLat = (p) =>
+  Array.isArray(p) && p.length === 2 && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90 && p.every(Number.isFinite);
+
+function handle(method, params) {
+  params = params || {};
+  if (method === 'tile') {
+    const { level, tile } = params;
+    if (!LEVELS[level] || !tile || ![tile.z, tile.x, tile.y].every(Number.isInteger)) throw new Error('bad request');
+    return getTile(level, tile).then((features) => ({ features }));
+  }
+  if (method === 'metro') return getMetro();
+  if (method === 'route') {
+    if (!isLngLat(params.from) || !isLngLat(params.to)) throw new Error('bad request');
+    return getRoute(params.from, params.to);
+  }
+  throw new Error('unknown method');
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.type !== 'zro-rpc') return false;
+  Promise.resolve()
+    .then(() => handle(msg.method, msg.params))
+    .then(
+      (result) => sendResponse({ result }),
+      (err) => sendResponse({ error: String((err && err.message) || err) })
+    );
   return true; // async response
 });
 
@@ -145,7 +268,8 @@ chrome.runtime.onInstalled.addListener(async ({ previousVersion }) => {
   const { DEFAULT_SETTINGS } = self.ZRO_CONFIG;
   const stored = await chrome.storage.sync.get('settings');
   const settings = { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
-  // 1.1.0 made the map show only dots by default; carry that to 1.0.0 installs.
-  if (previousVersion === '1.0.0') Object.assign(settings, { legend: false, outlines: false, dim: 0 });
+  // 1.1.0 switched the legend, outlines and darkening off; 1.2.0 brings
+  // back the full 1.0 feature set, so restore them for 1.1.0 installs.
+  if (previousVersion === '1.1.0') Object.assign(settings, { legend: true, outlines: true, dim: DEFAULT_SETTINGS.dim });
   await chrome.storage.sync.set({ settings });
 });

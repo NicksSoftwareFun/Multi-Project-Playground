@@ -2,15 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Race dot-density overlay</title>
+  <title>Zillow map overlays</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
     <label class="switch-row">
       <input type="checkbox" id="enabled">
-      <span>Show race dot density on Zillow</span>
+      <span>Race dot density</span>
     </label>
+    <label class="switch-row">
+      <input type="checkbox" id="metro">
+      <span>DC Metro lines &amp; stations</span>
+    </label>
+    <p class="hint">Road distance: click <b>Measure distance</b> on the map panel, then click two points.</p>
   </header>
 
   <section>
@@ -38,7 +43,7 @@
     <input type="range" id="dim" min="0" max="0.85" step="0.05">
 
     <label class="check"><input type="checkbox" id="outlines"> Area outlines</label>
-    <label class="check"><input type="checkbox" id="legend"> Legend on map</label>
+    <label class="check"><input type="checkbox" id="legend"> Panel on map (legend, Metro &amp; distance tools)</label>
   </section>
 
   <section>
@@ -48,9 +53,11 @@
 
   <footer>
     <button type="button" id="reset">Reset to defaults</button>
-    <p>Data: U.S. Census ACS 5-year, table B03002, from Esri Living Atlas
+    <p>Race: U.S. Census ACS 5-year, table B03002, from Esri Living Atlas
       “Race in the US by Dot Density”. Dots are placed randomly inside each
       area; they are not individual addresses.</p>
+    <p>Metro: DC GIS open data (WMATA lines and stations). Road distance:
+      OpenStreetMap via the public OSRM router; drive times assume no traffic.</p>
   </footer>
 
   <script src="config.js"></script>

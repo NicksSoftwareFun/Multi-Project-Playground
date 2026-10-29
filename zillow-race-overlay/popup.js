@@ -36,6 +36,7 @@
 
   function render() {
     $('enabled').checked = settings.enabled;
+    $('metro').checked = settings.metro;
     $('level').value = settings.level;
     $('dotValue').value = settings.dotValue > 0 ? settings.dotValue : '';
     $('dotSize').value = settings.dotSize;
@@ -50,6 +51,7 @@
   }
 
   $('enabled').addEventListener('change', (e) => save({ enabled: e.target.checked }));
+  $('metro').addEventListener('change', (e) => save({ metro: e.target.checked }));
   $('level').addEventListener('change', (e) => save({ level: e.target.value }));
   $('dotValue').addEventListener('change', (e) => save({ dotValue: Math.max(0, Math.round(Number(e.target.value) || 0)) }));
   $('dotSize').addEventListener('input', (e) => save({ dotSize: Number(e.target.value) }));
