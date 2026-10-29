@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Race dot-density overlay</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <label class="switch-row">
+      <input type="checkbox" id="enabled">
+      <span>Show race dot density on Zillow</span>
+    </label>
+  </header>
+
+  <section>
+    <label for="level">Geography</label>
+    <select id="level">
+      <option value="auto">Auto by zoom (state → county → tract)</option>
+      <option value="tract">Census tract</option>
+      <option value="county">County</option>
+      <option value="state">State</option>
+    </select>
+
+    <label for="dotValue">People per dot</label>
+    <div class="inline">
+      <input type="number" id="dotValue" min="0" step="1" placeholder="Auto">
+      <span class="hint">0 or blank = auto by zoom</span>
+    </div>
+
+    <label for="dotSize">Dot size <output id="dotSizeOut"></output></label>
+    <input type="range" id="dotSize" min="0" max="6" step="1">
+
+    <label for="opacity">Dot opacity <output id="opacityOut"></output></label>
+    <input type="range" id="opacity" min="0.1" max="1" step="0.05">
+
+    <label for="dim">Darken basemap <output id="dimOut"></output></label>
+    <input type="range" id="dim" min="0" max="0.85" step="0.05">
+
+    <label class="check"><input type="checkbox" id="outlines"> Area outlines</label>
+    <label class="check"><input type="checkbox" id="legend"> Legend on map</label>
+  </section>
+
+  <section>
+    <div class="section-title">Groups</div>
+    <div id="races"></div>
+  </section>
+
+  <footer>
+    <button type="button" id="reset">Reset to defaults</button>
+    <p>Data: U.S. Census ACS 5-year, table B03002, from Esri Living Atlas
+      “Race in the US by Dot Density”. Dots are placed randomly inside each
+      area; they are not individual addresses.</p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
